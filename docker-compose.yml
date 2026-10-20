@@ -1,0 +1,86 @@
+# Jamg'arma Platform API — локальный/стендовый запуск.
+#
+#   docker compose up -d --build
+#   API:    http://localhost:8888/docs
+#   Админка: http://localhost:8888/admin  (admin / admin12345 по умолчанию)
+#
+# Переменные подставляются из файла .env в корне проекта (если он есть),
+# значения после ":-" — дефолты.
+
+name: ytrj
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: ytrj_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ytrj_db}
+    ports:
+      - "${DB_PORT_HOST:-5555}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ytrj-api:latest
+    container_name: ytrj_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # .env (если есть) даёт JWT/ONEID/прочие настройки; значения ниже имеют приоритет.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_NAME: ${APP_NAME:-Jamg'arma Platform API}
+      DEBUG_ERRORS: ${DEBUG_ERRORS:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["*"]}
+
+      # БД внутри compose-сети — всегда сервис db
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      DB_NAME: ${DB_NAME:-ytrj_db}
+
+      # Суперпользователь, создаётся entrypoint-ом при первом старте
+      SUPERUSER: ${SUPERUSER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+      RUN_MIGRATIONS: "true"
+      CREATE_SUPERUSER: "true"
+
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-to-a-long-random-string}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change-me-too}
+
+      MEDIA_PATH: /app/media
+      MAX_APPLICATION_PHOTOS: ${MAX_APPLICATION_PHOTOS:-4}
+      PHOTO_MAX_SIZE_MB: ${PHOTO_MAX_SIZE_MB:-5}
+
+      ONEID_MOCK: ${ONEID_MOCK:-true}
+      ONEID_CLIENT_ID: ${ONEID_CLIENT_ID:-}
+      ONEID_CLIENT_SECRET: ${ONEID_CLIENT_SECRET:-}
+      ONEID_REDIRECT_URI: ${ONEID_REDIRECT_URI:-http://localhost:3000/auth/oneid/callback}
+
+      SCORING_MODE: ${SCORING_MODE:-auto_pass}
+    ports:
+      - "${API_PORT:-8888}:8000"
+    volumes:
+      - media_data:/app/media
+
+volumes:
+  pg_data:
+  media_data:

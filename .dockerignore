@@ -1,0 +1,26 @@
+# окружение и кеши
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+.idea/
+.vscode/
+.git/
+
+# секреты и локальные данные — передаются через environment / volume
+.env
+media/
+*.log
+
+# документация ТЗ и архитектура — в образ не нужны
+*.docx
+*.pdf
+*.html
+README.md
+
+# docker-файлы
+Dockerfile
+docker-compose*.yml
+.dockerignore
