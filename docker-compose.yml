@@ -48,7 +48,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["*"]}
 
       # БД внутри compose-сети — всегда сервис db
-      DB_HOST: db
+      DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASS: ${DB_PASS:-postgres}
