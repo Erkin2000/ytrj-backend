@@ -19,7 +19,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS:-postgres}
       POSTGRES_DB: ${DB_NAME:-ytrj_db}
     ports:
-      - "${DB_PORT_HOST:-5555}:5432"
+      - "${DB_PORT_HOST:-5556}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -77,7 +77,7 @@ services:
 
       SCORING_MODE: ${SCORING_MODE:-auto_pass}
     ports:
-      - "${API_PORT:-8888}:8000"
+      - "${API_PORT:-8808}:8000"
     volumes:
       - media_data:/app/media
 
