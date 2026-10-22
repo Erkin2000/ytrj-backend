@@ -104,7 +104,7 @@ class ApplicationService(ApplicationBaseService):
             ApplicationAddDTO(
                 number=number,
                 applicant_id=applicant.id,
-                # Данные из OneID подставляются автоматически и не редактируются заявителем.
+                # Данные из YIA SSO подставляются автоматически и не редактируются заявителем.
                 applicant_full_name=applicant.full_name,
                 applicant_phone=applicant.phone,
                 applicant_passport=applicant.passport_number,

@@ -1,0 +1,41 @@
+{% extends "sso_base.html" %}
+{% block title %}Возврат с YIA Portal{% endblock %}
+{% block content %}
+  <h1>Возврат с YIA Portal</h1>
+  <p class="muted" id="hint">Завершаем вход…</p>
+  <div class="status hidden" id="status"></div>
+  <div class="row hidden" id="actions">
+    <a class="btn secondary" href="{{ login_url }}">Войти заново</a>
+  </div>
+{% endblock %}
+{% block script %}
+<script>
+  (async () => {
+    const status = document.getElementById("status");
+    const hint = document.getElementById("hint");
+    const actions = document.getElementById("actions");
+    const q = new URLSearchParams(window.location.search);
+    const code = q.get("code"), state = q.get("state"), error = q.get("error");
+    const saved = sessionStorage.getItem(STATE_KEY);
+
+    const fail = (text, details) => { hint.textContent = "Вход не выполнен."; showStatus(status, "err", text, details); actions.classList.remove("hidden"); };
+
+    if (!state) return fail("Портал не вернул параметр state.");
+    if (saved && saved !== state) return fail("state не совпадает с сохранённым: вход начат в другом окне или подменён.", { expected: saved, received: state });
+
+    try {
+      // code живёт 60 секунд — отправляем сразу
+      const tokens = await api("/auth/sso/callback", { method: "POST", body: JSON.stringify({ code, state, error }) });
+      sessionStorage.removeItem(STATE_KEY);
+      localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+      const me = await api("/auth/me", { headers: { Authorization: "Bearer " + tokens.access_token } });
+      hint.textContent = "Вход выполнен.";
+      showStatus(status, "ok", (me.full_name || me.username) + " · роль " + (me.role ? me.role.code : "—") + (me.pinfl ? " · ПИНФЛ " + me.pinfl : ""), tokens);
+      // Очищаем code из адресной строки, чтобы его нельзя было переиспользовать по F5.
+      history.replaceState(null, "", window.location.pathname);
+    } catch (e) {
+      fail("Ошибка входа: " + e.message, e.body);
+    }
+  })();
+</script>
+{% endblock %}

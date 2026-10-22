@@ -3,9 +3,9 @@ from fastapi import APIRouter, Request
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
-    OneIDCallbackDTO,
-    OneIDMockLoginDTO,
     RefreshTokenRequestDTO,
+    SSOCallbackDTO,
+    SSOMockLoginDTO,
 )
 from src.auth.services.auth_service import AuthService
 from src.common.dependencies import CurrentUserDep, DBDep
@@ -110,42 +110,56 @@ async def change_password(data: ChangePasswordDTO, db: DBDep, user: CurrentUserD
     return ResponseBuilder.success(data=tokens, message="Password changed.")
 
 
-# ---------- OneID ----------
+# ---------- YIA Portal SSO ----------
 
 
 @router.get(
-    "/oneid/authorize",
-    summary="OneID: ссылка для перехода на страницу входа",
+    "/sso/authorize",
+    summary="YIA SSO: ссылка на страницу входа портала и подписанный state",
+    description=(
+        "Фронтенд сохраняет `state` (sessionStorage) и перенаправляет браузер на "
+        "`authorize_url`. Портал вернёт пользователя на `SSO_REDIRECT_URI` с `code` и `state`."
+    ),
     responses={
         200: success_example(
-            {"authorize_url": "https://sso.egov.uz/sso/oauth/Authorization.do?...", "state": "abc"},
+            {
+                "authorize_url": (
+                    "https://api.e-yoshlar.uz/api/v1/users/auth/sso/authorize/"
+                    "?client_id=...&redirect_uri=...&state=..."
+                ),
+                "state": "ImFiYyI.aBcD...",
+            },
             message="Authorize URL generated.",
         ),
         **COMMON_ERRORS,
     },
 )
-async def oneid_authorize(db: DBDep):
-    data = AuthService(db).oneid_authorize()
+async def sso_authorize(db: DBDep):
+    data = AuthService(db).sso_authorize()
     return ResponseBuilder.success(data=data, message="Authorize URL generated.")
 
 
 @router.post(
-    "/oneid/callback",
-    summary="OneID (только заявители): обмен code на токены, профиль определяется или создаётся",
+    "/sso/callback",
+    summary="YIA SSO (только заявители): обмен code на токены, профиль определяется или создаётся",
+    description=(
+        "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
+        "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа."
+    ),
     responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
 )
-async def oneid_callback(data: OneIDCallbackDTO, db: DBDep, request: Request):
-    tokens = await AuthService(db).oneid_callback(data.code, *_client_meta(request))
-    return ResponseBuilder.success(data=tokens, message="Logged in via OneID.")
+async def sso_callback(data: SSOCallbackDTO, db: DBDep, request: Request):
+    tokens = await AuthService(db).sso_callback(data, *_client_meta(request))
+    return ResponseBuilder.success(data=tokens, message="Logged in via YIA Portal.")
 
 
-if settings.ONEID_MOCK:
+if settings.SSO_MOCK:
 
     @router.post(
-        "/oneid/mock-login",
-        summary="OneID (тест, только заявители): вход с ручными данными профиля — при ONEID_MOCK=True",
+        "/sso/mock-login",
+        summary="YIA SSO (тест, только заявители): вход с ручными данными — при SSO_MOCK=True",
         responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
     )
-    async def oneid_mock_login(data: OneIDMockLoginDTO, db: DBDep, request: Request):
-        tokens = await AuthService(db).oneid_mock_login(data, *_client_meta(request))
-        return ResponseBuilder.success(data=tokens, message="Logged in via mock OneID.")
+    async def sso_mock_login(data: SSOMockLoginDTO, db: DBDep, request: Request):
+        tokens = await AuthService(db).sso_mock_login(data, *_client_meta(request))
+        return ResponseBuilder.success(data=tokens, message="Logged in via mock YIA SSO.")

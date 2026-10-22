@@ -33,7 +33,7 @@ class UserDTO(BaseModel):
     organization: str | None = None
     region: str | None = None
     has_password: bool = False
-    oneid_linked: bool = False
+    sso_linked: bool = False
     last_login_at: datetime | None = None
     created_at: datetime | None = None
 
@@ -132,7 +132,7 @@ class UserAddDTO(BaseModel):
     bank_id: int | None = None
     organization: str | None = None
     region: str | None = None
-    oneid_sub: str | None = None
+    sso_sub: str | None = None
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None
@@ -149,7 +149,7 @@ class UserUpdateDTO(BaseModel):
     organization: str | None = None
     region: str | None = None
     status: UserStatus | None = None
-    oneid_sub: str | None = None
+    sso_sub: str | None = None
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None

@@ -1,0 +1,56 @@
+{% extends "sso_base.html" %}
+{% block title %}Вход для заявителей{% endblock %}
+{% block content %}
+  <h1>Вход для заявителей</h1>
+  <p class="muted">Авторизация проходит на портале YIA (e-yoshlar.uz) через OneID. После входа портал вернёт вас на эту платформу.</p>
+
+  <button class="btn" id="btn-sso">Войти через YIA Portal</button>
+  <div class="status hidden" id="status"></div>
+
+  {% if sso_mock %}
+  <hr>
+  <h1>Тестовый вход (mock)</h1>
+  <p class="muted">Портал не вызывается: профиль заявителя создаётся по введённым данным. Включено настройкой <code>SSO_MOCK=true</code>.</p>
+  <form id="mock-form">
+    <label for="pinfl">ПИНФЛ (14 цифр)</label>
+    <input id="pinfl" name="pinfl" required pattern="\d{14}" inputmode="numeric" placeholder="30101900000011">
+    <label for="full_name">Ф.И.О.</label>
+    <input id="full_name" name="full_name" required placeholder="Алиев Али Алиевич">
+    <div class="row"><button class="btn secondary" type="submit">Войти как тестовый заявитель</button></div>
+  </form>
+  <div class="status hidden" id="mock-status"></div>
+  {% endif %}
+{% endblock %}
+{% block script %}
+<script>
+  const status = document.getElementById("status");
+  document.getElementById("btn-sso").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget; btn.disabled = true;
+    try {
+      const data = await api("/auth/sso/authorize");
+      sessionStorage.setItem(STATE_KEY, data.state);
+      window.location.assign(data.authorize_url);
+    } catch (e) {
+      showStatus(status, "err", "Не удалось начать вход: " + e.message, e.body);
+      btn.disabled = false;
+    }
+  });
+
+  const mockForm = document.getElementById("mock-form");
+  if (mockForm) {
+    mockForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const st = document.getElementById("mock-status");
+      const payload = { pinfl: mockForm.pinfl.value.trim(), full_name: mockForm.full_name.value.trim() };
+      try {
+        const tokens = await api("/auth/sso/mock-login", { method: "POST", body: JSON.stringify(payload) });
+        localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+        const me = await api("/auth/me", { headers: { Authorization: "Bearer " + tokens.access_token } });
+        showStatus(st, "ok", "Вход выполнен: " + (me.full_name || me.username) + " (" + (me.role ? me.role.code : "без роли") + ")", tokens);
+      } catch (e) {
+        showStatus(st, "err", "Ошибка: " + e.message, e.body);
+      }
+    });
+  }
+</script>
+{% endblock %}

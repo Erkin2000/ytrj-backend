@@ -19,7 +19,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS:-postgres}
       POSTGRES_DB: ${DB_NAME:-ytrj_db}
     ports:
-      - "${DB_PORT_HOST:-5556}:5432"
+      - "${DB_PORT_HOST:-5555}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -38,7 +38,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # .env (если есть) даёт JWT/ONEID/прочие настройки; значения ниже имеют приоритет.
+    # .env (если есть) даёт JWT/SSO/прочие настройки; значения ниже имеют приоритет.
     env_file:
       - path: .env
         required: false
@@ -70,14 +70,16 @@ services:
       MAX_APPLICATION_PHOTOS: ${MAX_APPLICATION_PHOTOS:-4}
       PHOTO_MAX_SIZE_MB: ${PHOTO_MAX_SIZE_MB:-5}
 
-      ONEID_MOCK: ${ONEID_MOCK:-true}
-      ONEID_CLIENT_ID: ${ONEID_CLIENT_ID:-}
-      ONEID_CLIENT_SECRET: ${ONEID_CLIENT_SECRET:-}
-      ONEID_REDIRECT_URI: ${ONEID_REDIRECT_URI:-http://localhost:3000/auth/oneid/callback}
+      SSO_MOCK: ${SSO_MOCK:-true}
+      SSO_BASE_URL: ${SSO_BASE_URL:-https://api.e-yoshlar.uz}
+      SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
+      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
+      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-http://localhost:8888/api/auth/one-id/callback}
+      SSO_STATE_TTL_SECONDS: ${SSO_STATE_TTL_SECONDS:-600}
 
       SCORING_MODE: ${SCORING_MODE:-auto_pass}
     ports:
-      - "${API_PORT:-8808}:8000"
+      - "${API_PORT:-8888}:8000"
     volumes:
       - media_data:/app/media
 

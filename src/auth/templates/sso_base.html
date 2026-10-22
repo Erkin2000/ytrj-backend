@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Вход через YIA Portal{% endblock %} — {{ app_name }}</title>
+  <style>
+    :root {
+      --bg: #f4f6fa; --card: #ffffff; --text: #1c2430; --muted: #6b7280;
+      --accent: #1f6feb; --accent-text: #ffffff; --ok: #15803d; --err: #b91c1c; --border: #e5e7eb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1419; --card: #1a212b; --text: #e6e9ef; --muted: #9aa4b2;
+        --accent: #3b82f6; --ok: #4ade80; --err: #f87171; --border: #2a3441;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 520px; margin: 0 auto; padding: 48px 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .btn { display: inline-block; width: 100%; text-align: center; padding: 12px 16px; border-radius: 8px; border: 0;
+           background: var(--accent); color: var(--accent-text); font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .btn[disabled] { opacity: .6; cursor: default; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 15px; }
+    .status { margin-top: 16px; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+    .status.ok { border-color: var(--ok); }
+    .status.err { border-color: var(--err); color: var(--err); }
+    pre { margin: 8px 0 0; padding: 10px; background: var(--bg); border-radius: 8px; font-size: 12px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    .row .btn { width: auto; flex: 1; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="card">
+    {% block content %}{% endblock %}
+  </div>
+  <p class="muted" style="text-align:center;margin-top:16px">{{ app_name }} · {{ "SSO: mock" if sso_mock else "SSO: live" }}</p>
+</main>
+<script>
+  const API = {{ api_prefix | tojson }};
+  const STATE_KEY = "yia_sso_state";
+  const TOKENS_KEY = "jamgarma_tokens";
+  async function api(path, opts = {}) {
+    const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+    const r = await fetch(API + path, Object.assign({}, opts, { headers }));
+    let body = null;
+    try { body = await r.json(); } catch (e) { /* no json */ }
+    if (!r.ok || !body || body.success === false) {
+      const msg = (body && body.message) || ("HTTP " + r.status);
+      const err = new Error(msg); err.status = r.status; err.body = body; throw err;
+    }
+    return body.data;
+  }
+  function showStatus(el, kind, text, details) {
+    el.className = "status " + kind;
+    el.innerHTML = "";
+    const p = document.createElement("div"); p.textContent = text; el.appendChild(p);
+    if (details !== undefined) { const pre = document.createElement("pre"); pre.textContent = typeof details === "string" ? details : JSON.stringify(details, null, 2); el.appendChild(pre); }
+    el.classList.remove("hidden");
+  }
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>

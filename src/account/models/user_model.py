@@ -22,15 +22,16 @@ class UserORM(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Логин для входа по паролю (внутренние пользователи). Для пользователей,
-    # созданных через OneID, равен ПИНФЛ.
+    # Логин для входа по паролю (внутренние пользователи). Для заявителей,
+    # созданных через YIA SSO, равен ПИНФЛ (или sso_<sub>, если ПИНФЛ не передан).
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # Идентификатор субъекта OneID (sub). Заполняется при первом входе.
-    oneid_sub: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    # Стабильный идентификатор пользователя YIA Portal (sub, общий для всех
+    # проектов портала). Заполняется при первом входе через SSO.
+    sso_sub: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
 
-    # Данные из OneID / госисточника. Заявитель не может их менять произвольно.
+    # Данные из YIA SSO (OneID) / госисточника. Заявитель не может их менять произвольно.
     full_name: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(20))
     passport_number: Mapped[str | None] = mapped_column(String(20))

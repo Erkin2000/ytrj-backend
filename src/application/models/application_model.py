@@ -38,7 +38,7 @@ class ApplicationORM(TimestampMixin, Base):
         index=True,
     )
 
-    # --- Снимок данных заявителя из OneID на момент создания (ТЗ, п. 5-6) ---
+    # --- Снимок данных заявителя из YIA SSO (OneID) на момент создания (ТЗ, п. 5-6) ---
     applicant_full_name: Mapped[str | None] = mapped_column(String(255))
     applicant_phone: Mapped[str | None] = mapped_column(String(20))
     applicant_passport: Mapped[str | None] = mapped_column(String(20))

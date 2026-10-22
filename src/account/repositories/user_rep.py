@@ -54,8 +54,8 @@ class UserRepository(BaseRepository):
     async def get_orm_by_username(self, username: str) -> UserORM | None:
         return await self.session.scalar(select(self.model).where(self.model.username == username))
 
-    async def get_orm_by_oneid_sub(self, sub: str) -> UserORM | None:
-        return await self.session.scalar(select(self.model).where(self.model.oneid_sub == sub))
+    async def get_orm_by_sso_sub(self, sub: str) -> UserORM | None:
+        return await self.session.scalar(select(self.model).where(self.model.sso_sub == sub))
 
     async def get_orm_by_pinfl(self, pinfl: str) -> UserORM | None:
         return await self.session.scalar(select(self.model).where(self.model.pinfl == pinfl))

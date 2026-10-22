@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from src.account.schemas.user_schema import PasswordStr, PhoneStr, PinflStr
+from src.account.schemas.user_schema import PasswordStr, PinflStr
 
 
 class LoginDTO(BaseModel):
@@ -45,37 +45,42 @@ class RefreshTokenCreateDTO(BaseModel):
     ip_address: str | None = None
 
 
-# ---------- OneID ----------
+# ---------- YIA SSO ----------
 
 
-class OneIDAuthorizeDTO(BaseModel):
+class SSOAuthorizeDTO(BaseModel):
     authorize_url: str
     state: str
 
 
-class OneIDCallbackDTO(BaseModel):
-    code: str
-    state: str | None = None
+class SSOCallbackDTO(BaseModel):
+    """Параметры, с которыми YIA Portal вернул пользователя на redirect_uri."""
+
+    code: str | None = Field(default=None, examples=["ONE_TIME_CODE"])
+    state: str = Field(examples=["eyJ...signed-state"])
+    error: str | None = Field(default=None, examples=[None])
 
 
-class OneIDProfileDTO(BaseModel):
-    """Данные, которые платформа получает из OneID после входа."""
+class SSOProfileDTO(BaseModel):
+    """Данные, которые платформа получает от YIA Portal после входа.
+    Гарантированы sub и full_name; pinfl — по договорённости с порталом;
+    region/city/makhalla/role заполняются только у ётакчи."""
 
     sub: str
-    pinfl: PinflStr
     full_name: str
-    phone: PhoneStr | None = None
-    passport_number: str | None = None
-    inn: str | None = None
-    email: str | None = None
+    pinfl: PinflStr | None = None
+    region: str | None = None
+    city: str | None = None
+    makhalla: str | None = None
+    yia_role: str | None = None
 
 
-class OneIDMockLoginDTO(BaseModel):
-    """Тестовый вход вместо OneID (только при ONEID_MOCK=True)."""
+class SSOMockLoginDTO(BaseModel):
+    """Тестовый вход вместо YIA Portal (только при SSO_MOCK=True)."""
 
     pinfl: PinflStr = Field(examples=["30101900000011"])
     full_name: str = Field(examples=["Алиев Али Алиевич"])
-    phone: PhoneStr | None = Field(default=None, examples=["+998901234567"])
-    passport_number: str | None = Field(default=None, examples=["AA1234567"])
-    inn: str | None = Field(default=None, examples=["123456789"])
-    email: str | None = None
+    sub: str | None = Field(
+        default=None,
+        description="Стабильный идентификатор пользователя портала; по умолчанию mock-<pinfl>",
+    )

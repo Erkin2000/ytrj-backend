@@ -47,8 +47,8 @@ class ExpiredRefreshTokenException(UnauthorizedException):
     message = "Refresh token expired"
 
 
-class OneIDException(UnauthorizedException):
-    message = "OneID authentication failed. Please try again."
+class SSOException(UnauthorizedException):
+    message = "YIA Portal authentication failed. Please try again."
 
 
 # ---------- 403 ----------
@@ -227,18 +227,29 @@ class ResourceAllocationNotAllowedException(BadRequestException):
     message = "Resource allocation is allowed only after council approval"
 
 
-# ---------- политика входа: OneID только для заявителей ----------
+# ---------- политика входа: YIA SSO только для заявителей ----------
 
 
-class ApplicantLoginViaOneIDException(ForbiddenException):
-    message = "Applicants sign in via OneID only"
+class ApplicantLoginViaSSOException(ForbiddenException):
+    message = "Applicants sign in via YIA Portal only"
 
 
-class OneIDNotForInternalUsersException(ForbiddenException):
+class SSONotForInternalUsersException(ForbiddenException):
     message = (
-        "OneID sign-in is for applicants only. Internal users sign in with username and password"
+        "YIA Portal sign-in is for applicants only. "
+        "Internal users sign in with username and password"
     )
 
 
+class SSOAccessDeniedException(ForbiddenException):
+    message = "YIA Portal denied access: user is not allowed to sign in to this project"
+
+
+class SSOInvalidStateException(BadRequestException):
+    message = "Invalid SSO state, start sign-in again"
+
+
 class ApplicantRoleNotAssignableException(BadRequestException):
-    message = "Applicant role is assigned automatically on OneID sign-in and cannot be set manually"
+    message = (
+        "Applicant role is assigned automatically on YIA Portal sign-in and cannot be set manually"
+    )

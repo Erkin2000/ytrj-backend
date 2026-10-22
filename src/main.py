@@ -15,7 +15,7 @@ from src.application.apis import (
     council_api,
     fund_api,
 )
-from src.auth.apis import auth_api
+from src.auth.apis import auth_api, sso_web_api
 from src.common.logging_config import configure_logging
 from src.common.responses.handlers import register_exception_handlers
 from src.common.responses.validation_handler import validation_exception_handler
@@ -27,7 +27,7 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 
 Модульный монолит на FastAPI. Текущие модули:
 
-- **auth** — вход через OneID и по паролю, JWT access/refresh с ротацией, сессии;
+- **auth** — вход через YIA Portal (SSO) и по паролю, JWT access/refresh с ротацией, сессии;
 - **rbac** — роли и права по модулям (Create / Read / Update / Delete / Approve), серверная проверка;
 - **account** — пользователи, статусы, scope (банк), последний вход и сессии;
 - **application** — заявки: черновик → скоринг KATM → банк → Совет → документ-требование → выделение ресурсов.
@@ -39,7 +39,7 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 TAGS_METADATA = [
     {
         "name": "Авторизация и аутентификация",
-        "description": "OneID, логин/пароль, refresh, профиль.",
+        "description": "YIA Portal SSO, логин/пароль, refresh, профиль.",
     },
     {
         "name": "Пользователи",
@@ -111,6 +111,9 @@ app.include_router(application_api.router, prefix=API_PREFIX)
 app.include_router(fund_api.router, prefix=API_PREFIX)
 app.include_router(bank_stage_api.router, prefix=API_PREFIX)
 app.include_router(council_api.router, prefix=API_PREFIX)
+
+# Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)
+app.include_router(sso_web_api.router)
 
 setup_admin(app)
 

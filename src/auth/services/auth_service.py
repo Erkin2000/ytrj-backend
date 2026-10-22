@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 from src.account.mappers import UserDataMapper
@@ -7,26 +8,27 @@ from src.account.schemas.user_schema import CurrentUserDTO, UserAddDTO, UserProf
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
-    OneIDAuthorizeDTO,
-    OneIDMockLoginDTO,
-    OneIDProfileDTO,
     RefreshTokenCreateDTO,
+    SSOAuthorizeDTO,
+    SSOCallbackDTO,
+    SSOMockLoginDTO,
+    SSOProfileDTO,
     TokenPairDTO,
 )
-from src.auth.services.oneid_service import OneIDService
 from src.auth.services.password_service import hash_password, verify_password
+from src.auth.services.sso_service import YiaSSOService
 from src.auth.services.token_service import TokenService
 from src.common.responses.exceptions import (
-    ApplicantLoginViaOneIDException,
+    ApplicantLoginViaSSOException,
     ExpiredRefreshTokenException,
     InvalidCredentialsException,
     InvalidCurrentPasswordException,
-    OneIDException,
-    OneIDNotForInternalUsersException,
     PasswordLoginNotAllowedException,
     RefreshTokenNotFoundException,
     RefreshTokenRevokedException,
     SamePasswordException,
+    SSOException,
+    SSONotForInternalUsersException,
     UserBlockedException,
     UserNotFoundException,
 )
@@ -34,10 +36,12 @@ from src.config import settings
 from src.rbac.permissions import RoleCode
 from src.utils.base_service import BaseService
 
+logger = logging.getLogger(__name__)
+
 
 class AuthService(BaseService):
     token_service = TokenService()
-    oneid_service = OneIDService()
+    sso_service = YiaSSOService()
 
     # ---------- токены ----------
 
@@ -90,9 +94,9 @@ class AuthService(BaseService):
         if user is None or not is_valid:
             raise InvalidCredentialsException()
 
-        # Заявители входят только через OneID; пароль — для внутренних ролей.
+        # Заявители входят только через YIA SSO; пароль — для внутренних ролей.
         if self._is_applicant(user):
-            raise ApplicantLoginViaOneIDException()
+            raise ApplicantLoginViaSSOException()
 
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
@@ -142,8 +146,6 @@ class AuthService(BaseService):
         await self.db.refresh_token.delete(user_id=user_id)
         await self.db.commit()
 
-
-
     async def change_password(self, user_id: int, data: ChangePasswordDTO) -> TokenPairDTO:
         user = await self.db.user.get_orm_by_id(user_id)
         if user is None:
@@ -183,95 +185,113 @@ class AuthService(BaseService):
 
         return UserDataMapper.map_to_profile(user, permissions)
 
-    # ---------- OneID ----------
+    # ---------- YIA SSO ----------
 
-    def oneid_authorize(self) -> OneIDAuthorizeDTO:
-        return self.oneid_service.build_authorize_url()
+    def sso_authorize(self) -> SSOAuthorizeDTO:
+        return self.sso_service.build_authorize_url()
 
-    async def oneid_callback(
+    async def sso_callback(
         self,
-        code: str,
+        data: SSOCallbackDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
     ) -> TokenPairDTO:
-        profile = await self.oneid_service.exchange_code(code)
-        return await self._login_with_oneid_profile(profile, user_agent, ip_address)
+        # Порядок как в sso_integration.md: сверяем state, смотрим error,
+        # затем сразу меняем code (живёт 60 секунд) на профиль.
+        self.sso_service.verify_state(data.state)
+        self.sso_service.check_callback_error(data.error)
+        if not data.code:
+            raise SSOException("SSO code is missing")
 
-    async def oneid_mock_login(
+        profile = await self.sso_service.exchange_code(data.code)
+        return await self._login_with_sso_profile(profile, user_agent, ip_address)
+
+    async def sso_mock_login(
         self,
-        data: OneIDMockLoginDTO,
+        data: SSOMockLoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
     ) -> TokenPairDTO:
-        if not settings.ONEID_MOCK:
-            raise OneIDException("Mock OneID login is disabled")
+        if not settings.SSO_MOCK:
+            raise SSOException("Mock SSO login is disabled")
 
-        profile = OneIDProfileDTO(sub=f"mock-{data.pinfl}", **data.model_dump())
-        return await self._login_with_oneid_profile(profile, user_agent, ip_address)
+        profile = SSOProfileDTO(
+            sub=data.sub or f"mock-{data.pinfl}",
+            full_name=data.full_name,
+            pinfl=data.pinfl,
+        )
+        return await self._login_with_sso_profile(profile, user_agent, ip_address)
 
-    async def _login_with_oneid_profile(
+    async def _login_with_sso_profile(
         self,
-        profile: OneIDProfileDTO,
+        profile: SSOProfileDTO,
         user_agent: str | None,
         ip_address: str | None,
     ) -> TokenPairDTO:
-        user = await self._find_or_create_oneid_user(profile)
+        user = await self._find_or_create_sso_user(profile)
 
-        # Через OneID входят только заявители. Сотрудник Фонда, банка или
+        # Через YIA Portal входят только заявители. Сотрудник Фонда, банка или
         # Совета с таким же ПИНФЛ входит по логину и паролю.
         if not self._is_applicant(user):
-            raise OneIDNotForInternalUsersException()
+            raise SSONotForInternalUsersException()
 
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
         return await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
 
-    async def _find_or_create_oneid_user(self, profile: OneIDProfileDTO) -> UserORM:
-        """Определяет существующий профиль по sub или ПИНФЛ, иначе создаёт
-        заявителя. Идентификационные данные всегда обновляются из источника."""
-        user = await self.db.user.get_orm_by_oneid_sub(profile.sub)
+    async def _find_or_create_sso_user(self, profile: SSOProfileDTO) -> UserORM:
+        """Определяет существующий профиль по sub портала, затем по ПИНФЛ
+        (пользователь, заведённый до перехода на YIA SSO), иначе создаёт
+        заявителя. Ф.И.О. и ПИНФЛ всегда обновляются из источника."""
+        user = await self.db.user.get_orm_by_sso_sub(profile.sub)
 
-        if user is None:
+        if user is None and profile.pinfl:
             user = await self.db.user.get_orm_by_pinfl(profile.pinfl)
 
         if user is None:
-            applicant_role = await self.db.role.get_by_code(RoleCode.APPLICANT)
-            username = profile.pinfl
-            if await self.db.user.get_orm_by_username(username):
-                username = f"oneid_{profile.sub}"
-
-            await self.db.user.add(
-                UserAddDTO(
-                    username=username,
-                    role_id=applicant_role.id if applicant_role else None,
-                    oneid_sub=profile.sub,
-                    full_name=profile.full_name,
-                    phone=profile.phone,
-                    passport_number=profile.passport_number,
-                    pinfl=profile.pinfl,
-                    inn=profile.inn,
-                    email=profile.email,
-                )
-            )
-            await self.db.flush()
-            user = await self.db.user.get_orm_by_oneid_sub(profile.sub)
-            return user
+            return await self._create_applicant(profile)
 
         if not self._is_applicant(user):
-            raise OneIDNotForInternalUsersException()
+            raise SSONotForInternalUsersException()
 
-        user.oneid_sub = profile.sub
+        user.sso_sub = profile.sub
         user.full_name = profile.full_name
-        user.pinfl = profile.pinfl
-        if profile.phone:
-            user.phone = profile.phone
-        if profile.passport_number:
-            user.passport_number = profile.passport_number
-        if profile.inn:
-            user.inn = profile.inn
-        if profile.email:
-            user.email = profile.email
+        if profile.pinfl and profile.pinfl != user.pinfl:
+            if user.pinfl is None:
+                user.pinfl = profile.pinfl
+            else:
+                # ПИНФЛ в профиле уже есть и отличается от переданного порталом —
+                # не перезаписываем молча, это повод для ручной проверки.
+                logger.warning(
+                    "YIA SSO pinfl mismatch for user %s: stored=%s, portal=%s",
+                    user.id,
+                    user.pinfl,
+                    profile.pinfl,
+                )
 
         await self.db.flush()
+        return user
+
+    async def _create_applicant(self, profile: SSOProfileDTO) -> UserORM:
+        applicant_role = await self.db.role.get_by_code(RoleCode.APPLICANT)
+
+        username = profile.pinfl or f"sso_{profile.sub}"
+        if await self.db.user.get_orm_by_username(username):
+            username = f"sso_{profile.sub}"
+
+        await self.db.user.add(
+            UserAddDTO(
+                username=username,
+                role_id=applicant_role.id if applicant_role else None,
+                sso_sub=profile.sub,
+                full_name=profile.full_name,
+                pinfl=profile.pinfl,
+                region=profile.region,
+            )
+        )
+        await self.db.flush()
+        user = await self.db.user.get_orm_by_sso_sub(profile.sub)
+        if user is None:
+            raise UserNotFoundException()
         return user

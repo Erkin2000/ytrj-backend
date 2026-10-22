@@ -47,17 +47,19 @@ class Settings(BaseSettings):
     PHOTO_MAX_SIZE_MB: int = 5
     PHOTO_ALLOWED_TYPES: list[str] = ["image/jpeg", "image/png", "image/webp"]
 
-    # OneID (OAuth2). Пока интеграция не подключена — ONEID_MOCK=True
-    # включает тестовый вход /auth/oneid/mock-login.
-    ONEID_MOCK: bool = True
-    ONEID_CLIENT_ID: str = ""
-    ONEID_CLIENT_SECRET: str = ""
-    ONEID_AUTHORIZE_URL: str = "https://sso.egov.uz/sso/oauth/Authorization.do"
-    ONEID_TOKEN_URL: str = "https://sso.egov.uz/sso/oauth/Authorization.do"
-    ONEID_USERINFO_URL: str = "https://sso.egov.uz/sso/oauth/Authorization.do"
-    ONEID_REDIRECT_URI: str = "http://localhost:3000/auth/oneid/callback"
-    ONEID_SCOPE: str = "myportal"
-    ONEID_TIMEOUT_SECONDS: float = 10.0
+    # SSO YIA Portal (e-yoshlar.uz): пользователь проходит OneID на стороне
+    # портала, платформа получает code и меняет его на профиль (sso_integration.md).
+    # Пока доступ не выдан — SSO_MOCK=True включает тестовый вход /auth/sso/mock-login.
+    SSO_MOCK: bool = True
+    # Prod: https://api.e-yoshlar.uz, dev-стенд портала: https://dev-api.yiaportal.uz
+    SSO_BASE_URL: str = "https://api.e-yoshlar.uz"
+    SSO_CLIENT_ID: str = ""
+    SSO_CLIENT_SECRET: str = ""
+    # Должен в точности совпадать с redirect_uri, зарегистрированным на портале.
+    SSO_REDIRECT_URI: str = "http://localhost:8000/api/auth/one-id/callback"
+    SSO_TIMEOUT_SECONDS: float = 10.0
+    # Сколько живёт подписанный state между authorize и callback.
+    SSO_STATE_TTL_SECONDS: int = 600
 
     # Режим скоринга KATM, пока нет реальной интеграции:
     #   auto_pass       — каждая отправленная заявка проходит скоринг;

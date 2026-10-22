@@ -126,7 +126,7 @@ class UserAdmin(ModelView, model=UserORM):
         UserORM.bank_id: "Банк (scope)",
         UserORM.organization: "Организация",
         UserORM.region: "Регион",
-        UserORM.oneid_sub: "OneID sub",
+        UserORM.sso_sub: "YIA SSO sub",
         UserORM.last_login_at: "Последний вход",
         UserORM.created_at: "Создан",
         UserORM.updated_at: "Обновлён",

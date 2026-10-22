@@ -29,7 +29,7 @@ def _base_fields(model: UserORM) -> dict:
         "organization": model.organization,
         "region": model.region,
         "has_password": model.hashed_password is not None,
-        "oneid_linked": model.oneid_sub is not None,
+        "sso_linked": model.sso_sub is not None,
         "last_login_at": model.last_login_at,
         "created_at": model.created_at,
     }

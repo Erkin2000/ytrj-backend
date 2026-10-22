@@ -56,7 +56,7 @@ class UserService(BaseService):
         if role is not None and role.code == RoleCode.BANK_EMPLOYEE and bank_id is None:
             raise BankScopeRequiredException()
 
-        # Заявители появляются только через OneID; вручную эту роль не выдаём.
+        # Заявители появляются только через YIA SSO; вручную эту роль не выдаём.
         if role is not None and role.code == RoleCode.APPLICANT:
             raise ApplicantRoleNotAssignableException()
 

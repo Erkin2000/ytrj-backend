@@ -188,7 +188,7 @@ class JamgarmaAdmin(Admin):
                 "recent_logins": recent_logins,
                 "status_badge": status_badge,
                 "scoring_mode": settings.SCORING_MODE,
-                "oneid_mock": settings.ONEID_MOCK,
+                "sso_mock": settings.SSO_MOCK,
             },
         )
 
