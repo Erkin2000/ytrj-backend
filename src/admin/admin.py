@@ -53,6 +53,15 @@ from src.utils.db_manager import DBManager
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
+# Иконка вкладки: синий квадрат с буквой J (SVG data URI, без статики).
+FAVICON = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
+    "%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E"
+    "%3Ctext x='16' y='22' font-family='Inter,Arial' font-weight='700' font-size='18' "
+    "fill='white' text-anchor='middle'%3EJ%3C/text%3E%3C/svg%3E"
+)
+
 
 class AdminAuth(AuthenticationBackend):
     """Логин/пароль платформы; в админку пускается только суперпользователь."""
@@ -233,6 +242,7 @@ def setup_admin(app: FastAPI) -> Admin:
         app,
         engine,
         title="Jamg'arma · Admin",
+        favicon_url=FAVICON,
         base_url="/admin",
         templates_dir=str(TEMPLATES_DIR),
         authentication_backend=AdminAuth(secret_key=settings.ADMIN_SESSION_SECRET),

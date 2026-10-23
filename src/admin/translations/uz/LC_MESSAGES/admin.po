@@ -704,6 +704,9 @@ msgstr "Kengash qarori"
 
 # ===================== Верхняя панель, вход =====================
 
+msgid "Тема"
+msgstr "Mavzu"
+
 msgid "API-документация"
 msgstr "API hujjatlari"
 

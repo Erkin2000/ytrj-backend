@@ -3,132 +3,297 @@
 {% block head_tail %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Тема применяется до первой отрисовки, чтобы не мигало.
+  (function () {
+    try {
+      var t = localStorage.getItem("jg-theme");
+      if (!t && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
+      if (t === "dark") document.documentElement.setAttribute("data-bs-theme", "dark");
+    } catch (e) {}
+  })();
+</script>
 <style>
   :root {
     --tblr-font-sans-serif: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
     --tblr-primary: #2563eb;
     --tblr-primary-rgb: 37, 99, 235;
+    --jg-bg: #f3f5f9;
+    --jg-card: #ffffff;
+    --jg-border: #e5e9f0;
+    --jg-soft: #f8fafc;
+    --jg-muted: #64748b;
+    --jg-text: #1e293b;
+    --jg-code-bg: #eef2ff;
+    --jg-code: #3730a3;
+    --jg-side-from: #0f172a;
+    --jg-side-to: #1e293b;
   }
-  body { background: #f3f5f9; }
-  .navbar-vertical.navbar-dark {
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-    border-right: 0;
+  [data-bs-theme="dark"] {
+    --jg-bg: #0f141a;
+    --jg-card: #171e27;
+    --jg-border: #27313d;
+    --jg-soft: #1d2631;
+    --jg-muted: #94a3b8;
+    --jg-text: #e6e9ef;
+    --jg-code-bg: #1e2a4a;
+    --jg-code: #a5b4fc;
+    --jg-side-from: #0b1017;
+    --jg-side-to: #121a24;
   }
-  .navbar-vertical .navbar-brand h3 {
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin: .4rem 0 .6rem;
-    color: #fff;
-  }
-  .navbar-vertical .navbar-brand h3::before {
-    content: "◉";
-    color: #60a5fa;
-    margin-right: .45rem;
-  }
-  .navbar-vertical .nav-link { border-radius: .5rem; margin: 1px .5rem; }
-  .navbar-vertical .nav-link.active,
-  .navbar-vertical .nav-link:hover { background: rgba(96,165,250,.16); }
-  .navbar-vertical .dropdown-menu { background: transparent; border: 0; }
-  .navbar-vertical .dropdown-item { color: rgba(255,255,255,.75); }
-  .navbar-vertical .dropdown-item.active,
-  .navbar-vertical .dropdown-item:hover { color: #fff; background: rgba(96,165,250,.16); border-radius: .5rem; }
-  .card { border: 0; box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -16px rgba(15,23,42,.25); border-radius: .9rem; }
+  body { background: var(--jg-bg); }
+  .card { border: 0; background: var(--jg-card); box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -16px rgba(15,23,42,.25); border-radius: .9rem; }
   .page-title { font-weight: 700; letter-spacing: -0.01em; }
+  .page-pretitle a { color: inherit; text-decoration: none; }
+  .page-pretitle a:hover { color: var(--tblr-primary); }
   .badge { font-weight: 600; letter-spacing: .01em; }
-  .table thead th { text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; color: #64748b; }
-  .table-hover tbody tr:hover { background: #f8fafc; }
+  .table thead th { text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; color: var(--jg-muted); }
+  .table-hover tbody tr:hover { background: var(--jg-soft); }
   .btn-primary { background: #2563eb; border-color: #2563eb; }
   .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
 
-  /* Верхняя панель: окружение, пользователь, язык */
-  .jg-topbar { background: #fff; border-bottom: 1px solid #e5e9f0; }
-  .jg-topbar .navbar { min-height: 3rem; }
-  .jg-env { font-size: .75rem; color: #64748b; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
-  .jg-env code { background: #eef2ff; color: #3730a3; padding: .1rem .4rem; border-radius: .3rem; }
-  .jg-env a { color: #2563eb; text-decoration: none; }
-  .jg-user { font-size: .8rem; color: #334155; display: flex; align-items: center; gap: .4rem; }
-  .jg-user .avatar { width: 1.6rem; height: 1.6rem; font-size: .7rem; background: #2563eb; color: #fff; }
-  .jg-lang .btn { font-size: .8rem; padding: .25rem .6rem; }
+  /* Сайдбар: собственная разметка — заголовки групп и пункты с переносом строк */
+  .jg-sidebar.navbar-vertical { background: linear-gradient(180deg, var(--jg-side-from) 0%, var(--jg-side-to) 100%); border-right: 0; box-shadow: none; }
+  .jg-sidebar .navbar-collapse { display: flex; flex-direction: column; min-height: 0; }
+  .jg-sidebar .navbar-nav { flex: 1 1 auto; width: 100%; }
+  .jg-brand { display: flex; align-items: center; gap: .6rem; padding: 1rem .9rem .6rem; color: #fff; text-decoration: none; white-space: normal; }
+  .jg-brand .jg-logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #3b82f6, #14b8a6); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; flex: 0 0 34px; }
+  .jg-brand .jg-name { font-weight: 700; font-size: 1.05rem; line-height: 1.1; letter-spacing: -0.02em; }
+  .jg-brand .jg-name small { display: block; font-weight: 500; font-size: .7rem; color: rgba(255,255,255,.55); letter-spacing: .08em; text-transform: uppercase; }
+  .jg-group { margin-top: .75rem; }
+  .jg-group-title { padding: .35rem 1rem; font-size: .68rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.45); white-space: normal; }
+  .jg-sidebar .nav-link { border-radius: .55rem; margin: 1px .5rem; padding: .45rem .6rem; color: rgba(255,255,255,.78); white-space: normal; line-height: 1.25; align-items: flex-start; }
+  .jg-sidebar .nav-link .nav-link-icon { width: 1.4rem; flex: 0 0 1.4rem; opacity: .8; margin-top: .05rem; }
+  .jg-sidebar .nav-link .nav-link-title { white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+  .jg-sidebar .nav-link.active, .jg-sidebar .nav-link:hover { background: rgba(96,165,250,.16); color: #fff; }
+  .jg-sidebar .nav-link.active { box-shadow: inset 3px 0 0 #60a5fa; }
+  .jg-sidebar-footer { margin-top: auto; padding: .9rem; border-top: 1px solid rgba(255,255,255,.08); color: rgba(255,255,255,.8); font-size: .8rem; }
+  .jg-sidebar-footer .avatar { width: 2rem; height: 2rem; font-size: .8rem; background: #2563eb; color: #fff; flex: 0 0 2rem; }
+  .jg-sidebar-footer .jg-u { min-width: 0; }
+  .jg-sidebar-footer .jg-u div { overflow-wrap: anywhere; }
+  .jg-sidebar-footer .btn { --tblr-btn-color: rgba(255,255,255,.8); --tblr-btn-border-color: rgba(255,255,255,.2); --tblr-btn-bg: transparent; }
+  .jg-sidebar-footer .jg-ver { color: rgba(255,255,255,.4); font-size: .7rem; margin-top: .5rem; }
+
+  /* Верхняя панель */
+  .jg-topbar { background: var(--jg-card); border-bottom: 1px solid var(--jg-border); }
+  .jg-topbar .navbar { min-height: 3rem; flex-wrap: wrap; gap: .5rem; }
+  .jg-env { font-size: .75rem; color: var(--jg-muted); display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+  .jg-env code { background: var(--jg-code-bg); color: var(--jg-code); padding: .1rem .4rem; border-radius: .3rem; }
+  .jg-env a { color: var(--tblr-primary); text-decoration: none; }
+  .jg-tools { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .jg-tools .btn { font-size: .8rem; padding: .25rem .6rem; }
 
   /* Дашборд */
-  .jg-stat { display:flex; align-items:center; gap: 1rem; }
-  .jg-stat .jg-icon {
-    width: 48px; height: 48px; border-radius: 14px; display:flex; align-items:center; justify-content:center;
-    font-size: 1.2rem; color:#fff; flex: 0 0 48px;
-  }
+  .jg-stat { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .jg-stat > div:last-child { min-width: 0; }
+  .jg-stat .jg-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff; flex: 0 0 48px; }
   .jg-stat .jg-value { font-size: 1.6rem; font-weight: 700; line-height: 1; }
-  .jg-stat .jg-label { color:#64748b; font-size:.8rem; margin-top:.25rem; }
-  .jg-stat .jg-sub { color:#16a34a; font-size:.75rem; margin-top:.2rem; }
-  .jg-pipe { display:flex; flex-wrap:wrap; gap:.5rem; }
-  .jg-pipe .jg-step {
-    flex: 1 1 140px; background:#fff; border-radius:.75rem; padding:.85rem 1rem;
-    border:1px solid #e5e9f0;
-  }
-  .jg-pipe .jg-step .jg-count { font-size:1.5rem; font-weight:700; }
-  .jg-pipe .jg-step .jg-title { color:#64748b; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
-  .jg-pipe .jg-step ul { list-style:none; padding:0; margin:.5rem 0 0; font-size:.8rem; color:#475569; }
-  .jg-pipe .jg-step li a { display:flex; justify-content:space-between; color:inherit; text-decoration:none; padding:.1rem 0; }
-  .jg-pipe .jg-step li a:hover { color:#2563eb; }
+  .jg-stat .jg-label { color: var(--jg-muted); font-size: .8rem; margin-top: .25rem; overflow-wrap: anywhere; }
+  .jg-stat .jg-sub { color: #16a34a; font-size: .75rem; margin-top: .2rem; }
+  .card-link:hover { transform: translateY(-1px); transition: transform .15s; }
+  .jg-pipe { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .jg-pipe .jg-step { flex: 1 1 150px; min-width: 0; background: var(--jg-card); border-radius: .75rem; padding: .85rem 1rem; border: 1px solid var(--jg-border); }
+  .jg-pipe .jg-step .jg-count { font-size: 1.5rem; font-weight: 700; }
+  .jg-pipe .jg-step .jg-title { color: var(--jg-muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; overflow-wrap: anywhere; }
+  .jg-pipe .jg-step ul { list-style: none; padding: 0; margin: .5rem 0 0; font-size: .8rem; color: var(--jg-text); }
+  .jg-pipe .jg-step li a { display: flex; justify-content: space-between; gap: .4rem; color: inherit; text-decoration: none; padding: .1rem 0; }
+  .jg-pipe .jg-step li a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .jg-pipe .jg-step li a:hover { color: var(--tblr-primary); }
 
   /* Карточка заявки */
-  .jg-progress { display:flex; gap:.4rem; flex-wrap:wrap; }
-  .jg-progress .jg-pstep { flex:1 1 110px; text-align:center; font-size:.72rem; color:#94a3b8; }
-  .jg-progress .jg-pstep .bar { height:6px; border-radius:3px; background:#e2e8f0; margin-bottom:.35rem; }
-  .jg-progress .jg-pstep.done { color:#0f766e; }
-  .jg-progress .jg-pstep.done .bar { background:#14b8a6; }
-  .jg-progress .jg-pstep.active { color:#1d4ed8; font-weight:600; }
-  .jg-progress .jg-pstep.active .bar { background:#2563eb; }
-  .jg-progress .jg-pstep.rejected { color:#b91c1c; font-weight:600; }
-  .jg-progress .jg-pstep.rejected .bar { background:#ef4444; }
-  .jg-timeline { list-style:none; margin:0; padding:0 0 0 1.1rem; border-left:2px solid #e2e8f0; }
-  .jg-timeline li { position:relative; padding:0 0 1rem 1rem; }
-  .jg-timeline li::before {
-    content:""; position:absolute; left:-1.55rem; top:.3rem; width:.8rem; height:.8rem; border-radius:50%;
-    background:#fff; border:3px solid #94a3b8;
+  .jg-progress { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .jg-progress .jg-pstep { flex: 1 1 110px; min-width: 0; text-align: center; font-size: .72rem; color: #94a3b8; overflow-wrap: anywhere; }
+  .jg-progress .jg-pstep .bar { height: 6px; border-radius: 3px; background: var(--jg-border); margin-bottom: .35rem; }
+  .jg-progress .jg-pstep.done { color: #0f766e; }
+  .jg-progress .jg-pstep.done .bar { background: #14b8a6; }
+  .jg-progress .jg-pstep.active { color: #2563eb; font-weight: 600; }
+  .jg-progress .jg-pstep.active .bar { background: #2563eb; }
+  .jg-progress .jg-pstep.rejected { color: #dc2626; font-weight: 600; }
+  .jg-progress .jg-pstep.rejected .bar { background: #ef4444; }
+  .jg-timeline { list-style: none; margin: 0; padding: 0 0 0 1.1rem; border-left: 2px solid var(--jg-border); }
+  .jg-timeline li { position: relative; padding: 0 0 1rem 1rem; }
+  .jg-timeline li::before { content: ""; position: absolute; left: -1.55rem; top: .3rem; width: .8rem; height: .8rem; border-radius: 50%; background: var(--jg-card); border: 3px solid #94a3b8; }
+  .jg-timeline li.ok::before { border-color: #14b8a6; }
+  .jg-timeline li.bad::before { border-color: #ef4444; }
+  .jg-timeline .when { font-size: .75rem; color: var(--jg-muted); white-space: nowrap; }
+  .jg-timeline .who { font-size: .78rem; color: var(--jg-muted); }
+  .jg-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .6rem; }
+  .jg-photos a { display: block; border-radius: .6rem; overflow: hidden; border: 1px solid var(--jg-border); background: var(--jg-soft); }
+  .jg-photos img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+  .jg-thumb { width: 56px; height: 42px; object-fit: cover; border-radius: .4rem; border: 1px solid var(--jg-border); }
+  .jg-kv { margin: 0; }
+  .jg-kv dt { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--jg-muted); font-weight: 600; }
+  .jg-kv dd { margin-bottom: .6rem; overflow-wrap: anywhere; }
+  details.jg-all summary { cursor: pointer; color: var(--tblr-primary); font-weight: 600; }
+
+  @media (max-width: 991.98px) {
+    .jg-sidebar-footer { border-top: 0; }
   }
-  .jg-timeline li.ok::before { border-color:#14b8a6; }
-  .jg-timeline li.bad::before { border-color:#ef4444; }
-  .jg-timeline .when { font-size:.75rem; color:#64748b; }
-  .jg-timeline .who { font-size:.78rem; color:#475569; }
-  .jg-photos { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:.6rem; }
-  .jg-photos a { display:block; border-radius:.6rem; overflow:hidden; border:1px solid #e5e9f0; background:#f8fafc; }
-  .jg-photos img { width:100%; aspect-ratio: 4/3; object-fit:cover; display:block; }
-  .jg-thumb { width:56px; height:42px; object-fit:cover; border-radius:.4rem; border:1px solid #e5e9f0; }
-  .jg-kv { margin:0; }
-  .jg-kv dt { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; font-weight:600; }
-  .jg-kv dd { margin-bottom:.6rem; }
-  details.jg-all summary { cursor:pointer; color:#2563eb; font-weight:600; }
 </style>
 {% endblock %}
 
-{% block topbar %}
-<header class="jg-topbar d-print-none">
-  <div class="navbar px-3 py-1">
-    <div class="jg-env">
-      <span>{{ _("Скоринг") }}: <code>{{ admin_env.scoring_mode }}</code></span>
-      <span>YIA SSO: <code>{{ "mock" if admin_env.sso_mock else "live" }}</code></span>
-      <a href="/docs" target="_blank"><i class="fa-solid fa-book me-1"></i>{{ _("API-документация") }}</a>
-    </div>
-    <div class="d-flex align-items-center gap-3">
-      {% if request.state.admin_user is defined %}
-      <div class="jg-user">
-        <span class="avatar rounded-circle">{{ (request.state.admin_user.full_name or request.state.admin_user.username)[:1] | upper }}</span>
-        <span>{{ request.state.admin_user.full_name or request.state.admin_user.username }}</span>
-      </div>
-      {% endif %}
-      {% if i18n_config.language_switcher and i18n_config.language_switcher | length > 1 %}
-      <div class="dropdown jg-lang">
-        <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="{{ _('Language') }}">
-          <i class="fa fa-language me-1"></i>{{ get_locale_display_name(get_locale()) }}
-        </a>
-        <div class="dropdown-menu dropdown-menu-end">
-          {% for code in i18n_config.language_switcher %}
-          <a class="dropdown-item {% if code == get_locale() %}active{% endif %}" href="{{ request.url.include_query_params(lang=code) }}">{{ get_locale_display_name(code) }}</a>
+{% block body %}
+{% set admin_user = request.state.admin_user if request.state.admin_user is defined else None %}
+<div class="wrapper">
+  <aside class="navbar navbar-vertical navbar-expand-lg jg-sidebar" data-bs-theme="dark">
+    <div class="container-fluid">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#jg-sidebar-menu" aria-controls="jg-sidebar-menu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <a class="jg-brand" href="{{ url_for('admin:index') }}">
+        <span class="jg-logo">J</span>
+        <span class="jg-name">Jamg'arma<small>{{ _("Панель управления") }}</small></span>
+      </a>
+      <div class="collapse navbar-collapse" id="jg-sidebar-menu">
+        <ul class="navbar-nav pt-lg-2">
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path.rstrip('/') == admin.base_url.rstrip('/') %}active{% endif %}" href="{{ url_for('admin:index') }}">
+              <span class="nav-link-icon"><i class="fa-solid fa-gauge-high"></i></span>
+              <span class="nav-link-title">{{ _("Панель управления") }}</span>
+            </a>
+          </li>
+          {% for item in admin._menu.items %}
+            {% if item.is_visible(request) and item.is_accessible(request) %}
+              {% if item.type_ == "Category" %}
+              <li class="nav-item jg-group">
+                <div class="jg-group-title">{{ item.display_name }}</div>
+                {% for sub in item.children %}
+                  {% if sub.is_visible(request) and sub.is_accessible(request) %}
+                  <a class="nav-link {% if sub.is_active(request) %}active{% endif %}" href="{{ sub.url(request) }}">
+                    <span class="nav-link-icon">{% if sub.icon %}<i class="{{ sub.icon }}"></i>{% endif %}</span>
+                    <span class="nav-link-title">{{ sub.display_name }}</span>
+                  </a>
+                  {% endif %}
+                {% endfor %}
+              </li>
+              {% else %}
+              <li class="nav-item">
+                <a class="nav-link {% if item.is_active(request) %}active{% endif %}" href="{{ item.url(request) }}">
+                  <span class="nav-link-icon">{% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}</span>
+                  <span class="nav-link-title">{{ item.display_name }}</span>
+                </a>
+              </li>
+              {% endif %}
+            {% endif %}
           {% endfor %}
+        </ul>
+        <div class="jg-sidebar-footer">
+          {% if admin_user %}
+          <div class="d-flex align-items-center gap-2">
+            <span class="avatar rounded-circle">{{ (admin_user.full_name or admin_user.username)[:1] | upper }}</span>
+            <div class="jg-u flex-grow-1">
+              <div class="fw-semibold">{{ admin_user.full_name or admin_user.username }}</div>
+              <div class="text-muted small">{{ admin_user.role.name if admin_user.role else "Super Admin" }}</div>
+            </div>
+            {% if admin.authentication_backend %}
+            <a href="{{ request.url_for('admin:logout') }}" class="btn btn-sm btn-icon" title="{{ _('Logout') }}"><i class="fa fa-sign-out"></i></a>
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="jg-ver">Jamg'arma Platform · v{{ app_version }}</div>
         </div>
       </div>
-      {% endif %}
+    </div>
+  </aside>
+
+  <div class="page-wrapper">
+    {% block topbar %}
+    <header class="jg-topbar d-print-none">
+      <div class="navbar px-3 py-1">
+        <div class="jg-env">
+          <span>{{ _("Скоринг") }}: <code>{{ admin_env.scoring_mode }}</code></span>
+          <span>YIA SSO: <code>{{ "mock" if admin_env.sso_mock else "live" }}</code></span>
+          <a href="/docs" target="_blank"><i class="fa-solid fa-book me-1"></i>{{ _("API-документация") }}</a>
+        </div>
+        <div class="jg-tools">
+          <button type="button" class="btn btn-outline-secondary btn-icon" id="jg-theme-toggle" title="{{ _('Тема') }}">
+            <i class="fa-solid fa-moon" data-theme-icon="light"></i><i class="fa-solid fa-sun" data-theme-icon="dark"></i>
+          </button>
+          {% if i18n_config.language_switcher and i18n_config.language_switcher | length > 1 %}
+          <div class="dropdown">
+            <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="{{ _('Language') }}">
+              <i class="fa fa-language me-1"></i>{{ get_locale_display_name(get_locale()) }}
+            </a>
+            <div class="dropdown-menu dropdown-menu-end">
+              {% for code in i18n_config.language_switcher %}
+              <a class="dropdown-item {% if code == get_locale() %}active{% endif %}" href="{{ request.url.include_query_params(lang=code) }}">{{ get_locale_display_name(code) }}</a>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+    {% endblock %}
+
+    <div class="container-fluid">
+      <div class="page-header d-print-none">
+        {% block content_header %}
+        {% if model_view is defined %}
+        {% set path = request.url.path %}
+        <div class="row align-items-center">
+          <div class="col">
+            <div class="page-pretitle">
+              <a href="{{ url_for('admin:index') }}">{{ _("Панель управления") }}</a>
+              {% if model_view.category %} / {{ model_view.category }}{% endif %}
+              {% if '/details/' in path or '/edit/' in path or path.endswith('/create') %} / <a href="{{ url_for('admin:list', identity=model_view.identity) }}">{{ model_view.name_plural }}</a>{% endif %}
+            </div>
+            <h2 class="page-title">
+              {% if model_view.icon %}<i class="{{ model_view.icon }} me-2 text-muted"></i>{% endif %}
+              {% if path.endswith('/create') %}{{ _("New %(name)s", name=model_view.name) }}
+              {% elif '/edit/' in path %}{{ _("Edit %(name)s", name=model_view.name) }} · {{ request.path_params.get('pk') }}
+              {% elif '/details/' in path %}{{ model_view.name }} · {{ request.path_params.get('pk') }}
+              {% else %}{{ model_view.name_plural }}{% endif %}
+            </h2>
+          </div>
+        </div>
+        {% elif title is defined and title %}
+        <div class="row align-items-center">
+          <div class="col">
+            <h2 class="page-title">{{ title }}</h2>
+            <div class="page-pretitle">{{ subtitle }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% endblock %}
+      </div>
+    </div>
+    <div class="page-body flex-grow-1">
+      <div class="container-fluid">
+        <div class="row row-deck row-cards">
+          {% block content %} {% endblock %}
+          {% block flash %}
+          {% include 'sqladmin/flash.html' %}
+          {% endblock %}
+          {% block secret_modal %}
+          {% include 'sqladmin/secret_modal.html' %}
+          {% endblock %}
+        </div>
+      </div>
     </div>
   </div>
-</header>
+</div>
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById("jg-theme-toggle");
+    function paint() {
+      var dark = root.getAttribute("data-bs-theme") === "dark";
+      document.querySelectorAll("[data-theme-icon]").forEach(function (el) {
+        el.style.display = (el.getAttribute("data-theme-icon") === (dark ? "dark" : "light")) ? "" : "none";
+      });
+    }
+    if (btn) btn.addEventListener("click", function () {
+      var dark = root.getAttribute("data-bs-theme") === "dark";
+      if (dark) root.removeAttribute("data-bs-theme"); else root.setAttribute("data-bs-theme", "dark");
+      try { localStorage.setItem("jg-theme", dark ? "light" : "dark"); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+</script>
 {% endblock %}
