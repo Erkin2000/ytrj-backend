@@ -1,0 +1,163 @@
+{% extends "sqladmin/details.html" %}
+
+{% block content %}
+{% set a = model %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body">
+      <div class="row align-items-center g-3">
+        <div class="col">
+          <div class="page-pretitle">{{ _("Заявка") }} · {{ subject_label(a.subject_type) }}{% if a.legal_name %} · {{ a.legal_name }}{% endif %}</div>
+          <h2 class="page-title mb-1">{{ a.number }} &nbsp;{{ status_badge(a.status) }}
+            {% if a.scoring_retry_required %}<span class="badge bg-warning-lt ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ _("Ожидает повтора KATM") }}</span>{% endif %}
+          </h2>
+          <div class="text-muted small">
+            {{ _("Заявитель") }}: <a href="{{ url_for('admin:details', identity='user-orm', pk=a.applicant_id) }}">{{ a.applicant_full_name or a.applicant }}</a>
+            {% if a.applicant_pinfl %} · {{ _("ПИНФЛ") }} {{ a.applicant_pinfl }}{% endif %}
+            {% if a.applicant_phone %} · {{ a.applicant_phone }}{% endif %}
+            {% if a.bank %} · {{ _("Банк") }}: <a href="{{ url_for('admin:details', identity='bank-orm', pk=a.bank_id) }}">{{ a.bank.name }}</a>{% endif %}
+            {% if a.submitted_at %} · {{ _("Подана") }} {{ fmt_dt(a.submitted_at) }}{% endif %}
+          </div>
+        </div>
+        <div class="col-auto">
+          <a href="{{ url_for('admin:list', identity='application-orm') }}" class="btn">{{ _("Go Back") }}</a>
+          {% if model_view.check_can_edit(request, model) %}
+          <a href="{{ model_view._build_url_for('admin:edit', request, model) }}" class="btn btn-primary">{{ _("Edit") }}</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="jg-progress mt-4">
+        {% for step in application_progress(a) %}
+        <div class="jg-pstep {{ step.state }}"><div class="bar"></div>{{ step.title }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="col-lg-7">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("История статусов") }}</h3></div>
+    <div class="card-body">
+      {% if a.status_history %}
+      <ul class="jg-timeline">
+        {% for h in a.status_history | reverse %}
+        {% set key = h.to_status.value if h.to_status.value is defined else h.to_status %}
+        <li class="{% if key in ['SCORING_FAILED','ELIGIBILITY_FAILED','BANK_REJECTED','COUNCIL_REJECTED'] %}bad{% elif key in ['COMPLETED','COUNCIL_APPROVED','BANK_APPROVED'] %}ok{% endif %}">
+          <div class="d-flex justify-content-between">
+            <div class="fw-semibold">{{ event_label(h.event) }}</div>
+            <div class="when">{{ fmt_dt(h.created_at) }}</div>
+          </div>
+          <div class="mt-1">{% if h.from_status %}{{ status_badge(h.from_status) }} <i class="fa-solid fa-arrow-right-long mx-1 text-muted"></i> {% endif %}{{ status_badge(h.to_status) }}</div>
+          {% if h.actor or h.actor_role %}
+          <div class="who mt-1"><i class="fa-regular fa-user me-1"></i>{{ h.actor.full_name or h.actor.username if h.actor else "—" }}{% if h.actor_role %} · {{ h.actor_role }}{% endif %}</div>
+          {% endif %}
+          {% if h.comment %}<div class="text-muted small mt-1">{{ h.comment }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted">{{ _("История пуста.") }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Скоринг KATM") }}</h3></div>
+    {% if a.scoring_attempts %}
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead><tr><th>#</th><th>{{ _("Результат") }}</th><th>{{ _("Требования Фонда") }}</th><th>{{ _("Внёс вручную") }}</th><th>{{ _("Когда") }}</th></tr></thead>
+        <tbody>
+          {% for s in a.scoring_attempts %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td>{{ scoring_badge(s.result) }}{% if s.error_message %}<div class="text-muted small">{{ s.error_message }}</div>{% endif %}</td>
+            <td>{% if s.eligibility_passed is none %}—{% elif s.eligibility_passed %}<i class="fa fa-check text-success"></i>{% else %}<i class="fa fa-xmark text-danger"></i>{% endif %}</td>
+            <td>{{ (s.recorded_by.full_name or s.recorded_by.username) if s.recorded_by else "—" }}</td>
+            <td class="text-muted">{{ fmt_dt(s.created_at) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Попыток скоринга не было.") }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="col-lg-5">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("Фотографии") }} <span class="badge bg-secondary-lt ms-2">{{ a.photos | length }}</span></h3></div>
+    <div class="card-body">
+      {% if a.photos %}
+      <div class="jg-photos">
+        {% for p in a.photos %}
+        <a href="{{ admin.base_url }}/application-photo/{{ p.id }}" target="_blank" title="{{ p.file_name }} · {{ fmt_size(p.size) }}">
+          <img src="{{ admin.base_url }}/application-photo/{{ p.id }}" alt="{{ p.file_name }}" loading="lazy">
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-muted">{{ _("Фотографий нет.") }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Место деятельности") }}</h3></div>
+    <div class="card-body">
+      <dl class="jg-kv">
+        <dt>{{ _("Адрес деятельности") }}</dt><dd>{{ a.location_address or "—" }}</dd>
+        <dt>{{ _("Координаты") }}</dt>
+        <dd>{% if a.location_lat and a.location_lng %}<a href="https://www.openstreetmap.org/?mlat={{ a.location_lat }}&mlon={{ a.location_lng }}#map=16/{{ a.location_lat }}/{{ a.location_lng }}" target="_blank">{{ a.location_lat }}, {{ a.location_lng }}</a>{% else %}—{% endif %}
+          {% if a.location_confirmed %}<span class="badge bg-green-lt ms-2">{{ _("Место подтверждено") }}</span>{% endif %}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Решения Совета") }}</h3></div>
+    {% if a.council_assignments %}
+    <div class="list-group list-group-flush">
+      {% for c in a.council_assignments %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">{{ c.council_member.full_name or c.council_member.username }}</div>
+          <div>{{ decision_badge(c.decision) if c.decision else '<span class="badge bg-secondary-lt">…</span>' | safe }}</div>
+        </div>
+        <div class="text-muted small">{{ _("Направлена") }} {{ fmt_dt(c.assigned_at) }}{% if c.decided_at %} · {{ _("Решение") }} {{ fmt_dt(c.decided_at) }}{% endif %}</div>
+        {% if c.reason %}<div class="small mt-1">{{ c.reason }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Совет ещё не назначен.") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Финансирование") }}</h3></div>
+    <div class="card-body">
+      <dl class="jg-kv">
+        <dt>{{ _("Документ-требование") }}</dt>
+        <dd>{% if a.demand_document %}<a href="{{ url_for('admin:details', identity='demand-document-orm', pk=a.demand_document.id) }}">{{ a.demand_document.number }}</a> {{ demand_badge(a.demand_document.status) }} <span class="text-muted small">· {{ fmt_dt(a.demand_document.issued_at) }}</span>{% else %}<span class="text-muted">{{ _("Документ ещё не создан.") }}</span>{% endif %}</dd>
+        <dt>{{ _("Выделение ресурсов") }}</dt>
+        <dd>{% if a.resource_allocation %}<strong>{{ fmt_money(a.resource_allocation.amount, a.resource_allocation.currency) }}</strong>{% if a.resource_allocation.reference_number %} · {{ a.resource_allocation.reference_number }}{% endif %}
+          <div class="text-muted small">{{ fmt_dt(a.resource_allocation.allocated_at) }}{% if a.resource_allocation.allocated_by %} · {{ a.resource_allocation.allocated_by.full_name or a.resource_allocation.allocated_by.username }}{% endif %}</div>
+          {% else %}<span class="text-muted">{{ _("Ресурсы ещё не выделены.") }}</span>{% endif %}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<div class="col-12">
+  <details class="jg-all">
+    <summary class="mb-2">{{ _("Все поля") }}</summary>
+    <div class="row row-cards">
+      {{ super() }}
+    </div>
+  </details>
+</div>
+{% endblock %}

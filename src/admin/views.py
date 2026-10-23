@@ -1,10 +1,35 @@
-"""ModelView-ы SQLAdmin: русские подписи, фильтры, поиск, значки."""
+"""ModelView-ы SQLAdmin: подписи (ru/uz), фильтры, поиск, значки.
 
-from markupsafe import Markup
-from sqladmin import ModelView
+Подписи колонок хранятся как русские msgid и переводятся на язык запроса
+(``LocalizedLabelsMixin``). Имена моделей, категорий и фильтров объявляются
+при импорте, поэтому для них используется отложенный перевод ``_l``.
+"""
+
+from __future__ import annotations
+
+from markupsafe import Markup, escape
+from sqladmin import BaseView, ModelView, expose
 from sqladmin.filters import BooleanFilter, ForeignKeyFilter, StaticValuesFilter
+from sqlalchemy.orm import selectinload
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import FileResponse
 
 from src.account.models.user_model import UserORM, UserStatus
+from src.admin.i18n import _, _l, fmt_dt, fmt_money, fmt_size
+from src.admin.labels import (
+    DECISION_LABELS,
+    DEMAND_STATUS_LABELS,
+    SCORING_RESULT_LABELS,
+    STATUS_LABELS,
+    SUBJECT_LABELS,
+    USER_STATUS_LABELS,
+    badge,
+    labeled_badge,
+    role_badge,
+    status_badge,
+    subject_label,
+)
 from src.application.enums import ApplicationStatus, SubjectType
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
@@ -14,59 +39,77 @@ from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
+from src.application.services.photo_storage import PhotoStorage
 from src.auth.models.refresh_token_model import RefreshTokenORM
+from src.database import async_session_maker
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 
-STATUS_LABELS: dict[str, tuple[str, str]] = {
-    "DRAFT": ("Черновик", "secondary"),
-    "SUBMITTED": ("Подана", "blue"),
-    "SCORING_IN_PROGRESS": ("Скоринг KATM", "azure"),
-    "SCORING_FAILED": ("Скоринг не пройден", "red"),
-    "ELIGIBILITY_FAILED": ("Не соответствует требованиям", "red"),
-    "READY_FOR_BANK": ("Готова к отправке в банк", "cyan"),
-    "SENT_TO_BANK": ("Отправлена в банк", "indigo"),
-    "BANK_REVIEW": ("Банк рассматривает", "purple"),
-    "BANK_APPROVED": ("Банк одобрил", "teal"),
-    "BANK_REJECTED": ("Банк отказал", "red"),
-    "COUNCIL_REVIEW": ("Рассмотрение Советом", "orange"),
-    "COUNCIL_APPROVED": ("Совет утвердил", "lime"),
-    "COUNCIL_REJECTED": ("Совет отказал", "red"),
-    "DEMAND_DOCUMENT_CREATED": ("Требование подтверждено", "green"),
-    "RESOURCE_ALLOCATION": ("Выделение ресурсов", "yellow"),
-    "COMPLETED": ("Завершена", "success"),
-}
-
-SUBJECT_LABELS = {"YATT": "ИП", "MCHJ": "ООО", "SELF_EMPLOYED": "Самозанятый"}
+CATEGORY_ACCESS = _l("Пользователи и доступ")
+CATEGORY_DICTS = _l("Справочники")
+CATEGORY_APPLICATIONS = _l("Заявки")
 
 
-def badge(label: str, color: str) -> Markup:
-    return Markup(f'<span class="badge bg-{color}-lt">{label}</span>')
+# ---------- локализация подписей колонок ----------
+
+
+class LocalizedLabelsMixin:
+    """``column_labels`` содержит msgid; ``_column_labels`` отдаёт перевод
+    для языка текущего запроса. SQLAdmin читает ``_column_labels`` в шаблонах,
+    экспорте и плейсхолдере поиска (там нужны именно строки, не прокси)."""
+
+    @property
+    def _column_labels(self) -> dict:
+        source = self.__dict__.get("_column_labels_source", {})
+        return {key: _(value) for key, value in source.items()}
+
+    @_column_labels.setter
+    def _column_labels(self, value: dict) -> None:
+        self.__dict__["_column_labels_source"] = value
+
+
+# ---------- форматтеры ----------
+
+
+def _attr_value(model, attribute):
+    key = attribute.key if hasattr(attribute, "key") else attribute
+    return getattr(model, key, None)
 
 
 def fmt_status(model, attribute) -> Markup:
-    value = getattr(model, "status", None)
-    key = value.value if hasattr(value, "value") else str(value)
-    label, color = STATUS_LABELS.get(key, (key, "secondary"))
-    return badge(label, color)
+    return status_badge(getattr(model, "status", None))
 
 
-def fmt_user_status(model, attribute) -> Markup:
-    if model.status == UserStatus.ACTIVE:
-        return badge("Активен", "green")
-    return badge("Заблокирован", "red")
+def fmt_history_status(model, attribute) -> Markup:
+    return status_badge(_attr_value(model, attribute))
+
+
+def fmt_user_status(model, attribute) -> Markup | str:
+    return labeled_badge(USER_STATUS_LABELS, model.status)
+
+
+def fmt_role(model, attribute) -> Markup | str:
+    return role_badge(getattr(model, "role", None))
 
 
 def fmt_subject(model, attribute) -> str:
-    value = getattr(model, "subject_type", None)
-    if value is None:
-        return "—"
-    key = value.value if hasattr(value, "value") else str(value)
-    return SUBJECT_LABELS.get(key, key)
+    return subject_label(getattr(model, "subject_type", None))
+
+
+def fmt_decision(model, attribute) -> Markup | str:
+    return labeled_badge(DECISION_LABELS, _attr_value(model, attribute))
+
+
+def fmt_scoring_result(model, attribute) -> Markup | str:
+    return labeled_badge(SCORING_RESULT_LABELS, _attr_value(model, attribute))
+
+
+def fmt_demand_status(model, attribute) -> Markup | str:
+    return labeled_badge(DEMAND_STATUS_LABELS, _attr_value(model, attribute))
 
 
 def fmt_bool(model, attribute):
-    value = getattr(model, attribute.key if hasattr(attribute, "key") else attribute, None)
+    value = _attr_value(model, attribute)
     if value is None:
         return "—"
     return (
@@ -76,19 +119,41 @@ def fmt_bool(model, attribute):
     )
 
 
-def fmt_datetime(model, attribute):
-    value = getattr(model, attribute.key if hasattr(attribute, "key") else attribute, None)
-    return value.strftime("%d.%m.%Y %H:%M") if value else "—"
+def fmt_datetime(model, attribute) -> str:
+    return fmt_dt(_attr_value(model, attribute))
+
+
+def fmt_amount(model, attribute) -> str:
+    return fmt_money(getattr(model, "amount", None), getattr(model, "currency", None))
+
+
+def fmt_file_size(model, attribute) -> str:
+    return fmt_size(getattr(model, "size", None))
+
+
+def fmt_photo_preview(model, attribute) -> Markup:
+    url = f"/admin/application-photo/{model.id}"
+    return Markup(
+        f'<a href="{url}" target="_blank"><img src="{url}" alt="{escape(model.file_name)}" '
+        'class="jg-thumb"></a>'
+    )
+
+
+def fmt_subject_types(model, attribute) -> Markup | str:
+    values = getattr(model, "allowed_subject_types", None) or []
+    if not values:
+        return "—"
+    return Markup(" ").join(badge(subject_label(v), "blue") for v in values)
 
 
 # ---------- Пользователи и доступ ----------
 
 
-class UserAdmin(ModelView, model=UserORM):
-    name = "Пользователь"
-    name_plural = "Пользователи"
+class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
+    name = _l("Пользователь")
+    name_plural = _l("Пользователи")
     icon = "fa-solid fa-users"
-    category = "Пользователи и доступ"
+    category = CATEGORY_ACCESS
 
     column_list = [
         UserORM.id,
@@ -105,10 +170,12 @@ class UserAdmin(ModelView, model=UserORM):
     column_default_sort = [(UserORM.id, True)]
     column_filters = [
         StaticValuesFilter(
-            UserORM.status, [(s.value, s.value) for s in UserStatus], title="Статус"
+            UserORM.status,
+            [(s.value, _l(USER_STATUS_LABELS[s.value][0])) for s in UserStatus],
+            title=_l("Статус"),
         ),
-        ForeignKeyFilter(UserORM.role_id, RoleORM.name, title="Роль"),
-        ForeignKeyFilter(UserORM.bank_id, BankORM.name, title="Банк"),
+        ForeignKeyFilter(UserORM.role_id, RoleORM.name, title=_l("Роль")),
+        ForeignKeyFilter(UserORM.bank_id, BankORM.name, title=_l("Банк")),
     ]
     column_labels = {
         UserORM.id: "ID",
@@ -133,10 +200,12 @@ class UserAdmin(ModelView, model=UserORM):
     }
     column_formatters = {
         UserORM.status: fmt_user_status,
+        UserORM.role: fmt_role,
         UserORM.last_login_at: fmt_datetime,
     }
     column_formatters_detail = {
         UserORM.status: fmt_user_status,
+        UserORM.role: fmt_role,
         UserORM.last_login_at: fmt_datetime,
         UserORM.created_at: fmt_datetime,
         UserORM.updated_at: fmt_datetime,
@@ -151,11 +220,11 @@ class UserAdmin(ModelView, model=UserORM):
     page_size = 25
 
 
-class RoleAdmin(ModelView, model=RoleORM):
-    name = "Роль"
-    name_plural = "Роли"
+class RoleAdmin(LocalizedLabelsMixin, ModelView, model=RoleORM):
+    name = _l("Роль")
+    name_plural = _l("Роли")
     icon = "fa-solid fa-user-shield"
-    category = "Пользователи и доступ"
+    category = CATEGORY_ACCESS
 
     column_list = [
         RoleORM.id,
@@ -185,11 +254,11 @@ class RoleAdmin(ModelView, model=RoleORM):
     }
 
 
-class PermissionAdmin(ModelView, model=PermissionORM):
-    name = "Право"
-    name_plural = "Права"
+class PermissionAdmin(LocalizedLabelsMixin, ModelView, model=PermissionORM):
+    name = _l("Право")
+    name_plural = _l("Права")
     icon = "fa-solid fa-key"
-    category = "Пользователи и доступ"
+    category = CATEGORY_ACCESS
 
     column_list = [
         PermissionORM.id,
@@ -210,11 +279,11 @@ class PermissionAdmin(ModelView, model=PermissionORM):
     page_size = 50
 
 
-class RefreshTokenAdmin(ModelView, model=RefreshTokenORM):
-    name = "Сессия"
-    name_plural = "Сессии (refresh-токены)"
+class RefreshTokenAdmin(LocalizedLabelsMixin, ModelView, model=RefreshTokenORM):
+    name = _l("Сессия")
+    name_plural = _l("Сессии (refresh-токены)")
     icon = "fa-solid fa-right-to-bracket"
-    category = "Пользователи и доступ"
+    category = CATEGORY_ACCESS
 
     column_list = [
         RefreshTokenORM.id,
@@ -247,14 +316,14 @@ class RefreshTokenAdmin(ModelView, model=RefreshTokenORM):
     page_size = 25
 
 
-# ---------- Заявки ----------
+# ---------- Справочники ----------
 
 
-class BankAdmin(ModelView, model=BankORM):
-    name = "Банк"
-    name_plural = "Банки"
+class BankAdmin(LocalizedLabelsMixin, ModelView, model=BankORM):
+    name = _l("Банк")
+    name_plural = _l("Банки")
     icon = "fa-solid fa-building-columns"
-    category = "Справочники"
+    category = CATEGORY_DICTS
 
     column_list = [
         BankORM.id,
@@ -277,15 +346,26 @@ class BankAdmin(ModelView, model=BankORM):
         BankORM.created_at: "Создан",
         BankORM.updated_at: "Обновлён",
     }
-    column_formatters = {BankORM.is_active: fmt_bool}
+    column_formatters = {
+        BankORM.is_active: fmt_bool,
+        BankORM.allowed_subject_types: fmt_subject_types,
+    }
+    column_formatters_detail = {
+        BankORM.is_active: fmt_bool,
+        BankORM.allowed_subject_types: fmt_subject_types,
+    }
     form_excluded_columns = [BankORM.created_at, BankORM.updated_at]
 
 
-class ApplicationAdmin(ModelView, model=ApplicationORM):
-    name = "Заявка"
-    name_plural = "Заявки"
+# ---------- Заявки ----------
+
+
+class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
+    name = _l("Заявка")
+    name_plural = _l("Заявки")
     icon = "fa-solid fa-file-lines"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
+    details_template = "sqladmin/application_details.html"
 
     column_list = [
         ApplicationORM.id,
@@ -315,16 +395,16 @@ class ApplicationAdmin(ModelView, model=ApplicationORM):
     column_filters = [
         StaticValuesFilter(
             ApplicationORM.status,
-            [(s.value, STATUS_LABELS[s.value][0]) for s in ApplicationStatus],
-            title="Статус",
+            [(s.value, _l(STATUS_LABELS[s.value][0])) for s in ApplicationStatus],
+            title=_l("Статус"),
         ),
         StaticValuesFilter(
             ApplicationORM.subject_type,
-            [(s.value, SUBJECT_LABELS[s.value]) for s in SubjectType],
-            title="Тип субъекта",
+            [(s.value, _l(SUBJECT_LABELS[s.value])) for s in SubjectType],
+            title=_l("Тип субъекта"),
         ),
-        ForeignKeyFilter(ApplicationORM.bank_id, BankORM.name, title="Банк"),
-        BooleanFilter(ApplicationORM.scoring_retry_required, title="Ожидает повтора KATM"),
+        ForeignKeyFilter(ApplicationORM.bank_id, BankORM.name, title=_l("Банк")),
+        BooleanFilter(ApplicationORM.scoring_retry_required, title=_l("Ожидает повтора KATM")),
     ]
     column_labels = {
         ApplicationORM.id: "ID",
@@ -379,8 +459,18 @@ class ApplicationAdmin(ModelView, model=ApplicationORM):
     column_formatters_detail = {
         ApplicationORM.status: fmt_status,
         ApplicationORM.subject_type: fmt_subject,
+        ApplicationORM.bank_decision: fmt_decision,
         ApplicationORM.scoring_retry_required: fmt_bool,
         ApplicationORM.location_confirmed: fmt_bool,
+        ApplicationORM.submitted_at: fmt_datetime,
+        ApplicationORM.sent_to_bank_at: fmt_datetime,
+        ApplicationORM.bank_accepted_at: fmt_datetime,
+        ApplicationORM.bank_decided_at: fmt_datetime,
+        ApplicationORM.sent_to_council_at: fmt_datetime,
+        ApplicationORM.council_decided_at: fmt_datetime,
+        ApplicationORM.completed_at: fmt_datetime,
+        ApplicationORM.created_at: fmt_datetime,
+        ApplicationORM.updated_at: fmt_datetime,
     }
     # Статусы меняются только через бизнес-операции API — здесь только просмотр
     # и исправление справочных полей черновика.
@@ -394,12 +484,37 @@ class ApplicationAdmin(ModelView, model=ApplicationORM):
     ]
     page_size = 25
 
+    async def get_object_for_details(self, request: Request):
+        # Карточка заявки показывает таймлайн, фото, решения Совета и т.д.
+        # Вложенные связи подгружаем заранее: ленивая загрузка в async-шаблоне невозможна.
+        stmt = self.details_query(request).options(
+            selectinload(ApplicationORM.status_history).selectinload(StatusHistoryORM.actor),
+            selectinload(ApplicationORM.photos),
+            selectinload(ApplicationORM.scoring_attempts).selectinload(
+                ScoringAttemptORM.recorded_by
+            ),
+            selectinload(ApplicationORM.council_assignments).selectinload(
+                CouncilAssignmentORM.council_member
+            ),
+            selectinload(ApplicationORM.council_assignments).selectinload(
+                CouncilAssignmentORM.assigned_by
+            ),
+            selectinload(ApplicationORM.demand_document),
+            selectinload(ApplicationORM.resource_allocation).selectinload(
+                ResourceAllocationORM.allocated_by
+            ),
+            selectinload(ApplicationORM.bank_accepted_by),
+            selectinload(ApplicationORM.bank_decided_by),
+            selectinload(ApplicationORM.sent_to_council_by),
+        )
+        return await self._get_object_by_pk(stmt)
 
-class StatusHistoryAdmin(ModelView, model=StatusHistoryORM):
-    name = "Запись истории"
-    name_plural = "История статусов"
+
+class StatusHistoryAdmin(LocalizedLabelsMixin, ModelView, model=StatusHistoryORM):
+    name = _l("Запись истории")
+    name_plural = _l("История статусов")
     icon = "fa-solid fa-clock-rotate-left"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         StatusHistoryORM.id,
@@ -416,8 +531,8 @@ class StatusHistoryAdmin(ModelView, model=StatusHistoryORM):
     column_filters = [
         StaticValuesFilter(
             StatusHistoryORM.to_status,
-            [(s.value, STATUS_LABELS[s.value][0]) for s in ApplicationStatus],
-            title="Новый статус",
+            [(s.value, _l(STATUS_LABELS[s.value][0])) for s in ApplicationStatus],
+            title=_l("Новый статус"),
         ),
     ]
     column_labels = {
@@ -433,7 +548,12 @@ class StatusHistoryAdmin(ModelView, model=StatusHistoryORM):
         StatusHistoryORM.actor_role: "Роль",
         StatusHistoryORM.created_at: "Когда",
     }
-    column_formatters = {StatusHistoryORM.created_at: fmt_datetime}
+    column_formatters = {
+        StatusHistoryORM.from_status: fmt_history_status,
+        StatusHistoryORM.to_status: fmt_history_status,
+        StatusHistoryORM.created_at: fmt_datetime,
+    }
+    column_formatters_detail = column_formatters
     # История неизменяема.
     can_create = False
     can_edit = False
@@ -441,11 +561,11 @@ class StatusHistoryAdmin(ModelView, model=StatusHistoryORM):
     page_size = 50
 
 
-class ScoringAttemptAdmin(ModelView, model=ScoringAttemptORM):
-    name = "Попытка скоринга"
-    name_plural = "Скоринг KATM"
+class ScoringAttemptAdmin(LocalizedLabelsMixin, ModelView, model=ScoringAttemptORM):
+    name = _l("Попытка скоринга")
+    name_plural = _l("Скоринг KATM")
     icon = "fa-solid fa-magnifying-glass-chart"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         ScoringAttemptORM.id,
@@ -471,19 +591,21 @@ class ScoringAttemptAdmin(ModelView, model=ScoringAttemptORM):
         ScoringAttemptORM.created_at: "Когда",
     }
     column_formatters = {
+        ScoringAttemptORM.result: fmt_scoring_result,
         ScoringAttemptORM.eligibility_passed: fmt_bool,
         ScoringAttemptORM.created_at: fmt_datetime,
     }
+    column_formatters_detail = column_formatters
     can_create = False
     can_edit = False
     can_delete = False
 
 
-class CouncilAssignmentAdmin(ModelView, model=CouncilAssignmentORM):
-    name = "Назначение Совета"
-    name_plural = "Решения Совета"
+class CouncilAssignmentAdmin(LocalizedLabelsMixin, ModelView, model=CouncilAssignmentORM):
+    name = _l("Назначение Совета")
+    name_plural = _l("Решения Совета")
     icon = "fa-solid fa-gavel"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         CouncilAssignmentORM.id,
@@ -508,22 +630,25 @@ class CouncilAssignmentAdmin(ModelView, model=CouncilAssignmentORM):
         CouncilAssignmentORM.decided_at: "Решение (дата)",
     }
     column_formatters = {
+        CouncilAssignmentORM.decision: fmt_decision,
         CouncilAssignmentORM.assigned_at: fmt_datetime,
         CouncilAssignmentORM.decided_at: fmt_datetime,
     }
+    column_formatters_detail = column_formatters
     can_create = False
     can_edit = False
     can_delete = False
 
 
-class PhotoAdmin(ModelView, model=ApplicationPhotoORM):
-    name = "Фотография"
-    name_plural = "Фотографии заявок"
+class PhotoAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationPhotoORM):
+    name = _l("Фотография")
+    name_plural = _l("Фотографии заявок")
     icon = "fa-solid fa-image"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         ApplicationPhotoORM.id,
+        ApplicationPhotoORM.storage_path,
         ApplicationPhotoORM.application,
         ApplicationPhotoORM.file_name,
         ApplicationPhotoORM.content_type,
@@ -535,21 +660,26 @@ class PhotoAdmin(ModelView, model=ApplicationPhotoORM):
         ApplicationPhotoORM.application: "Заявка",
         ApplicationPhotoORM.application_id: "Заявка",
         ApplicationPhotoORM.file_name: "Файл",
-        ApplicationPhotoORM.storage_path: "Путь",
+        ApplicationPhotoORM.storage_path: "Превью",
         ApplicationPhotoORM.content_type: "Тип",
-        ApplicationPhotoORM.size: "Размер, байт",
+        ApplicationPhotoORM.size: "Размер",
         ApplicationPhotoORM.created_at: "Загружена",
     }
-    column_formatters = {ApplicationPhotoORM.created_at: fmt_datetime}
+    column_formatters = {
+        ApplicationPhotoORM.storage_path: fmt_photo_preview,
+        ApplicationPhotoORM.size: fmt_file_size,
+        ApplicationPhotoORM.created_at: fmt_datetime,
+    }
+    column_formatters_detail = column_formatters
     can_create = False
     can_edit = False
 
 
-class DemandDocumentAdmin(ModelView, model=DemandDocumentORM):
-    name = "Документ-требование"
-    name_plural = "Документы «Требование подтверждено»"
+class DemandDocumentAdmin(LocalizedLabelsMixin, ModelView, model=DemandDocumentORM):
+    name = _l("Документ-требование")
+    name_plural = _l("Документы «Требование подтверждено»")
     icon = "fa-solid fa-file-signature"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         DemandDocumentORM.id,
@@ -567,22 +697,25 @@ class DemandDocumentAdmin(ModelView, model=DemandDocumentORM):
         DemandDocumentORM.file_path: "Файл",
         DemandDocumentORM.issued_at: "Выдан",
     }
-    column_formatters = {DemandDocumentORM.issued_at: fmt_datetime}
+    column_formatters = {
+        DemandDocumentORM.status: fmt_demand_status,
+        DemandDocumentORM.issued_at: fmt_datetime,
+    }
+    column_formatters_detail = column_formatters
     can_create = False
     can_delete = False
 
 
-class ResourceAllocationAdmin(ModelView, model=ResourceAllocationORM):
-    name = "Выделение ресурсов"
-    name_plural = "Выделение ресурсов"
+class ResourceAllocationAdmin(LocalizedLabelsMixin, ModelView, model=ResourceAllocationORM):
+    name = _l("Выделение ресурсов")
+    name_plural = _l("Выделение ресурсов")
     icon = "fa-solid fa-coins"
-    category = "Заявки"
+    category = CATEGORY_APPLICATIONS
 
     column_list = [
         ResourceAllocationORM.id,
         ResourceAllocationORM.application,
         ResourceAllocationORM.amount,
-        ResourceAllocationORM.currency,
         ResourceAllocationORM.reference_number,
         ResourceAllocationORM.allocated_by,
         ResourceAllocationORM.allocated_at,
@@ -599,9 +732,50 @@ class ResourceAllocationAdmin(ModelView, model=ResourceAllocationORM):
         ResourceAllocationORM.allocated_by_id: "Зафиксировал",
         ResourceAllocationORM.allocated_at: "Дата",
     }
-    column_formatters = {ResourceAllocationORM.allocated_at: fmt_datetime}
+    column_formatters = {
+        ResourceAllocationORM.amount: fmt_amount,
+        ResourceAllocationORM.allocated_at: fmt_datetime,
+    }
+    column_formatters_detail = column_formatters
     can_create = False
     can_delete = False
+
+
+# ---------- Файлы фотографий (только для авторизованных в админке) ----------
+
+
+class ApplicationPhotoFileView(BaseView):
+    """Отдаёт файл фотографии заявки под cookie-сессией админки.
+    В меню не показывается; используется превью в списках и карточке заявки."""
+
+    name = _l("Файл фотографии")
+
+    def is_visible(self, request: Request) -> bool:
+        return False
+
+    @expose("/application-photo/{pk}", methods=["GET"], include_in_schema=False)
+    async def photo_file(self, request: Request):
+        try:
+            pk = int(request.path_params["pk"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=404) from None
+
+        async with async_session_maker() as session:
+            photo = await session.get(ApplicationPhotoORM, pk)
+
+        if photo is None:
+            raise HTTPException(status_code=404)
+
+        path = PhotoStorage().absolute_path(photo.storage_path)
+        if not path.is_file():
+            raise HTTPException(status_code=404)
+
+        return FileResponse(
+            path,
+            media_type=photo.content_type,
+            filename=photo.file_name,
+            content_disposition_type="inline",
+        )
 
 
 ALL_VIEWS = [
@@ -617,4 +791,5 @@ ALL_VIEWS = [
     PhotoAdmin,
     DemandDocumentAdmin,
     ResourceAllocationAdmin,
+    ApplicationPhotoFileView,
 ]

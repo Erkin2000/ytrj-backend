@@ -36,15 +36,29 @@
   .page-title { font-weight: 700; letter-spacing: -0.01em; }
   .badge { font-weight: 600; letter-spacing: .01em; }
   .table thead th { text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; color: #64748b; }
+  .table-hover tbody tr:hover { background: #f8fafc; }
   .btn-primary { background: #2563eb; border-color: #2563eb; }
   .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+
+  /* Верхняя панель: окружение, пользователь, язык */
+  .jg-topbar { background: #fff; border-bottom: 1px solid #e5e9f0; }
+  .jg-topbar .navbar { min-height: 3rem; }
+  .jg-env { font-size: .75rem; color: #64748b; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+  .jg-env code { background: #eef2ff; color: #3730a3; padding: .1rem .4rem; border-radius: .3rem; }
+  .jg-env a { color: #2563eb; text-decoration: none; }
+  .jg-user { font-size: .8rem; color: #334155; display: flex; align-items: center; gap: .4rem; }
+  .jg-user .avatar { width: 1.6rem; height: 1.6rem; font-size: .7rem; background: #2563eb; color: #fff; }
+  .jg-lang .btn { font-size: .8rem; padding: .25rem .6rem; }
+
+  /* Дашборд */
   .jg-stat { display:flex; align-items:center; gap: 1rem; }
   .jg-stat .jg-icon {
     width: 48px; height: 48px; border-radius: 14px; display:flex; align-items:center; justify-content:center;
-    font-size: 1.2rem; color:#fff;
+    font-size: 1.2rem; color:#fff; flex: 0 0 48px;
   }
   .jg-stat .jg-value { font-size: 1.6rem; font-weight: 700; line-height: 1; }
   .jg-stat .jg-label { color:#64748b; font-size:.8rem; margin-top:.25rem; }
+  .jg-stat .jg-sub { color:#16a34a; font-size:.75rem; margin-top:.2rem; }
   .jg-pipe { display:flex; flex-wrap:wrap; gap:.5rem; }
   .jg-pipe .jg-step {
     flex: 1 1 140px; background:#fff; border-radius:.75rem; padding:.85rem 1rem;
@@ -53,8 +67,68 @@
   .jg-pipe .jg-step .jg-count { font-size:1.5rem; font-weight:700; }
   .jg-pipe .jg-step .jg-title { color:#64748b; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
   .jg-pipe .jg-step ul { list-style:none; padding:0; margin:.5rem 0 0; font-size:.8rem; color:#475569; }
-  .jg-pipe .jg-step li { display:flex; justify-content:space-between; }
-  .jg-env { font-size:.75rem; color:#64748b; }
-  .jg-env code { background:#eef2ff; color:#3730a3; padding:.1rem .4rem; border-radius:.3rem; }
+  .jg-pipe .jg-step li a { display:flex; justify-content:space-between; color:inherit; text-decoration:none; padding:.1rem 0; }
+  .jg-pipe .jg-step li a:hover { color:#2563eb; }
+
+  /* Карточка заявки */
+  .jg-progress { display:flex; gap:.4rem; flex-wrap:wrap; }
+  .jg-progress .jg-pstep { flex:1 1 110px; text-align:center; font-size:.72rem; color:#94a3b8; }
+  .jg-progress .jg-pstep .bar { height:6px; border-radius:3px; background:#e2e8f0; margin-bottom:.35rem; }
+  .jg-progress .jg-pstep.done { color:#0f766e; }
+  .jg-progress .jg-pstep.done .bar { background:#14b8a6; }
+  .jg-progress .jg-pstep.active { color:#1d4ed8; font-weight:600; }
+  .jg-progress .jg-pstep.active .bar { background:#2563eb; }
+  .jg-progress .jg-pstep.rejected { color:#b91c1c; font-weight:600; }
+  .jg-progress .jg-pstep.rejected .bar { background:#ef4444; }
+  .jg-timeline { list-style:none; margin:0; padding:0 0 0 1.1rem; border-left:2px solid #e2e8f0; }
+  .jg-timeline li { position:relative; padding:0 0 1rem 1rem; }
+  .jg-timeline li::before {
+    content:""; position:absolute; left:-1.55rem; top:.3rem; width:.8rem; height:.8rem; border-radius:50%;
+    background:#fff; border:3px solid #94a3b8;
+  }
+  .jg-timeline li.ok::before { border-color:#14b8a6; }
+  .jg-timeline li.bad::before { border-color:#ef4444; }
+  .jg-timeline .when { font-size:.75rem; color:#64748b; }
+  .jg-timeline .who { font-size:.78rem; color:#475569; }
+  .jg-photos { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:.6rem; }
+  .jg-photos a { display:block; border-radius:.6rem; overflow:hidden; border:1px solid #e5e9f0; background:#f8fafc; }
+  .jg-photos img { width:100%; aspect-ratio: 4/3; object-fit:cover; display:block; }
+  .jg-thumb { width:56px; height:42px; object-fit:cover; border-radius:.4rem; border:1px solid #e5e9f0; }
+  .jg-kv { margin:0; }
+  .jg-kv dt { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b; font-weight:600; }
+  .jg-kv dd { margin-bottom:.6rem; }
+  details.jg-all summary { cursor:pointer; color:#2563eb; font-weight:600; }
 </style>
+{% endblock %}
+
+{% block topbar %}
+<header class="jg-topbar d-print-none">
+  <div class="navbar px-3 py-1">
+    <div class="jg-env">
+      <span>{{ _("Скоринг") }}: <code>{{ admin_env.scoring_mode }}</code></span>
+      <span>YIA SSO: <code>{{ "mock" if admin_env.sso_mock else "live" }}</code></span>
+      <a href="/docs" target="_blank"><i class="fa-solid fa-book me-1"></i>{{ _("API-документация") }}</a>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      {% if request.state.admin_user is defined %}
+      <div class="jg-user">
+        <span class="avatar rounded-circle">{{ (request.state.admin_user.full_name or request.state.admin_user.username)[:1] | upper }}</span>
+        <span>{{ request.state.admin_user.full_name or request.state.admin_user.username }}</span>
+      </div>
+      {% endif %}
+      {% if i18n_config.language_switcher and i18n_config.language_switcher | length > 1 %}
+      <div class="dropdown jg-lang">
+        <a href="#" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="{{ _('Language') }}">
+          <i class="fa fa-language me-1"></i>{{ get_locale_display_name(get_locale()) }}
+        </a>
+        <div class="dropdown-menu dropdown-menu-end">
+          {% for code in i18n_config.language_switcher %}
+          <a class="dropdown-item {% if code == get_locale() %}active{% endif %}" href="{{ request.url.include_query_params(lang=code) }}">{{ get_locale_display_name(code) }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</header>
 {% endblock %}

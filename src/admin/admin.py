@@ -1,63 +1,57 @@
-"""Админ-панель на SQLAdmin (Tabler UI): вход только для роли с is_superuser."""
+"""Админ-панель на SQLAdmin (Tabler UI): вход только для роли с is_superuser.
+
+Интерфейс двуязычный (ru/uz): системные строки SQLAdmin и наши подписи
+переводятся через Babel, язык выбирается переключателем в верхней панели
+(`?lang=`, сохраняется в cookie).
+"""
 
 import asyncio
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
-from markupsafe import Markup
 from sqladmin import Admin
 from sqladmin.authentication import AuthenticationBackend, login_required
+from sqladmin.i18n import I18nConfig
 from sqlalchemy import func, select
 from starlette.requests import Request
 from starlette.responses import Response
 
 from src.account.models.user_model import UserORM, UserStatus
+from src.admin.i18n import (
+    ADMIN_LOCALES,
+    DEFAULT_ADMIN_LOCALE,
+    TASHKENT_TZ,
+    _,
+    fmt_dt,
+    fmt_money,
+    fmt_size,
+    register_locales,
+)
+from src.admin.labels import (
+    DECISION_LABELS,
+    DEMAND_STATUS_LABELS,
+    PIPELINE_GROUPS,
+    SCORING_RESULT_LABELS,
+    STATUS_LABELS,
+    event_label,
+    labeled_badge,
+    role_badge,
+    status_badge,
+    status_label,
+    subject_label,
+)
 from src.admin.views import ALL_VIEWS
-from src.application.enums import ApplicationStatus
+from src.application.enums import REJECTED_STATUSES, ApplicationStatus
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
+from src.application.workflow import build_progress
 from src.auth.services.password_service import verify_password
 from src.config import settings
 from src.database import async_session_maker, engine
-from src.rbac.models.role_model import RoleORM
 from src.utils.db_manager import DBManager
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-
-STATUS_LABELS: dict[str, tuple[str, str]] = {
-    "DRAFT": ("Черновик", "secondary"),
-    "SUBMITTED": ("Подана", "blue"),
-    "SCORING_IN_PROGRESS": ("Скоринг KATM", "azure"),
-    "SCORING_FAILED": ("Скоринг не пройден", "red"),
-    "ELIGIBILITY_FAILED": ("Не соответствует требованиям", "red"),
-    "READY_FOR_BANK": ("Готова к отправке в банк", "cyan"),
-    "SENT_TO_BANK": ("Отправлена в банк", "indigo"),
-    "BANK_REVIEW": ("Банк рассматривает", "purple"),
-    "BANK_APPROVED": ("Банк одобрил", "teal"),
-    "BANK_REJECTED": ("Банк отказал", "red"),
-    "COUNCIL_REVIEW": ("Рассмотрение Советом", "orange"),
-    "COUNCIL_APPROVED": ("Совет утвердил", "lime"),
-    "COUNCIL_REJECTED": ("Совет отказал", "red"),
-    "DEMAND_DOCUMENT_CREATED": ("Требование подтверждено", "green"),
-    "RESOURCE_ALLOCATION": ("Выделение ресурсов", "yellow"),
-    "COMPLETED": ("Завершена", "success"),
-}
-
-PIPELINE_GROUPS: list[tuple[str, list[str]]] = [
-    ("Черновики", ["DRAFT"]),
-    ("Скоринг", ["SUBMITTED", "SCORING_IN_PROGRESS"]),
-    ("Банк", ["READY_FOR_BANK", "SENT_TO_BANK", "BANK_REVIEW"]),
-    ("Фонд → Совет", ["BANK_APPROVED", "COUNCIL_REVIEW"]),
-    ("Финансирование", ["COUNCIL_APPROVED", "DEMAND_DOCUMENT_CREATED", "RESOURCE_ALLOCATION"]),
-    ("Завершены", ["COMPLETED"]),
-    ("Отклонены", ["SCORING_FAILED", "ELIGIBILITY_FAILED", "BANK_REJECTED", "COUNCIL_REJECTED"]),
-]
-
-
-def status_badge(value) -> Markup:
-    key = value.value if isinstance(value, ApplicationStatus) else str(value)
-    label, color = STATUS_LABELS.get(key, (key, "secondary"))
-    return Markup(f'<span class="badge bg-{color}-lt">{label}</span>')
 
 
 class AdminAuth(AuthenticationBackend):
@@ -114,6 +108,10 @@ class JamgarmaAdmin(Admin):
 
     @login_required
     async def index(self, request: Request) -> Response:
+        now = datetime.now(TASHKENT_TZ)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=6)
+
         async with async_session_maker() as session:
             by_status = dict(
                 (
@@ -124,6 +122,31 @@ class JamgarmaAdmin(Admin):
             )
             counts = {status.value: by_status.get(status, 0) for status in ApplicationStatus}
 
+            new_today = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ApplicationORM)
+                    .where(ApplicationORM.created_at >= today_start)
+                )
+                or 0
+            )
+            new_week = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ApplicationORM)
+                    .where(ApplicationORM.created_at >= week_start)
+                )
+                or 0
+            )
+            scoring_retry = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ApplicationORM)
+                    .where(ApplicationORM.scoring_retry_required.is_(True))
+                )
+                or 0
+            )
+
             users_total = await session.scalar(select(func.count()).select_from(UserORM)) or 0
             users_active = (
                 await session.scalar(
@@ -133,7 +156,6 @@ class JamgarmaAdmin(Admin):
                 )
                 or 0
             )
-            roles_total = await session.scalar(select(func.count()).select_from(RoleORM)) or 0
             banks_active = (
                 await session.scalar(
                     select(func.count()).select_from(BankORM).where(BankORM.is_active.is_(True))
@@ -156,18 +178,22 @@ class JamgarmaAdmin(Admin):
             ).all()
 
         total_apps = sum(counts.values())
+        completed = counts[ApplicationStatus.COMPLETED.value]
+        rejected = sum(counts[s.value] for s in REJECTED_STATUSES)
+        in_progress = total_apps - completed - rejected - counts[ApplicationStatus.DRAFT.value]
+
         pipeline = [
             {
-                "title": title,
+                "title": _(title),
                 "count": sum(counts[s] for s in statuses),
                 "statuses": [
-                    (STATUS_LABELS[s][0], STATUS_LABELS[s][1], counts[s]) for s in statuses
+                    (s, status_label(s), STATUS_LABELS[s][1], counts[s]) for s in statuses
                 ],
             }
             for title, statuses in PIPELINE_GROUPS
         ]
         needs_attention = {
-            "scoring_retry": await self._count_retry(),
+            "scoring_retry": scoring_retry,
             "to_council": counts["BANK_APPROVED"],
             "to_allocate": counts["DEMAND_DOCUMENT_CREATED"],
             "new_for_bank": counts["SENT_TO_BANK"],
@@ -178,34 +204,31 @@ class JamgarmaAdmin(Admin):
             "sqladmin/index.html",
             {
                 "total_apps": total_apps,
+                "new_today": new_today,
+                "new_week": new_week,
+                "in_progress": in_progress,
+                "completed": completed,
+                "rejected": rejected,
                 "users_total": users_total,
                 "users_active": users_active,
-                "roles_total": roles_total,
                 "banks_active": banks_active,
                 "pipeline": pipeline,
                 "needs_attention": needs_attention,
                 "recent": recent,
                 "recent_logins": recent_logins,
-                "status_badge": status_badge,
-                "scoring_mode": settings.SCORING_MODE,
-                "sso_mock": settings.SSO_MOCK,
             },
         )
 
-    @staticmethod
-    async def _count_retry() -> int:
-        async with async_session_maker() as session:
-            return (
-                await session.scalar(
-                    select(func.count())
-                    .select_from(ApplicationORM)
-                    .where(ApplicationORM.scoring_retry_required.is_(True))
-                )
-                or 0
-            )
+
+def _application_progress(application: ApplicationORM) -> list[dict]:
+    """Шаги индикатора прогресса (как в API) с переведёнными названиями."""
+    steps = build_progress(application.status, application.scoring_retry_required)
+    return [{"key": s.key, "title": _(s.title), "state": s.state} for s in steps]
 
 
 def setup_admin(app: FastAPI) -> Admin:
+    register_locales()
+
     admin = JamgarmaAdmin(
         app,
         engine,
@@ -213,6 +236,30 @@ def setup_admin(app: FastAPI) -> Admin:
         base_url="/admin",
         templates_dir=str(TEMPLATES_DIR),
         authentication_backend=AdminAuth(secret_key=settings.ADMIN_SESSION_SECRET),
+        i18n_config=I18nConfig(
+            default_locale=DEFAULT_ADMIN_LOCALE,
+            language_switcher=ADMIN_LOCALES,
+        ),
+    )
+
+    # Хелперы для наших шаблонов (дашборд, карточка заявки, верхняя панель).
+    admin.templates.env.globals.update(
+        {
+            "admin_env": {"scoring_mode": settings.SCORING_MODE, "sso_mock": settings.SSO_MOCK},
+            "app_version": settings.APP_VERSION,
+            "status_badge": status_badge,
+            "status_label": status_label,
+            "subject_label": subject_label,
+            "role_badge": role_badge,
+            "event_label": event_label,
+            "decision_badge": lambda v: labeled_badge(DECISION_LABELS, v),
+            "scoring_badge": lambda v: labeled_badge(SCORING_RESULT_LABELS, v),
+            "demand_badge": lambda v: labeled_badge(DEMAND_STATUS_LABELS, v),
+            "fmt_dt": fmt_dt,
+            "fmt_money": fmt_money,
+            "fmt_size": fmt_size,
+            "application_progress": _application_progress,
+        }
     )
 
     for view in ALL_VIEWS:

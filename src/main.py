@@ -4,7 +4,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from scalar_fastapi import get_scalar_api_reference
+from fastapi.responses import JSONResponse
+from scalar_fastapi import OpenAPISource, get_scalar_api_reference
 
 from src.account.apis import user_api
 from src.admin.admin import setup_admin
@@ -19,6 +20,7 @@ from src.auth.apis import auth_api, sso_web_api
 from src.common.logging_config import configure_logging
 from src.common.responses.handlers import register_exception_handlers
 from src.common.responses.validation_handler import validation_exception_handler
+from src.common.swagger.i18n import DESCRIPTION_UZ, translate_openapi
 from src.config import settings
 from src.rbac.apis import permission_api, role_api
 
@@ -34,6 +36,8 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
+
+Язык документации переключается в выпадающем списке слева вверху (Русский / Oʻzbek).
 """
 
 TAGS_METADATA = [
@@ -85,11 +89,46 @@ register_exception_handlers(app)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
+_openapi_uz_cache: dict | None = None
+
+
+def openapi_uz() -> dict:
+    """OpenAPI-схема на узбекском: русские строки заменяются по словарю
+    src/common/swagger/i18n.py. Считается один раз, как и app.openapi()."""
+    global _openapi_uz_cache
+    if _openapi_uz_cache is None:
+        _openapi_uz_cache = translate_openapi(app.openapi(), description=DESCRIPTION_UZ)
+    return _openapi_uz_cache
+
+
+@app.get("/openapi-uz.json", include_in_schema=False)
+async def openapi_uz_json():
+    return JSONResponse(openapi_uz())
+
+
 @app.get("/docs", include_in_schema=False)
 async def scalar_html():
+    # Два документа в одном Scalar: переключатель языка — в шапке сайдбара.
     return get_scalar_api_reference(
-        openapi_url=app.openapi_url,
         title=settings.APP_NAME,
+        sources=[
+            OpenAPISource(title="Русский", slug="ru", url=app.openapi_url, default=True),
+            OpenAPISource(title="Oʻzbek", slug="uz", url="/openapi-uz.json"),
+        ],
+        dark_mode=True,
+        hide_client_button=True,
+    )
+
+
+@app.get("/docs/uz", include_in_schema=False)
+async def scalar_html_uz():
+    """Прямая ссылка на узбекскую версию документации."""
+    return get_scalar_api_reference(
+        title=settings.APP_NAME,
+        sources=[
+            OpenAPISource(title="Oʻzbek", slug="uz", url="/openapi-uz.json", default=True),
+            OpenAPISource(title="Русский", slug="ru", url=app.openapi_url),
+        ],
         dark_mode=True,
         hide_client_button=True,
     )

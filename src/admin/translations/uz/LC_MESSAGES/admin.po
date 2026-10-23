@@ -1,0 +1,811 @@
+# Oʻzbekcha (lotin) tarjima — Jamgʻarma admin-paneli.
+#
+# Ikki qatlam:
+#   1) SQLAdmin tizim satrlari (inglizcha msgid);
+#   2) bizning admin-panel satrlari (ruscha msgid): modellar, ustunlar,
+#      holatlar, dashboard, ariza kartochkasi.
+#
+# .mo fayli ilova ishga tushganda kompilyatsiya qilinadi (src/admin/i18n.py).
+msgid ""
+msgstr ""
+"Project-Id-Version: Jamg'arma Admin\n"
+"Language: uz\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# ===================== SQLAdmin (system strings) =====================
+
+msgid "List"
+msgstr "Roʻyxat"
+
+msgid "Details"
+msgstr "Tafsilotlar"
+
+msgid "Create"
+msgstr "Yaratish"
+
+msgid "Edit"
+msgstr "Tahrirlash"
+
+msgid "Delete"
+msgstr "Oʻchirish"
+
+msgid "Export"
+msgstr "Eksport"
+
+msgid "Import"
+msgstr "Import"
+
+msgid "Access"
+msgstr "Kirish huquqi"
+
+msgid "Page"
+msgstr "Sahifa"
+
+msgid "Permissions"
+msgstr "Ruxsatlar"
+
+msgid "You are not allowed to grant: %(permissions)s"
+msgstr "Siz quyidagi ruxsatlarni bera olmaysiz: %(permissions)s"
+
+msgid "New %(name)s"
+msgstr "Yangi: %(name)s"
+
+msgid "Cancel"
+msgstr "Bekor qilish"
+
+msgid "Save"
+msgstr "Saqlash"
+
+msgid "Save and continue editing"
+msgstr "Saqlash va tahrirlashni davom ettirish"
+
+msgid "Save and add another"
+msgstr "Saqlash va yana qoʻshish"
+
+msgid "Column"
+msgstr "Ustun"
+
+msgid "Value"
+msgstr "Qiymat"
+
+msgid "Go Back"
+msgstr "Orqaga"
+
+msgid "Edit %(name)s"
+msgstr "Tahrirlash: %(name)s"
+
+msgid "Save as new"
+msgstr "Yangi sifatida saqlash"
+
+msgid "Logout"
+msgstr "Chiqish"
+
+msgid "Language"
+msgstr "Til"
+
+msgid "Import CSV"
+msgstr "CSV import qilish"
+
+msgid "You are not authorized to view these records."
+msgstr "Sizda ushbu yozuvlarni koʻrish huquqi yoʻq."
+
+msgid "Actions"
+msgstr "Amallar"
+
+msgid "Delete selected items"
+msgstr "Tanlanganlarni oʻchirish"
+
+msgid "Search"
+msgstr "Qidirish"
+
+msgid "Select all"
+msgstr "Hammasini tanlash"
+
+msgid "Select item"
+msgstr "Elementni tanlash"
+
+msgid "View"
+msgstr "Koʻrish"
+
+msgid "Showing %(start)s to %(end)s of %(count)s items"
+msgstr "%(count)s tadan %(start)s–%(end)s koʻrsatilmoqda"
+
+msgid "prev"
+msgstr "oldingi"
+
+msgid "next"
+msgstr "keyingi"
+
+msgid "Show"
+msgstr "Koʻrsatish"
+
+msgid "%(size)s / Page"
+msgstr "%(size)s / sahifa"
+
+msgid "Filters"
+msgstr "Filtrlar"
+
+msgid "Login to %(title)s"
+msgstr "%(title)s — kirish"
+
+msgid "Username"
+msgstr "Login"
+
+msgid "Enter username"
+msgstr "Loginni kiriting"
+
+msgid "Password"
+msgstr "Parol"
+
+msgid "Login"
+msgstr "Kirish"
+
+msgid "Close"
+msgstr "Yopish"
+
+msgid "Done"
+msgstr "Tayyor"
+
+msgid "Clear filter"
+msgstr "Filtrni tozalash"
+
+msgid "Apply Filter"
+msgstr "Filtrni qoʻllash"
+
+msgid "Please confirm"
+msgstr "Tasdiqlang"
+
+msgid "Yes"
+msgstr "Ha"
+
+msgid "Choose CSV file"
+msgstr "CSV faylni tanlang"
+
+msgid "No file selected"
+msgstr "Fayl tanlanmagan"
+
+msgid "Skip invalid rows and continue import"
+msgstr "Notoʻgʻri qatorlarni oʻtkazib yuborib, importni davom ettirish"
+
+msgid "Import progress"
+msgstr "Import jarayoni"
+
+msgid "%(processed)s/%(total)s rows processed"
+msgstr "%(processed)s/%(total)s qator qayta ishlandi"
+
+msgid ""
+"%(imported)s imported, %(skipped)s skipped, %(processed)s/%(total)s rows "
+"processed"
+msgstr ""
+"%(imported)s import qilindi, %(skipped)s oʻtkazib yuborildi, "
+"%(processed)s/%(total)s qator qayta ishlandi"
+
+msgid ""
+"%(imported)s imported, %(skipped)s skipped, %(processed)s/%(total)s rows "
+"processed - saving valid rows... (%(seconds)ss)"
+msgstr ""
+"%(imported)s import qilindi, %(skipped)s oʻtkazib yuborildi, "
+"%(processed)s/%(total)s qator qayta ishlandi — toʻgʻri qatorlar saqlanmoqda... "
+"(%(seconds)s s)"
+
+msgid "Import result"
+msgstr "Import natijasi"
+
+msgid "Missed rows"
+msgstr "Oʻtkazib yuborilgan qatorlar"
+
+msgid "Download CSV"
+msgstr "CSV yuklab olish"
+
+msgid "Download TXT"
+msgstr "TXT yuklab olish"
+
+msgid "Refresh list"
+msgstr "Roʻyxatni yangilash"
+
+# ===================== Категории и модели =====================
+
+msgid "Пользователи и доступ"
+msgstr "Foydalanuvchilar va kirish"
+
+msgid "Справочники"
+msgstr "Maʼlumotnomalar"
+
+msgid "Заявки"
+msgstr "Arizalar"
+
+msgid "Пользователь"
+msgstr "Foydalanuvchi"
+
+msgid "Пользователи"
+msgstr "Foydalanuvchilar"
+
+msgid "Роль"
+msgstr "Rol"
+
+msgid "Роли"
+msgstr "Rollar"
+
+msgid "Право"
+msgstr "Ruxsat"
+
+msgid "Права"
+msgstr "Ruxsatlar"
+
+msgid "Сессия"
+msgstr "Sessiya"
+
+msgid "Сессии (refresh-токены)"
+msgstr "Sessiyalar (refresh-tokenlar)"
+
+msgid "Банк"
+msgstr "Bank"
+
+msgid "Банки"
+msgstr "Banklar"
+
+msgid "Заявка"
+msgstr "Ariza"
+
+msgid "Запись истории"
+msgstr "Tarix yozuvi"
+
+msgid "История статусов"
+msgstr "Holatlar tarixi"
+
+msgid "Попытка скоринга"
+msgstr "Skoring urinishi"
+
+msgid "Скоринг KATM"
+msgstr "KATM skoringi"
+
+msgid "Назначение Совета"
+msgstr "Kengash tayinlovi"
+
+msgid "Решения Совета"
+msgstr "Kengash qarorlari"
+
+msgid "Фотография"
+msgstr "Surat"
+
+msgid "Фотографии заявок"
+msgstr "Ariza suratlari"
+
+msgid "Документ-требование"
+msgstr "Talab hujjati"
+
+msgid "Документы «Требование подтверждено»"
+msgstr "«Talab tasdiqlangan» hujjatlari"
+
+msgid "Выделение ресурсов"
+msgstr "Mablagʻ ajratish"
+
+msgid "Файл фотографии"
+msgstr "Surat fayli"
+
+# ===================== Подписи колонок =====================
+
+msgid "ID"
+msgstr "ID"
+
+msgid "Логин"
+msgstr "Login"
+
+msgid "Ф.И.О."
+msgstr "F.I.Sh."
+
+msgid "Телефон"
+msgstr "Telefon"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Паспорт"
+msgstr "Pasport"
+
+msgid "ПИНФЛ"
+msgstr "JShShIR"
+
+msgid "ИНН"
+msgstr "STIR"
+
+msgid "Статус"
+msgstr "Holat"
+
+msgid "Банк (scope)"
+msgstr "Bank (doira)"
+
+msgid "Организация"
+msgstr "Tashkilot"
+
+msgid "Регион"
+msgstr "Hudud"
+
+msgid "YIA SSO sub"
+msgstr "YIA SSO sub"
+
+msgid "Последний вход"
+msgstr "Oxirgi kirish"
+
+msgid "Создан"
+msgstr "Yaratilgan"
+
+msgid "Обновлён"
+msgstr "Yangilangan"
+
+msgid "Создана"
+msgstr "Yaratilgan"
+
+msgid "Обновлена"
+msgstr "Yangilangan"
+
+msgid "Код"
+msgstr "Kod"
+
+msgid "Название"
+msgstr "Nomi"
+
+msgid "Описание"
+msgstr "Tavsif"
+
+msgid "Суперпользователь"
+msgstr "Superfoydalanuvchi"
+
+msgid "Системная"
+msgstr "Tizimli"
+
+msgid "IP"
+msgstr "IP"
+
+msgid "User-Agent"
+msgstr "User-Agent"
+
+msgid "Вход"
+msgstr "Kirish"
+
+msgid "Истекает"
+msgstr "Tugaydi"
+
+msgid "Отозван"
+msgstr "Bekor qilingan"
+
+msgid "Порядок"
+msgstr "Tartib"
+
+msgid "Официальное название"
+msgstr "Rasmiy nomi"
+
+msgid "Типы субъектов"
+msgstr "Subyekt turlari"
+
+msgid "Активен"
+msgstr "Faol"
+
+msgid "Номер"
+msgstr "Raqam"
+
+msgid "Заявитель"
+msgstr "Ariza beruvchi"
+
+msgid "Ф.И.О. заявителя"
+msgstr "Ariza beruvchi F.I.Sh."
+
+msgid "Тип субъекта"
+msgstr "Subyekt turi"
+
+msgid "Юр. наименование"
+msgstr "Yuridik nomi"
+
+msgid "Широта"
+msgstr "Kenglik"
+
+msgid "Долгота"
+msgstr "Uzunlik"
+
+msgid "Адрес деятельности"
+msgstr "Faoliyat manzili"
+
+msgid "Место подтверждено"
+msgstr "Joy tasdiqlangan"
+
+msgid "Отправлена"
+msgstr "Yuborilgan"
+
+msgid "Ожидает повтора KATM"
+msgstr "KATM takrorini kutmoqda"
+
+msgid "Ошибка KATM"
+msgstr "KATM xatosi"
+
+msgid "В банк"
+msgstr "Bankka"
+
+msgid "Принял (банк)"
+msgstr "Qabul qildi (bank)"
+
+msgid "Принята банком"
+msgstr "Bank qabul qilgan"
+
+msgid "Решение банка"
+msgstr "Bank qarori"
+
+msgid "Причина банка"
+msgstr "Bank sababi"
+
+msgid "Решил (банк)"
+msgstr "Qaror qildi (bank)"
+
+msgid "Решение банка (дата)"
+msgstr "Bank qarori (sana)"
+
+msgid "В Совет"
+msgstr "Kengashga"
+
+msgid "Направил в Совет"
+msgstr "Kengashga yoʻnaltirdi"
+
+msgid "Решение Совета (дата)"
+msgstr "Kengash qarori (sana)"
+
+msgid "Причина Совета"
+msgstr "Kengash sababi"
+
+msgid "Завершена"
+msgstr "Yakunlangan"
+
+msgid "Фотографии"
+msgstr "Suratlar"
+
+msgid "История"
+msgstr "Tarix"
+
+msgid "Скоринг"
+msgstr "Skoring"
+
+msgid "Члены Совета"
+msgstr "Kengash aʼzolari"
+
+msgid "Из статуса"
+msgstr "Avvalgi holat"
+
+msgid "В статус"
+msgstr "Yangi holat"
+
+msgid "Новый статус"
+msgstr "Yangi holat"
+
+msgid "Событие"
+msgstr "Hodisa"
+
+msgid "Комментарий"
+msgstr "Izoh"
+
+msgid "Кто"
+msgstr "Kim"
+
+msgid "Когда"
+msgstr "Qachon"
+
+msgid "Провайдер"
+msgstr "Provayder"
+
+msgid "Результат"
+msgstr "Natija"
+
+msgid "Требования Фонда"
+msgstr "Jamgʻarma talablari"
+
+msgid "Детали"
+msgstr "Tafsilotlar"
+
+msgid "Ошибка"
+msgstr "Xato"
+
+msgid "Внёс вручную"
+msgstr "Qoʻlda kiritdi"
+
+msgid "Член Совета"
+msgstr "Kengash aʼzosi"
+
+msgid "Направил"
+msgstr "Yoʻnaltirdi"
+
+msgid "Направлена"
+msgstr "Yoʻnaltirilgan"
+
+msgid "Решение"
+msgstr "Qaror"
+
+msgid "Причина"
+msgstr "Sabab"
+
+msgid "Решение (дата)"
+msgstr "Qaror (sana)"
+
+msgid "Файл"
+msgstr "Fayl"
+
+msgid "Путь"
+msgstr "Yoʻl"
+
+msgid "Тип"
+msgstr "Tur"
+
+msgid "Размер"
+msgstr "Hajmi"
+
+msgid "Загружена"
+msgstr "Yuklangan"
+
+msgid "Превью"
+msgstr "Koʻrinish"
+
+msgid "Выдан"
+msgstr "Berilgan"
+
+msgid "Сумма"
+msgstr "Summa"
+
+msgid "Валюта"
+msgstr "Valyuta"
+
+msgid "Реквизиты"
+msgstr "Rekvizitlar"
+
+msgid "Зафиксировал"
+msgstr "Qayd etdi"
+
+msgid "Дата"
+msgstr "Sana"
+
+# ===================== Статусы и справочные значения =====================
+
+msgid "Черновик"
+msgstr "Qoralama"
+
+msgid "Подана"
+msgstr "Topshirilgan"
+
+msgid "Скоринг не пройден"
+msgstr "Skoringdan oʻtmagan"
+
+msgid "Не соответствует требованиям"
+msgstr "Talablarga mos emas"
+
+msgid "Готова к отправке в банк"
+msgstr "Bankka yuborishga tayyor"
+
+msgid "Отправлена в банк"
+msgstr "Bankka yuborilgan"
+
+msgid "Банк рассматривает"
+msgstr "Bank koʻrib chiqmoqda"
+
+msgid "Банк одобрил"
+msgstr "Bank maʼqulladi"
+
+msgid "Банк отказал"
+msgstr "Bank rad etdi"
+
+msgid "Рассмотрение Советом"
+msgstr "Kengash koʻrib chiqmoqda"
+
+msgid "Совет утвердил"
+msgstr "Kengash tasdiqladi"
+
+msgid "Совет отказал"
+msgstr "Kengash rad etdi"
+
+msgid "Требование подтверждено"
+msgstr "Talab tasdiqlangan"
+
+msgid "Черновики"
+msgstr "Qoralamalar"
+
+msgid "Фонд → Совет"
+msgstr "Jamgʻarma → Kengash"
+
+msgid "Финансирование"
+msgstr "Moliyalashtirish"
+
+msgid "Завершены"
+msgstr "Yakunlangan"
+
+msgid "Отклонены"
+msgstr "Rad etilgan"
+
+msgid "ИП"
+msgstr "YaTT"
+
+msgid "ООО"
+msgstr "MChJ"
+
+msgid "Самозанятый"
+msgstr "Oʻzini oʻzi band qilgan"
+
+msgid "Одобрено"
+msgstr "Maʼqullangan"
+
+msgid "Отклонено"
+msgstr "Rad etilgan"
+
+msgid "Пройден"
+msgstr "Oʻtdi"
+
+msgid "Не пройден"
+msgstr "Oʻtmadi"
+
+msgid "Техническая ошибка"
+msgstr "Texnik xatolik"
+
+msgid "Сформирован"
+msgstr "Shakllantirilgan"
+
+msgid "Заблокирован"
+msgstr "Bloklangan"
+
+# ===================== События истории =====================
+
+msgid "Заявка создана"
+msgstr "Ariza yaratildi"
+
+msgid "Заявка отправлена"
+msgstr "Ariza yuborildi"
+
+msgid "Запущен скоринг KATM"
+msgstr "KATM skoringi boshlandi"
+
+msgid "Скоринг пройден"
+msgstr "Skoringdan oʻtdi"
+
+msgid "Техническая ошибка KATM"
+msgstr "KATM texnik xatosi"
+
+msgid "Повтор скоринга"
+msgstr "Skoring takrori"
+
+msgid "Не соответствует требованиям Фонда"
+msgstr "Jamgʻarma talablariga mos emas"
+
+msgid "Направлена в банк"
+msgstr "Bankka yoʻnaltirildi"
+
+msgid "Банк принял заявку"
+msgstr "Bank arizani qabul qildi"
+
+msgid "Направлена в Совет"
+msgstr "Kengashga yoʻnaltirildi"
+
+msgid "Голос члена Совета"
+msgstr "Kengash aʼzosining ovozi"
+
+msgid "Создан документ «Требование подтверждено»"
+msgstr "«Talab tasdiqlangan» hujjati yaratildi"
+
+msgid "Ресурсы выделены"
+msgstr "Mablagʻ ajratildi"
+
+msgid "Заявка завершена"
+msgstr "Ariza yakunlandi"
+
+# ===================== Индикатор прогресса (workflow) =====================
+
+msgid "Заявка подана"
+msgstr "Ariza topshirildi"
+
+msgid "Проверка KATM"
+msgstr "KATM tekshiruvi"
+
+msgid "Решение Совета"
+msgstr "Kengash qarori"
+
+# ===================== Верхняя панель, вход =====================
+
+msgid "API-документация"
+msgstr "API hujjatlari"
+
+msgid "Панель управления платформой · только для Super Admin"
+msgstr "Platforma boshqaruv paneli · faqat Super Admin uchun"
+
+msgid "Пароль"
+msgstr "Parol"
+
+msgid "Войти"
+msgstr "Kirish"
+
+msgid "Неверный логин или пароль, либо нет доступа в админ-панель"
+msgstr "Login yoki parol notoʻgʻri, yoki admin-panelga kirish huquqi yoʻq"
+
+# ===================== Дашборд =====================
+
+msgid "Jamg'arma · платформа финансирования"
+msgstr "Jamgʻarma · moliyalashtirish platformasi"
+
+msgid "Панель управления"
+msgstr "Boshqaruv paneli"
+
+msgid "Заявок всего"
+msgstr "Jami arizalar"
+
+msgid "сегодня"
+msgstr "bugun"
+
+msgid "за 7 дней"
+msgstr "7 kunda"
+
+msgid "В работе"
+msgstr "Jarayonda"
+
+msgid "Завершено / отклонено"
+msgstr "Yakunlangan / rad etilgan"
+
+msgid "Активных пользователей"
+msgstr "Faol foydalanuvchilar"
+
+msgid "Воронка заявок"
+msgstr "Arizalar voronkasi"
+
+msgid "Требуют внимания"
+msgstr "Eʼtibor talab qiladi"
+
+msgid "Техническая ошибка KATM, ждут повтора"
+msgstr "KATM texnik xatosi, takror kutilmoqda"
+
+msgid "Новые для банков"
+msgstr "Banklar uchun yangi"
+
+msgid "Одобрены банком — направить в Совет"
+msgstr "Bank maʼqullagan — Kengashga yoʻnaltirish"
+
+msgid "Ожидают выделения ресурсов"
+msgstr "Mablagʻ ajratilishini kutmoqda"
+
+msgid "Последние входы"
+msgstr "Soʻnggi kirishlar"
+
+msgid "без роли"
+msgstr "rolsiz"
+
+msgid "Пока никто не входил."
+msgstr "Hali hech kim kirmagan."
+
+msgid "Последние изменения заявок"
+msgstr "Arizalardagi soʻnggi oʻzgarishlar"
+
+msgid "Все заявки"
+msgstr "Barcha arizalar"
+
+msgid "Заявок ещё нет."
+msgstr "Hozircha arizalar yoʻq."
+
+# ===================== Карточка заявки =====================
+
+msgid "История пуста."
+msgstr "Tarix boʻsh."
+
+msgid "Попыток скоринга не было."
+msgstr "Skoring urinishlari boʻlmagan."
+
+msgid "Фотографий нет."
+msgstr "Suratlar yoʻq."
+
+msgid "Место деятельности"
+msgstr "Faoliyat joyi"
+
+msgid "Координаты"
+msgstr "Koordinatalar"
+
+msgid "Совет ещё не назначен."
+msgstr "Kengash hali tayinlanmagan."
+
+msgid "Документ ещё не создан."
+msgstr "Hujjat hali yaratilmagan."
+
+msgid "Ресурсы ещё не выделены."
+msgstr "Mablagʻ hali ajratilmagan."
+
+msgid "Все поля"
+msgstr "Barcha maydonlar"

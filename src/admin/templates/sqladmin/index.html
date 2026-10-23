@@ -3,50 +3,50 @@
 {% block content_header %}
 <div class="row align-items-center">
   <div class="col">
-    <div class="page-pretitle">Jamg'arma · платформа финансирования</div>
-    <h2 class="page-title">Панель управления</h2>
-  </div>
-  <div class="col-auto jg-env">
-    Скоринг: <code>{{ scoring_mode }}</code>
-    &nbsp; YIA SSO: <code>{{ "mock" if sso_mock else "live" }}</code>
-    &nbsp; <a href="/docs" target="_blank">API Docs</a>
+    <div class="page-pretitle">{{ _("Jamg'arma · платформа финансирования") }}</div>
+    <h2 class="page-title">{{ _("Панель управления") }}</h2>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+{% set apps_url = url_for('admin:list', identity='application-orm') %}
 <div class="col-12">
   <div class="row row-cards">
     <div class="col-sm-6 col-lg-3">
-      <div class="card"><div class="card-body jg-stat">
+      <a class="card card-link" href="{{ apps_url }}"><div class="card-body jg-stat">
         <div class="jg-icon" style="background:#2563eb"><i class="fa-solid fa-file-lines"></i></div>
-        <div><div class="jg-value">{{ total_apps }}</div><div class="jg-label">Заявок всего</div></div>
-      </div></div>
+        <div>
+          <div class="jg-value">{{ total_apps }}</div>
+          <div class="jg-label">{{ _("Заявок всего") }}</div>
+          <div class="jg-sub">+{{ new_today }} {{ _("сегодня") }} · +{{ new_week }} {{ _("за 7 дней") }}</div>
+        </div>
+      </div></a>
     </div>
     <div class="col-sm-6 col-lg-3">
       <div class="card"><div class="card-body jg-stat">
+        <div class="jg-icon" style="background:#7c3aed"><i class="fa-solid fa-spinner"></i></div>
+        <div><div class="jg-value">{{ in_progress }}</div><div class="jg-label">{{ _("В работе") }}</div></div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <a class="card card-link" href="{{ apps_url }}?status=COMPLETED"><div class="card-body jg-stat">
+        <div class="jg-icon" style="background:#16a34a"><i class="fa-solid fa-circle-check"></i></div>
+        <div><div class="jg-value">{{ completed }} <span class="text-muted fs-5">/ {{ rejected }}</span></div><div class="jg-label">{{ _("Завершено / отклонено") }}</div></div>
+      </div></a>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <a class="card card-link" href="{{ url_for('admin:list', identity='user-orm') }}"><div class="card-body jg-stat">
         <div class="jg-icon" style="background:#0d9488"><i class="fa-solid fa-users"></i></div>
-        <div><div class="jg-value">{{ users_active }} <span class="text-muted fs-5">/ {{ users_total }}</span></div><div class="jg-label">Активных пользователей</div></div>
-      </div></div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="card"><div class="card-body jg-stat">
-        <div class="jg-icon" style="background:#7c3aed"><i class="fa-solid fa-user-shield"></i></div>
-        <div><div class="jg-value">{{ roles_total }}</div><div class="jg-label">Ролей в каталоге</div></div>
-      </div></div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="card"><div class="card-body jg-stat">
-        <div class="jg-icon" style="background:#ea580c"><i class="fa-solid fa-building-columns"></i></div>
-        <div><div class="jg-value">{{ banks_active }}</div><div class="jg-label">Банков-партнёров</div></div>
-      </div></div>
+        <div><div class="jg-value">{{ users_active }} <span class="text-muted fs-5">/ {{ users_total }}</span></div><div class="jg-label">{{ _("Активных пользователей") }}</div></div>
+      </div></a>
     </div>
   </div>
 </div>
 
 <div class="col-12">
   <div class="card">
-    <div class="card-header"><h3 class="card-title">Воронка заявок</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ _("Воронка заявок") }}</h3></div>
     <div class="card-body">
       <div class="jg-pipe">
         {% for step in pipeline %}
@@ -54,8 +54,8 @@
           <div class="jg-title">{{ step.title }}</div>
           <div class="jg-count">{{ step.count }}</div>
           <ul>
-            {% for label, color, count in step.statuses %}
-            <li><span><span class="badge bg-{{ color }}-lt me-1">&nbsp;</span>{{ label }}</span><strong>{{ count }}</strong></li>
+            {% for key, label, color, count in step.statuses %}
+            <li><a href="{{ apps_url }}?status={{ key }}" title="{{ label }}"><span><span class="badge bg-{{ color }}-lt me-1">&nbsp;</span>{{ label }}</span><strong>{{ count }}</strong></a></li>
             {% endfor %}
           </ul>
         </div>
@@ -67,42 +67,42 @@
 
 <div class="col-lg-4">
   <div class="card">
-    <div class="card-header"><h3 class="card-title">Требуют внимания</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ _("Требуют внимания") }}</h3></div>
     <div class="list-group list-group-flush">
-      <a class="list-group-item d-flex justify-content-between" href="{{ url_for('admin:list', identity='application-orm') }}?scoring_retry_required=true">
-        <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Техническая ошибка KATM, ждут повтора</span>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?scoring_retry_required=true">
+        <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>{{ _("Техническая ошибка KATM, ждут повтора") }}</span>
         <span class="badge bg-warning">{{ needs_attention.scoring_retry }}</span>
       </a>
-      <a class="list-group-item d-flex justify-content-between" href="{{ url_for('admin:list', identity='application-orm') }}?status=SENT_TO_BANK">
-        <span><i class="fa-solid fa-paper-plane text-indigo me-2"></i>Новые для банков</span>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=SENT_TO_BANK">
+        <span><i class="fa-solid fa-paper-plane text-indigo me-2"></i>{{ _("Новые для банков") }}</span>
         <span class="badge bg-indigo">{{ needs_attention.new_for_bank }}</span>
       </a>
-      <a class="list-group-item d-flex justify-content-between" href="{{ url_for('admin:list', identity='application-orm') }}?status=BANK_APPROVED">
-        <span><i class="fa-solid fa-gavel text-teal me-2"></i>Одобрены банком — направить в Совет</span>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=BANK_APPROVED">
+        <span><i class="fa-solid fa-gavel text-teal me-2"></i>{{ _("Одобрены банком — направить в Совет") }}</span>
         <span class="badge bg-teal">{{ needs_attention.to_council }}</span>
       </a>
-      <a class="list-group-item d-flex justify-content-between" href="{{ url_for('admin:list', identity='application-orm') }}?status=DEMAND_DOCUMENT_CREATED">
-        <span><i class="fa-solid fa-coins text-green me-2"></i>Ожидают выделения ресурсов</span>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=DEMAND_DOCUMENT_CREATED">
+        <span><i class="fa-solid fa-coins text-green me-2"></i>{{ _("Ожидают выделения ресурсов") }}</span>
         <span class="badge bg-green">{{ needs_attention.to_allocate }}</span>
       </a>
     </div>
   </div>
 
   <div class="card mt-3">
-    <div class="card-header"><h3 class="card-title">Последние входы</h3></div>
+    <div class="card-header"><h3 class="card-title">{{ _("Последние входы") }}</h3></div>
     <div class="list-group list-group-flush">
       {% for u in recent_logins %}
-      <div class="list-group-item">
+      <a class="list-group-item" href="{{ url_for('admin:details', identity='user-orm', pk=u.id) }}">
         <div class="d-flex justify-content-between">
           <div>
             <div class="fw-semibold">{{ u.full_name or u.username }}</div>
-            <div class="text-muted small">{{ u.role.name if u.role else "без роли" }}{% if u.bank %} · {{ u.bank.name }}{% endif %}</div>
+            <div class="text-muted small">{{ role_badge(u.role) if u.role else _("без роли") }}{% if u.bank %} · {{ u.bank.name }}{% endif %}</div>
           </div>
-          <div class="text-muted small">{{ u.last_login_at.strftime("%d.%m %H:%M") }}</div>
+          <div class="text-muted small">{{ fmt_dt(u.last_login_at) }}</div>
         </div>
-      </div>
+      </a>
       {% else %}
-      <div class="list-group-item text-muted">Пока никто не входил.</div>
+      <div class="list-group-item text-muted">{{ _("Пока никто не входил.") }}</div>
       {% endfor %}
     </div>
   </div>
@@ -111,12 +111,12 @@
 <div class="col-lg-8">
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">Последние изменения заявок</h3>
-      <div class="card-actions"><a href="{{ url_for('admin:list', identity='application-orm') }}" class="btn btn-sm btn-outline-primary">Все заявки</a></div>
+      <h3 class="card-title">{{ _("Последние изменения заявок") }}</h3>
+      <div class="card-actions"><a href="{{ apps_url }}" class="btn btn-sm btn-outline-primary">{{ _("Все заявки") }}</a></div>
     </div>
     <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead><tr><th>Номер</th><th>Заявитель</th><th>Банк</th><th>Статус</th><th>Обновлена</th></tr></thead>
+      <table class="table table-vcenter card-table table-hover">
+        <thead><tr><th>{{ _("Номер") }}</th><th>{{ _("Заявитель") }}</th><th>{{ _("Банк") }}</th><th>{{ _("Статус") }}</th><th>{{ _("Обновлена") }}</th></tr></thead>
         <tbody>
           {% for a in recent %}
           <tr>
@@ -124,10 +124,10 @@
             <td>{{ a.applicant_full_name or "—" }}</td>
             <td>{{ a.bank.name if a.bank else "—" }}</td>
             <td>{{ status_badge(a.status) }}</td>
-            <td class="text-muted">{{ a.updated_at.strftime("%d.%m.%Y %H:%M") }}</td>
+            <td class="text-muted">{{ fmt_dt(a.updated_at) }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-muted">Заявок ещё нет.</td></tr>
+          <tr><td colspan="5" class="text-muted">{{ _("Заявок ещё нет.") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
