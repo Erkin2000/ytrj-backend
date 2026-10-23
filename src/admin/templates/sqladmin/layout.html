@@ -42,6 +42,8 @@
     --jg-side-to: #121a24;
   }
   body { background: var(--jg-bg); }
+  /* row-deck у Tabler делает колонку flex-строкой: несколько карточек в одной колонке вставали рядом. */
+  .row-deck > [class*="col-"] { flex-direction: column; }
   .card { border: 0; background: var(--jg-card); box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px -16px rgba(15,23,42,.25); border-radius: .9rem; }
   .page-title { font-weight: 700; letter-spacing: -0.01em; }
   .page-pretitle a { color: inherit; text-decoration: none; }
