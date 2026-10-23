@@ -115,10 +115,11 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 ### Вход через YIA Portal (SSO)
 
 1. Фронтенд вызывает `GET /api/v1/auth/sso/authorize`, сохраняет `state` (например, в sessionStorage) и перенаправляет браузер на `authorize_url`. Пользователь проходит OneID на стороне портала.
-2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале) с `?code=...&state=...` либо `?error=access_denied&state=...`.
-3. Фронтенд сразу (code живёт 60 секунд) отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает пару JWT.
+2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале, например `https://yoshlarfondi.uz/api/auth/one-id/callback`) с `?code=...&state=...` либо `?error=access_denied&state=...`.
+3. Бэкенд на этом адресе ничего не обменивает, а сразу отвечает `302` на страницу входа фронтенда `SSO_FRONTEND_REDIRECT_URL` (по умолчанию `http://localhost:5173/login`), пробрасывая `code`, `state`, `error`, `error_description` в query.
+4. Фронтенд сразу (code живёт 60 секунд) сверяет `state` с сохранённым, отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает пару JWT.
 
-Пока отдельного фронтенда нет, бэкенд отдаёт встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — страница возврата, которую регистрируют на портале как `redirect_uri`. Обе работают через публичное API так же, как это делал бы SPA; токены кладутся в `localStorage`.
+Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — точка возврата с портала. Если `SSO_FRONTEND_REDIRECT_URL` пуст, вместо редиректа она показывает встроенную страницу, которая сама вызывает `POST /auth/sso/callback` и кладёт токены в `localStorage`.
 
 Бэкенд проверяет подпись и срок `state` (`SSO_STATE_TTL_SECONDS`), меняет `code` на профиль через `POST {SSO_BASE_URL}/api/v1/users/auth/sso/token/` с `client_secret` (только backend) и находит пользователя по `sub` портала (`users.sso_sub`), затем по ПИНФЛ; если не найден — создаёт заявителя (`username` = ПИНФЛ, при его отсутствии `sso_<sub>`). ПИНФЛ запрашивается у портала как опциональное поле при онбординге; `region/city/makhalla/role` приходят только у ётакчи и сейчас сохраняется только название региона.
 

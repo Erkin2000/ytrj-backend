@@ -7,8 +7,10 @@
 """
 
 from pathlib import Path
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Request
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.config import settings
@@ -37,8 +39,31 @@ async def sso_login_page(request: Request):
     return templates.TemplateResponse(request, "sso_login.html", _context(request))
 
 
+# Параметры, которые портал присылает на redirect_uri и которые нужны фронтенду.
+_CALLBACK_PARAMS = ("code", "state", "error", "error_description")
+
+
+def frontend_callback_url(query: dict[str, str]) -> str | None:
+    """Адрес страницы входа фронтенда с параметрами возврата портала.
+    None, если SSO_FRONTEND_REDIRECT_URL не задан (работает встроенная страница)."""
+    base = settings.SSO_FRONTEND_REDIRECT_URL.strip()
+    if not base:
+        return None
+
+    passthrough = {k: query[k] for k in _CALLBACK_PARAMS if query.get(k)}
+    scheme, netloc, path, existing_query, fragment = urlsplit(base)
+    merged_query = "&".join(part for part in (existing_query, urlencode(passthrough)) if part)
+    return urlunsplit((scheme, netloc, path, merged_query, fragment))
+
+
 @router.get("/callback")
 async def sso_callback_page(request: Request):
-    # code/state/error читает скрипт страницы из query и отправляет в
-    # POST /api/v1/auth/sso/callback — сервер здесь ничего не обменивает.
+    # Сервер здесь ничего не обменивает: code одноразовый и живёт 60 секунд,
+    # поэтому сразу передаём code/state/error на страницу входа фронтенда,
+    # а тот вызывает POST /api/v1/auth/sso/callback.
+    target = frontend_callback_url(dict(request.query_params))
+    if target:
+        return RedirectResponse(target, status_code=302)
+
+    # Без фронтенда — встроенная страница делает то же самое скриптом.
     return templates.TemplateResponse(request, "sso_callback.html", _context(request))

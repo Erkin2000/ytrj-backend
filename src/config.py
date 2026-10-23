@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     SSO_CLIENT_SECRET: str = ""
     # Должен в точности совпадать с redirect_uri, зарегистрированным на портале.
     SSO_REDIRECT_URI: str = "http://localhost:8000/api/auth/one-id/callback"
+    # Куда бэкенд перенаправляет браузер после возврата с портала: страница входа
+    # фронтенда, которая получает ?code&state (или ?error) и вызывает
+    # POST /auth/sso/callback. Пустое значение — показывать встроенную страницу.
+    SSO_FRONTEND_REDIRECT_URL: str = "http://localhost:5173/login"
     SSO_TIMEOUT_SECONDS: float = 10.0
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600
