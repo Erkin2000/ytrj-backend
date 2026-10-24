@@ -4,6 +4,8 @@ from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
 from src.application.models.demand_document_model import DemandDocumentORM
+from src.application.models.document_model import ApplicationDocumentORM
+from src.application.models.founder_model import ApplicationFounderORM
 from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
@@ -14,10 +16,14 @@ from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationListItemDTO,
     BankStageDTO,
+    CompanyDTO,
     CouncilAssignmentDTO,
     DemandDocumentDTO,
+    DocumentDTO,
+    FounderDTO,
     LocationResponseDTO,
     PhotoDTO,
+    ProjectResponseDTO,
     ResourceAllocationDTO,
     ScoringAttemptDTO,
     StatusHistoryDTO,
@@ -36,6 +42,72 @@ def actor(model: UserORM | None) -> ActorDTO | None:
 class BankDataMapper(DataMapper):
     db_model = BankORM
     schema = BankDTO
+
+
+class FounderDataMapper(DataMapper):
+    db_model = ApplicationFounderORM
+    schema = FounderDTO
+
+    @staticmethod
+    def map_to_domain_entity(model: ApplicationFounderORM) -> FounderDTO:
+        return FounderDTO(
+            id=model.id,
+            full_name=model.full_name,
+            passport_number=model.passport_number,
+            date_of_birth=model.date_of_birth,
+            created_at=model.created_at,
+        )
+
+
+def location_dto(model: ApplicationORM) -> LocationResponseDTO:
+    return LocationResponseDTO(
+        lat=model.location_lat,
+        lng=model.location_lng,
+        region=model.location_region,
+        district=model.location_district,
+        makhalla=model.location_makhalla,
+        address=model.location_address,
+        confirmed=model.location_confirmed,
+    )
+
+
+def project_dto(model: ApplicationORM) -> ProjectResponseDTO:
+    return ProjectResponseDTO(
+        requested_amount=model.project_requested_amount,
+        loan_term_months=model.project_loan_term_months,
+        total_cost=model.project_total_cost,
+        jobs_count=model.project_jobs_count,
+        description=model.project_description,
+    )
+
+
+def company_dto(model: ApplicationORM) -> CompanyDTO:
+    return CompanyDTO.model_construct(
+        inn=model.company_inn,
+        director_full_name=model.director_full_name,
+        director_passport=model.director_passport,
+        director_phone=model.director_phone,
+        director_date_of_birth=model.director_date_of_birth,
+    )
+
+
+class DocumentDataMapper(DataMapper):
+    db_model = ApplicationDocumentORM
+    schema = DocumentDTO
+
+    @staticmethod
+    def map_to_domain_entity(model: ApplicationDocumentORM) -> DocumentDTO:
+        return DocumentDTO(
+            id=model.id,
+            file_name=model.file_name,
+            content_type=model.content_type,
+            size=model.size,
+            url=(
+                f"{settings.API_PREFIX}/applications/{model.application_id}"
+                f"/documents/{model.id}/file"
+            ),
+            created_at=model.created_at,
+        )
 
 
 class PhotoDataMapper(DataMapper):
@@ -179,13 +251,12 @@ class ApplicationDataMapper(DataMapper):
                 gender=model.applicant_gender,
                 date_of_birth=model.applicant_date_of_birth,
             ),
-            location=LocationResponseDTO(
-                lat=model.location_lat,
-                lng=model.location_lng,
-                address=model.location_address,
-                confirmed=model.location_confirmed,
-            ),
+            company=company_dto(model),
+            founders=[FounderDataMapper.map_to_domain_entity(f) for f in model.founders],
+            project=project_dto(model),
+            location=location_dto(model),
             photos=[PhotoDataMapper.map_to_domain_entity(p) for p in model.photos],
+            documents=[DocumentDataMapper.map_to_domain_entity(d) for d in model.documents],
             bank_stage=BankStageDTO(
                 sent_to_bank_at=model.sent_to_bank_at,
                 accepted_by=actor(model.bank_accepted_by),

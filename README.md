@@ -122,6 +122,46 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 как `applicant.<field>`. Снимок данных заявителя в заявке обновляется из профиля в момент отправки.
 Список обязательных полей — `src/account/profile.py`.
 
+### Предприятие, руководитель и учредители
+
+Только для ООО (`SUBJECT_TYPES_WITH_COMPANY` / `SUBJECT_TYPES_WITH_FOUNDERS`); ИП и самозанятый действуют от своего имени,
+их данные берутся из профиля. Руководитель ООО может не совпадать с заявителем, поэтому его данные вводятся в самой заявке.
+В `POST /applications` и `PATCH /applications/{id}` блок `company`: `inn` (СТИР предприятия), `director_full_name`,
+`director_passport`, `director_phone`, `director_date_of_birth`. Учредители — таблица `application_founders`
+(`full_name`, `passport_number`, `date_of_birth`): передаются списком `founders` при создании либо отдельными ручками
+`POST/PATCH/DELETE /applications/{id}/founders[/{founder_id}]`; для ООО обязателен хотя бы один, лимит — `MAX_APPLICATION_FOUNDERS` (20).
+Для ИП и самозанятого `company` / `founders` отвечают 400, при смене типа с ООО они очищаются.
+Недостающие поля в сводке: `company.<field>`, `founders`.
+
+### Фото и документы
+
+Фото: `POST /applications/{id}/photos` — JPG/PNG/WEBP, до `MAX_APPLICATION_PHOTOS` (4) штук, `PHOTO_MAX_SIZE_MB` (5).
+Документы: `POST /applications/{id}/documents` — PDF или DOCX, до `MAX_APPLICATION_DOCUMENTS` (4) штук,
+`DOCUMENT_MAX_SIZE_MB` (10); тип определяется по content-type либо по расширению и сверяется с сигнатурой файла.
+`DELETE .../documents/{document_id}` — только в черновике; `GET .../documents/{document_id}/file` — для всех, кто видит заявку.
+Файлы лежат в `MEDIA_PATH/applications/{id}/documents/`, в карточке заявки — список `documents`, в сводке — `documents_count` / `max_documents`.
+
+### Место деятельности
+
+`PUT /applications/{id}/location`: координаты `lat`/`lng`, обязательные `region` (область), `district` (район), `makhalla`
+(махалля), необязательный `address` (улица, дом) и `confirmed`. Пока это текстовые поля; справочник адм.-терр. единиц — позже.
+Без координат, области, района и махалли в сводке остаётся `location`, без `confirmed=true` — `location.confirmed`.
+
+### Проект
+
+`PUT /applications/{id}/project` (только в черновике, заполняется целиком): `requested_amount` (запрашиваемая сумма, UZS),
+`loan_term_months` (срок кредита, `LOAN_TERM_MIN_MONTHS`…`LOAN_TERM_MAX_MONTHS`, по умолчанию 12–36), `total_cost`
+(общая стоимость проекта, не меньше запрашиваемой суммы), `jobs_count` (создаваемые рабочие места), `description` (20–4000 символов).
+Блок отдаётся в карточке и сводке как `project`; без него заявку отправить нельзя (недостающие поля — `project.<field>`).
+
+### Выбор банка
+
+Банк выбирается отдельным шагом черновика: `PUT /applications/{id}/bank` с `bank_id` из каталога `GET /banks?subject_type=...`
+(банк должен быть активен и работать с типом субъекта; при смене типа субъекта неподходящий банк сбрасывается).
+Без банка заявку отправить нельзя (`bank_id` в сводке). После успешного скоринга заявка автоматически уходит в выбранный банк.
+Если к этому моменту банк деактивирован или перестал подходить, заявка остаётся в `READY_FOR_BANK`, и Фонд назначает банк:
+`POST /fund/applications/{id}/send-to-bank`; счётчик `to_bank` показывает такие заявки.
+
 ### Вход через YIA Portal (SSO)
 
 1. Фронтенд вызывает `GET /api/v1/auth/sso/authorize`, сохраняет `state` (например, в sessionStorage) и перенаправляет браузер на `authorize_url`. Пользователь проходит OneID на стороне портала.
@@ -152,8 +192,11 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 - Требования Фонда (eligibility) помимо KATM не заданы — пока все проходят (`EligibilityChecker`).
 - Список из 9 банков содержит 3 обязательных (Microcreditbank, Xalq banki, Agrobank) и 6 предположительных — заменить на официальный список.
 - YIA Portal гарантирует только `sub` и `full_name`; телефон, паспорт, ИНН, email, пол и дату рождения заявитель вводит сам в профиле (`PATCH /auth/me`) — без них заявка не создаётся. Если портал начнёт передавать эти поля, их нужно перенести в `SSO_MANAGED_FIELDS`.
+- Реквизиты предприятия (СТИР + руководитель) и учредители (хотя бы один) обязательны только для ООО. Формат СТИР — 9 цифр.
+- Банк выбирает заявитель (`PUT /applications/{id}/bank`); ручка Фонда `send-to-bank` — запасной путь.
+- Срок кредита 12–36 месяцев и правило «сумма ≤ стоимость проекта» — предположение; границы вынесены в настройки.
 - Файл документа «Требование подтверждено» формирует будущий модуль `documents`; сейчас создаётся запись с номером `TD-ГГГГ-NNNNNN`.
-- Фото хранятся на диске (`MEDIA_PATH`); переход на закрытый S3 — в модуле `documents`.
+- Фото и документы хранятся на диске (`MEDIA_PATH`); переход на закрытый S3 — в модуле `documents`.
 
 ## Разработка
 

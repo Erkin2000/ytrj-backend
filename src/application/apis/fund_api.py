@@ -9,6 +9,7 @@ from src.application.schemas.application_schema import (
     CompleteApplicationDTO,
     ResourceAllocationCreateDTO,
     ScoringResultRecordDTO,
+    SendToBankDTO,
     SendToCouncilDTO,
 )
 from src.application.services.fund_service import FundService
@@ -56,6 +57,7 @@ async def get_applications(
         200: success_example(
             {
                 "new": 3,
+                "to_bank": 1,
                 "to_council": 2,
                 "in_council": 1,
                 "to_allocate": 1,
@@ -137,6 +139,25 @@ async def record_scoring_result(
 
 
 # ---------- Совет ----------
+
+
+@router.post(
+    "/{application_id}/send-to-bank",
+    summary="Направить заявку в банк (READY_FOR_BANK → SENT_TO_BANK)",
+    description=(
+        "Запасной путь: обычно заявка уходит в банк, выбранный заявителем, автоматически. "
+        "Если после скоринга она осталась в READY_FOR_BANK (банк деактивирован или не подходит "
+        "по типу субъекта), Фонд назначает банк из каталога."
+    ),
+    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
+    responses={
+        200: success_example({**ITEM, "status": "SENT_TO_BANK"}, "Application sent to bank."),
+        **COMMON_ERRORS,
+    },
+)
+async def send_to_bank(application_id: int, data: SendToBankDTO, db: DBDep, user: CurrentUserDep):
+    result = await FundService(db).send_to_bank(application_id, user, data)
+    return ResponseBuilder.success(data=result, message="Application sent to bank.")
 
 
 @router.post(

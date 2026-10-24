@@ -99,6 +99,10 @@ class PhotoNotFoundException(NotFoundException):
     message = "Photo not found"
 
 
+class DocumentNotFoundException(NotFoundException):
+    message = "Document not found"
+
+
 class DemandDocumentNotFoundException(NotFoundException):
     message = "Demand document not found"
 
@@ -187,12 +191,40 @@ class PhotoLimitExceededException(BadRequestException):
     message = "Maximum number of photos reached"
 
 
+class FounderNotFoundException(NotFoundException):
+    message = "Founder not found"
+
+
+class FounderLimitExceededException(BadRequestException):
+    message = "Maximum number of founders reached"
+
+
+class FoundersNotAllowedException(BadRequestException):
+    message = "Founders are specified only for MCHJ (LLC)"
+
+
+class CompanyNotAllowedException(BadRequestException):
+    message = "Company details are specified only for MCHJ (LLC)"
+
+
 class InvalidPhotoException(BadRequestException):
     message = "Only JPG, PNG and WEBP images are allowed"
 
 
 class PhotoTooLargeException(BadRequestException):
     message = "Photo is too large"
+
+
+class DocumentLimitExceededException(BadRequestException):
+    message = "Maximum number of documents reached"
+
+
+class InvalidDocumentException(BadRequestException):
+    message = "Only PDF and DOCX files are allowed"
+
+
+class DocumentTooLargeException(BadRequestException):
+    message = "Document is too large"
 
 
 class LocationNotConfirmedException(BadRequestException):

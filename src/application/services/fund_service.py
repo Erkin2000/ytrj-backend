@@ -13,11 +13,14 @@ from src.application.schemas.application_schema import (
     ResourceAllocationCreateDTO,
     ScoringAttemptDTO,
     ScoringResultRecordDTO,
+    SendToBankDTO,
     SendToCouncilDTO,
 )
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.scoring_service import ScoringService
 from src.common.responses.exceptions import (
+    BankNotFoundException,
+    BankSubjectTypeMismatchException,
     NoCouncilMembersException,
     ResourceAllocationNotAllowedException,
     UserNotFoundException,
@@ -48,6 +51,7 @@ class FundService(ApplicationBaseService):
         return {
             "new": by_status[ApplicationStatus.SUBMITTED.value]
             + by_status[ApplicationStatus.SCORING_IN_PROGRESS.value],
+            "to_bank": by_status[ApplicationStatus.READY_FOR_BANK.value],
             "to_council": by_status[ApplicationStatus.BANK_APPROVED.value],
             "in_council": by_status[ApplicationStatus.COUNCIL_REVIEW.value],
             "to_allocate": by_status[ApplicationStatus.DEMAND_DOCUMENT_CREATED.value],
@@ -84,6 +88,37 @@ class FundService(ApplicationBaseService):
     ) -> ApplicationDetailDTO:
         application = await self.get_for_user(application_id, user)
         await self.scoring_service.record_manual_result(application, data, actor=user)
+        await self.db.commit()
+        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
+
+    # ---------- банк ----------
+
+    async def send_to_bank(
+        self,
+        application_id: int,
+        user: CurrentUserDTO,
+        data: SendToBankDTO,
+    ) -> ApplicationDetailDTO:
+        """Фонд выбирает банк для заявки, прошедшей скоринг (READY_FOR_BANK → SENT_TO_BANK).
+        Заявитель банк не выбирает."""
+        application = await self.get_for_user(application_id, user)
+
+        bank = await self.db.bank.get_one_or_none(id=data.bank_id)
+        if bank is None or not bank.is_active:
+            raise BankNotFoundException()
+        if application.subject_type not in bank.allowed_subject_types:
+            raise BankSubjectTypeMismatchException()
+
+        application.bank_id = bank.id
+        application.sent_to_bank_at = now()
+        await self.transition(
+            application,
+            ApplicationStatus.SENT_TO_BANK,
+            event="sent_to_bank",
+            actor=user,
+            comment=data.comment or f"Заявка направлена в банк: {bank.name}",
+        )
+
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
 

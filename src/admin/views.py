@@ -36,11 +36,13 @@ from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
 from src.application.models.demand_document_model import DemandDocumentORM
+from src.application.models.document_model import ApplicationDocumentORM
+from src.application.models.founder_model import ApplicationFounderORM
 from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
-from src.application.services.photo_storage import PhotoStorage
+from src.application.services.photo_storage import DocumentStorage, PhotoStorage
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
 from src.rbac.models.permission_model import PermissionORM
@@ -137,6 +139,10 @@ def fmt_amount(model, attribute) -> str:
     return fmt_money(getattr(model, "amount", None), getattr(model, "currency", None))
 
 
+def fmt_uzs(model, attribute) -> str:
+    return fmt_money(_attr_value(model, attribute))
+
+
 def fmt_file_size(model, attribute) -> str:
     return fmt_size(getattr(model, "size", None))
 
@@ -146,6 +152,13 @@ def fmt_photo_preview(model, attribute) -> Markup:
     return Markup(
         f'<a href="{url}" target="_blank"><img src="{url}" alt="{escape(model.file_name)}" '
         'class="jg-thumb"></a>'
+    )
+
+
+def fmt_document_link(model, attribute) -> Markup:
+    return Markup(
+        f'<a href="/admin/application-document/{model.id}" target="_blank">'
+        f'<i class="fa-solid fa-file-arrow-down me-1"></i>{escape(model.file_name)}</a>'
     )
 
 
@@ -436,10 +449,24 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.applicant_date_of_birth: "Дата рождения",
         ApplicationORM.subject_type: "Тип субъекта",
         ApplicationORM.legal_name: "Юр. наименование",
+        ApplicationORM.company_inn: "СТИР предприятия",
+        ApplicationORM.director_full_name: "Ф.И.О. руководителя",
+        ApplicationORM.director_passport: "Паспорт руководителя",
+        ApplicationORM.director_phone: "Телефон руководителя",
+        ApplicationORM.director_date_of_birth: "Дата рождения руководителя",
+        ApplicationORM.founders: "Учредители",
+        ApplicationORM.project_requested_amount: "Запрашиваемая сумма",
+        ApplicationORM.project_loan_term_months: "Срок кредита, мес.",
+        ApplicationORM.project_total_cost: "Стоимость проекта",
+        ApplicationORM.project_jobs_count: "Рабочие места",
+        ApplicationORM.project_description: "Описание проекта",
         ApplicationORM.bank: "Банк",
         ApplicationORM.bank_id: "Банк",
         ApplicationORM.location_lat: "Широта",
         ApplicationORM.location_lng: "Долгота",
+        ApplicationORM.location_region: "Область",
+        ApplicationORM.location_district: "Район",
+        ApplicationORM.location_makhalla: "Махалля",
         ApplicationORM.location_address: "Адрес деятельности",
         ApplicationORM.location_confirmed: "Место подтверждено",
         ApplicationORM.submitted_at: "Отправлена",
@@ -458,6 +485,7 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.council_reject_reason: "Причина Совета",
         ApplicationORM.completed_at: "Завершена",
         ApplicationORM.photos: "Фотографии",
+        ApplicationORM.documents: "Документы",
         ApplicationORM.status_history: "История",
         ApplicationORM.scoring_attempts: "Скоринг",
         ApplicationORM.council_assignments: "Члены Совета",
@@ -478,6 +506,9 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.subject_type: fmt_subject,
         ApplicationORM.applicant_gender: fmt_gender,
         ApplicationORM.applicant_date_of_birth: fmt_date,
+        ApplicationORM.director_date_of_birth: fmt_date,
+        ApplicationORM.project_requested_amount: fmt_uzs,
+        ApplicationORM.project_total_cost: fmt_uzs,
         ApplicationORM.bank_decision: fmt_decision,
         ApplicationORM.scoring_retry_required: fmt_bool,
         ApplicationORM.location_confirmed: fmt_bool,
@@ -499,6 +530,9 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.subject_type,
         ApplicationORM.legal_name,
         ApplicationORM.bank,
+        ApplicationORM.location_region,
+        ApplicationORM.location_district,
+        ApplicationORM.location_makhalla,
         ApplicationORM.location_address,
     ]
     page_size = 25
@@ -659,6 +693,90 @@ class CouncilAssignmentAdmin(LocalizedLabelsMixin, ModelView, model=CouncilAssig
     can_delete = False
 
 
+class FounderAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationFounderORM):
+    name = _l("Учредитель")
+    name_plural = _l("Учредители")
+    icon = "fa-solid fa-people-group"
+    category = CATEGORY_APPLICATIONS
+
+    column_list = [
+        ApplicationFounderORM.id,
+        ApplicationFounderORM.application,
+        ApplicationFounderORM.full_name,
+        ApplicationFounderORM.passport_number,
+        ApplicationFounderORM.date_of_birth,
+        ApplicationFounderORM.created_at,
+    ]
+    column_searchable_list = [
+        ApplicationFounderORM.full_name,
+        ApplicationFounderORM.passport_number,
+    ]
+    column_sortable_list = [ApplicationFounderORM.id, ApplicationFounderORM.created_at]
+    column_default_sort = [(ApplicationFounderORM.id, True)]
+    column_labels = {
+        ApplicationFounderORM.id: "ID",
+        ApplicationFounderORM.application: "Заявка",
+        ApplicationFounderORM.application_id: "Заявка",
+        ApplicationFounderORM.full_name: "Ф.И.О.",
+        ApplicationFounderORM.passport_number: "Паспорт",
+        ApplicationFounderORM.date_of_birth: "Дата рождения",
+        ApplicationFounderORM.created_at: "Добавлен",
+    }
+    column_formatters = {
+        ApplicationFounderORM.date_of_birth: fmt_date,
+        ApplicationFounderORM.created_at: fmt_datetime,
+    }
+    column_formatters_detail = {
+        ApplicationFounderORM.date_of_birth: fmt_date,
+        ApplicationFounderORM.created_at: fmt_datetime,
+    }
+    form_excluded_columns = [ApplicationFounderORM.created_at]
+    page_size = 25
+
+
+class DocumentAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationDocumentORM):
+    name = _l("Документ заявки")
+    name_plural = _l("Документы заявок")
+    icon = "fa-solid fa-file-pdf"
+    category = CATEGORY_APPLICATIONS
+
+    can_create = False
+    can_edit = False
+
+    column_list = [
+        ApplicationDocumentORM.id,
+        ApplicationDocumentORM.application,
+        ApplicationDocumentORM.file_name,
+        ApplicationDocumentORM.content_type,
+        ApplicationDocumentORM.size,
+        ApplicationDocumentORM.created_at,
+    ]
+    column_searchable_list = [ApplicationDocumentORM.file_name]
+    column_sortable_list = [ApplicationDocumentORM.id, ApplicationDocumentORM.created_at]
+    column_default_sort = [(ApplicationDocumentORM.id, True)]
+    column_labels = {
+        ApplicationDocumentORM.id: "ID",
+        ApplicationDocumentORM.application: "Заявка",
+        ApplicationDocumentORM.application_id: "Заявка",
+        ApplicationDocumentORM.file_name: "Файл",
+        ApplicationDocumentORM.storage_path: "Путь",
+        ApplicationDocumentORM.content_type: "Тип",
+        ApplicationDocumentORM.size: "Размер",
+        ApplicationDocumentORM.created_at: "Загружен",
+    }
+    column_formatters = {
+        ApplicationDocumentORM.file_name: lambda m, a: fmt_document_link(m, a),
+        ApplicationDocumentORM.size: fmt_file_size,
+        ApplicationDocumentORM.created_at: fmt_datetime,
+    }
+    column_formatters_detail = {
+        ApplicationDocumentORM.file_name: lambda m, a: fmt_document_link(m, a),
+        ApplicationDocumentORM.size: fmt_file_size,
+        ApplicationDocumentORM.created_at: fmt_datetime,
+    }
+    page_size = 25
+
+
 class PhotoAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationPhotoORM):
     name = _l("Фотография")
     name_plural = _l("Фотографии заявок")
@@ -797,6 +915,39 @@ class ApplicationPhotoFileView(BaseView):
         )
 
 
+class ApplicationDocumentFileView(BaseView):
+    """Отдаёт документ заявки (PDF/DOCX) под cookie-сессией админки."""
+
+    name = _l("Файл документа")
+
+    def is_visible(self, request: Request) -> bool:
+        return False
+
+    @expose("/application-document/{pk}", methods=["GET"], include_in_schema=False)
+    async def document_file(self, request: Request):
+        try:
+            pk = int(request.path_params["pk"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=404) from None
+
+        async with async_session_maker() as session:
+            document = await session.get(ApplicationDocumentORM, pk)
+
+        if document is None:
+            raise HTTPException(status_code=404)
+
+        path = DocumentStorage().absolute_path(document.storage_path)
+        if not path.is_file():
+            raise HTTPException(status_code=404)
+
+        return FileResponse(
+            path,
+            media_type=document.content_type,
+            filename=document.file_name,
+            content_disposition_type="attachment",
+        )
+
+
 ALL_VIEWS = [
     UserAdmin,
     RoleAdmin,
@@ -807,8 +958,11 @@ ALL_VIEWS = [
     StatusHistoryAdmin,
     ScoringAttemptAdmin,
     CouncilAssignmentAdmin,
+    FounderAdmin,
     PhotoAdmin,
+    DocumentAdmin,
     DemandDocumentAdmin,
     ResourceAllocationAdmin,
     ApplicationPhotoFileView,
+    ApplicationDocumentFileView,
 ]

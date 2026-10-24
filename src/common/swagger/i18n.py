@@ -13,6 +13,8 @@ import copy
 import re
 from typing import Any
 
+from src.config import settings
+
 DESCRIPTION_UZ = """
 **Jamgʻarma** moliyalashtirish platformasining backend qismi (YTRJ-EP).
 
@@ -209,24 +211,123 @@ UZ: dict[str, str] = {
     "Карточка заявки: данные, место деятельности, фото, этапы": (
         "Ariza kartochkasi: maʼlumotlar, faoliyat joyi, suratlar, bosqichlar"
     ),
-    "Редактирование черновика: тип субъекта, юр. наименование, банк": (
-        "Qoralamani tahrirlash: subyekt turi, yuridik nomi, bank"
+    "Данные заявителя берутся из профиля (`/auth/me`). Банк выбирается отдельным шагом "
+    "(`PUT /applications/{id}/bank`). Для ООО в `company` передаются СТИР предприятия и данные "
+    "руководителя (он может не совпадать с заявителем) и список учредителей `founders`. "
+    "Для ИП и самозанятого `company` и `founders` не используются.": (
+        "Ariza beruvchi maʼlumotlari profildan (`/auth/me`) olinadi. Bank alohida qadamda "
+        "tanlanadi (`PUT /applications/{id}/bank`). MChJ uchun `company`da korxona "
+        "STIRi va rahbar maʼlumotlari (u ariza beruvchi bilan bir xil boʻlmasligi mumkin) hamda "
+        "`founders` taʼsischilar roʻyxati uzatiladi. YaTT va oʻzini oʻzi band qilganlar uchun "
+        "`company` va `founders` ishlatilmaydi."
     ),
-    "При смене типа субъекта банк, не подходящий новому типу, сбрасывается.": (
-        "Subyekt turi oʻzgarganda yangi turga mos kelmaydigan bank bekor qilinadi."
+    "Редактирование черновика: тип субъекта, юр. наименование, предприятие": (
+        "Qoralamani tahrirlash: subyekt turi, yuridik nomi, korxona"
+    ),
+    "При смене типа субъекта с ООО на ИП или самозанятого очищаются реквизиты "
+    "предприятия и список учредителей.": (
+        "Subyekt turi MChJdan YaTT yoki oʻzini oʻzi band qilganga oʻzgarganda korxona "
+        "rekvizitlari va taʼsischilar roʻyxati tozalanadi."
+    ),
+    "Направить заявку в банк (READY_FOR_BANK → SENT_TO_BANK)": (
+        "Arizani bankka yoʻnaltirish (READY_FOR_BANK → SENT_TO_BANK)"
+    ),
+    "Запасной путь: обычно заявка уходит в банк, выбранный заявителем, автоматически. "
+    "Если после скоринга она осталась в READY_FOR_BANK (банк деактивирован или не подходит "
+    "по типу субъекта), Фонд назначает банк из каталога.": (
+        "Zaxira yoʻl: odatda ariza ariza beruvchi tanlagan bankka avtomatik yuboriladi. "
+        "Agar skoringdan soʻng u READY_FOR_BANK holatida qolsa (bank faolsizlantirilgan yoki "
+        "subyekt turiga mos emas), Jamgʻarma katalogdan bank tayinlaydi."
+    ),
+    "Выбор банка для заявки": "Ariza uchun bank tanlash",
+    "Банк берётся из каталога `GET /banks?subject_type=...`: он должен быть активен и "
+    "работать с типом субъекта заявки. После успешного скоринга заявка автоматически "
+    "направляется в выбранный банк. При смене типа субъекта неподходящий банк сбрасывается.": (
+        "Bank `GET /banks?subject_type=...` katalogidan olinadi: u faol boʻlishi va ariza "
+        "subyekt turi bilan ishlashi kerak. Skoring muvaffaqiyatli oʻtgach ariza tanlangan bankka "
+        "avtomatik yuboriladi. Subyekt turi oʻzgarganda mos kelmaydigan bank bekor qilinadi."
+    ),
+    "Выбор банка заявителем (отдельный шаг черновика).": (
+        "Ariza beruvchi tomonidan bank tanlash (qoralamaning alohida qadami)."
+    ),
+    "Фонд направляет заявку в банк после успешного скоринга.": (
+        "Jamgʻarma skoring muvaffaqiyatli oʻtgach arizani bankka yoʻnaltiradi."
+    ),
+    "Добавить учредителя (только для ООО)": "Taʼsischi qoʻshish (faqat MChJ uchun)",
+    "Изменить данные учредителя": "Taʼsischi maʼlumotlarini oʻzgartirish",
+    "Удалить учредителя из черновика": "Taʼsischini qoralamadan oʻchirish",
+    "Усманов Жасур Абдуллаевич": "Usmanov Jasur Abdullayevich",
+    "Каримов Бахтиёр Рустамович": "Karimov Baxtiyor Rustamovich",
+    "СТИР (ИНН) предприятия.": "Korxona STIRi.",
+    "Реквизиты предприятия и руководителя (только для ООО).": (
+        "Korxona va rahbar rekvizitlari (faqat MChJ uchun)."
+    ),
+    "Учредители (только для ООО, хотя бы один).": (
+        "Taʼsischilar (faqat MChJ uchun, kamida bittasi)."
+    ),
+    "Передаются только изменяемые поля; `null` очищает поле.": (
+        "Faqat oʻzgartiriladigan maydonlar uzatiladi; `null` maydonni tozalaydi."
+    ),
+    "Реквизиты ООО и его руководителя. Руководитель может не совпадать с заявителем.": (
+        "MChJ va uning rahbari rekvizitlari. Rahbar ariza beruvchi bilan bir xil boʻlmasligi "
+        "mumkin."
     ),
     "Удаление черновика": "Qoralamani oʻchirish",
+    "Информация о проекте: сумма, срок кредита, стоимость, рабочие места, описание": (
+        "Loyiha haqida maʼlumot: summa, kredit muddati, qiymat, ish oʻrinlari, tavsif"
+    ),
+    "Заполняется целиком. Срок кредита — в месяцах, в пределах LOAN_TERM_MIN_MONTHS…"
+    "LOAN_TERM_MAX_MONTHS (по умолчанию 12–36). Запрашиваемая сумма не больше общей стоимости "
+    "проекта. Без этого блока заявку отправить нельзя.": (
+        "Toʻliq toʻldiriladi. Kredit muddati — oylarda, LOAN_TERM_MIN_MONTHS…LOAN_TERM_MAX_MONTHS "
+        "oraligʻida (odatiy 12–36). Soʻralayotgan summa loyihaning umumiy qiymatidan oshmasligi "
+        "kerak. Bu blok boʻlmasa arizani yuborib boʻlmaydi."
+    ),
+    "Проект, на который запрашивается финансирование.": ("Moliyalashtirish soʻralayotgan loyiha."),
+    "Запрашиваемая сумма, UZS.": "Soʻralayotgan summa, UZS.",
+    f"Срок кредита в месяцах: от {settings.LOAN_TERM_MIN_MONTHS} "
+    f"до {settings.LOAN_TERM_MAX_MONTHS}.": (
+        f"Kredit muddati oylarda: {settings.LOAN_TERM_MIN_MONTHS} dan "
+        f"{settings.LOAN_TERM_MAX_MONTHS} gacha."
+    ),
+    "Общая стоимость проекта, UZS (не меньше запрашиваемой суммы).": (
+        "Loyihaning umumiy qiymati, UZS (soʻralayotgan summadan kam boʻlmasligi kerak)."
+    ),
+    "Сколько рабочих мест будет создано.": "Qancha ish oʻrni yaratiladi.",
+    "Описание проекта: на что пойдут средства.": "Loyiha tavsifi: mablagʻ nimaga sarflanadi.",
+    "Открытие швейного цеха: закупка 10 машин и аренда помещения на 12 месяцев.": (
+        "Tikuv sexini ochish: 10 ta mashina xarid qilish va binoni 12 oyga ijaraga olish."
+    ),
+    "Открытие швейного цеха: закупка 10 машин и аренда помещения.": (
+        "Tikuv sexini ochish: 10 ta mashina xarid qilish va binoni ijaraga olish."
+    ),
     "Место осуществления деятельности (не текущее местоположение!)": (
         "Faoliyat amalga oshiriladigan joy (joriy joylashuv emas!)"
     ),
+    "Координаты плюс область, район и махалля; адрес — уточнение. "
     "Отправка заявки невозможна без confirmed=true.": (
+        "Koordinatalar hamda viloyat, tuman va mahalla; manzil — aniqlashtirish. "
         "confirmed=true boʻlmasa arizani yuborib boʻlmaydi."
     ),
+    "Область.": "Viloyat.",
+    "Район.": "Tuman.",
+    "Махалля.": "Mahalla.",
+    "Улица, дом (уточнение).": "Koʻcha, uy (aniqlashtirish).",
+    "Яккасарайский район": "Yakkasaroy tumani",
+    "Махалля Кушбеги": "Qushbegi mahallasi",
+    "ул. Бабура, 12": "Bobur koʻchasi, 12",
     "Ташкент": "Toshkent",
     "Прикрепить фотографию (максимум 4; JPG/PNG/WEBP)": (
         "Surat biriktirish (koʻpi bilan 4 ta; JPG/PNG/WEBP)"
     ),
     "Удалить фотографию черновика": "Qoralama suratini oʻchirish",
+    "Прикрепить документ (максимум 4; PDF/DOCX до 10 МБ)": (
+        "Hujjat biriktirish (koʻpi bilan 4 ta; PDF/DOCX, 10 MB gacha)"
+    ),
+    "Удалить документ черновика": "Qoralama hujjatini oʻchirish",
+    "Файл документа (только для тех, кто имеет доступ к заявке)": (
+        "Hujjat fayli (faqat arizaga kirish huquqi borlar uchun)"
+    ),
     "Файл фотографии (только для тех, кто имеет доступ к заявке)": (
         "Surat fayli (faqat arizaga kirish huquqi borlar uchun)"
     ),

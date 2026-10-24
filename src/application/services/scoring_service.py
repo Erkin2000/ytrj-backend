@@ -215,12 +215,20 @@ class ScoringService(ApplicationBaseService):
             comment="Скоринг KATM и требования Фонда пройдены",
         )
 
-        # Подходящая заявка автоматически направляется в выбранный банк.
-        application.sent_to_bank_at = now()
-        await self.transition(
-            application,
-            ApplicationStatus.SENT_TO_BANK,
-            event="sent_to_bank",
-            actor=None,
-            comment=f"Заявка направлена в банк: {application.bank.name if application.bank else application.bank_id}",
-        )
+        # Заявка автоматически уходит в банк, выбранный заявителем. Если банк
+        # к этому моменту деактивирован или не подходит по типу субъекта, заявка
+        # остаётся в READY_FOR_BANK, и банк назначает Фонд (send-to-bank).
+        bank = application.bank
+        if (
+            bank is not None
+            and bank.is_active
+            and application.subject_type in bank.allowed_subject_types
+        ):
+            application.sent_to_bank_at = now()
+            await self.transition(
+                application,
+                ApplicationStatus.SENT_TO_BANK,
+                event="sent_to_bank",
+                actor=None,
+                comment=f"Заявка направлена в банк: {bank.name}",
+            )

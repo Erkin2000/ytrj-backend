@@ -274,6 +274,27 @@ msgstr "Surat"
 msgid "Фотографии заявок"
 msgstr "Ariza suratlari"
 
+msgid "Документ заявки"
+msgstr "Ariza hujjati"
+
+msgid "Документы заявок"
+msgstr "Ariza hujjatlari"
+
+msgid "Документы"
+msgstr "Hujjatlar"
+
+msgid "Документов нет."
+msgstr "Hujjatlar yoʻq."
+
+msgid "Файл документа"
+msgstr "Hujjat fayli"
+
+msgid "Путь"
+msgstr "Yoʻl"
+
+msgid "Загружен"
+msgstr "Yuklangan"
+
 msgid "Документ-требование"
 msgstr "Talab hujjati"
 
@@ -411,11 +432,74 @@ msgstr "Subyekt turi"
 msgid "Юр. наименование"
 msgstr "Yuridik nomi"
 
+msgid "СТИР предприятия"
+msgstr "Korxona STIRi"
+
+msgid "Ф.И.О. руководителя"
+msgstr "Rahbar F.I.Sh."
+
+msgid "Паспорт руководителя"
+msgstr "Rahbar pasporti"
+
+msgid "Телефон руководителя"
+msgstr "Rahbar telefoni"
+
+msgid "Дата рождения руководителя"
+msgstr "Rahbarning tugʻilgan sanasi"
+
+msgid "Учредители"
+msgstr "Taʼsischilar"
+
+msgid "Учредитель"
+msgstr "Taʼsischi"
+
+msgid "Добавлен"
+msgstr "Qoʻshilgan"
+
+msgid "Предприятие и руководитель"
+msgstr "Korxona va rahbar"
+
+msgid "Реквизиты предприятия не указаны."
+msgstr "Korxona rekvizitlari koʻrsatilmagan."
+
+msgid "Учредители не указаны."
+msgstr "Taʼsischilar koʻrsatilmagan."
+
+msgid "Проект"
+msgstr "Loyiha"
+
+msgid "Запрашиваемая сумма"
+msgstr "Soʻralayotgan summa"
+
+msgid "Срок кредита, мес."
+msgstr "Kredit muddati, oy"
+
+msgid "Стоимость проекта"
+msgstr "Loyiha qiymati"
+
+msgid "Рабочие места"
+msgstr "Ish oʻrinlari"
+
+msgid "Описание проекта"
+msgstr "Loyiha tavsifi"
+
+msgid "Информация о проекте не заполнена."
+msgstr "Loyiha haqida maʼlumot toʻldirilmagan."
+
 msgid "Широта"
 msgstr "Kenglik"
 
 msgid "Долгота"
 msgstr "Uzunlik"
+
+msgid "Область"
+msgstr "Viloyat"
+
+msgid "Район"
+msgstr "Tuman"
+
+msgid "Махалля"
+msgstr "Mahalla"
 
 msgid "Адрес деятельности"
 msgstr "Faoliyat manzili"

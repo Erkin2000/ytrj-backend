@@ -44,8 +44,21 @@ class Settings(BaseSettings):
 
     MEDIA_PATH: str = "media"
     MAX_APPLICATION_PHOTOS: int = 4
+    MAX_APPLICATION_FOUNDERS: int = 20
+
+    # Срок кредита в заявке, месяцев (границы уточнить с заказчиком).
+    LOAN_TERM_MIN_MONTHS: int = 12
+    LOAN_TERM_MAX_MONTHS: int = 36
     PHOTO_MAX_SIZE_MB: int = 5
     PHOTO_ALLOWED_TYPES: list[str] = ["image/jpeg", "image/png", "image/webp"]
+
+    # Документы заявки (PDF / DOCX).
+    MAX_APPLICATION_DOCUMENTS: int = 4
+    DOCUMENT_MAX_SIZE_MB: int = 10
+    DOCUMENT_ALLOWED_TYPES: list[str] = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
 
     # SSO YIA Portal (e-yoshlar.uz): пользователь проходит OneID на стороне
     # портала, платформа получает code и меняет его на профиль (sso_integration.md).

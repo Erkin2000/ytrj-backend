@@ -6,10 +6,14 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 
 from src.application.schemas.application_schema import (
+    ApplicationBankDTO,
     ApplicationCreateDTO,
     ApplicationFilterDTO,
     ApplicationUpdateDTO,
+    FounderCreateDTO,
+    FounderUpdateDTO,
     LocationDTO,
+    ProjectDTO,
 )
 from src.application.services.application_service import ApplicationService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
@@ -31,6 +35,14 @@ APPLICATION_EXAMPLE = {
     "applicant_full_name": "Алиев Али Алиевич",
     "submitted_at": None,
     "created_at": "2026-10-19T10:00:00Z",
+}
+
+FOUNDER_EXAMPLE = {
+    "id": 3,
+    "full_name": "Усманов Жасур Абдуллаевич",
+    "passport_number": "AC1122334",
+    "date_of_birth": "1990-07-14",
+    "created_at": "2026-10-24T10:00:00Z",
 }
 
 read_dep = Depends(require_permission(Module.APPLICATIONS, Action.READ))
@@ -57,6 +69,12 @@ async def get_my_applications(
 @router.post(
     "",
     summary="Подать заявку: создаётся номер и черновик (DRAFT)",
+    description=(
+        "Данные заявителя берутся из профиля (`/auth/me`). Банк выбирается отдельным шагом "
+        "(`PUT /applications/{id}/bank`). Для ООО в `company` передаются СТИР предприятия и данные "
+        "руководителя (он может не совпадать с заявителем) и список учредителей `founders`. "
+        "Для ИП и самозанятого `company` и `founders` не используются."
+    ),
     dependencies=[create_dep],
     responses={201: success_example(APPLICATION_EXAMPLE, "Application created."), **COMMON_ERRORS},
 )
@@ -80,8 +98,11 @@ async def get_application(application_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.patch(
     "/{application_id}",
-    summary="Редактирование черновика: тип субъекта, юр. наименование, банк",
-    description="При смене типа субъекта банк, не подходящий новому типу, сбрасывается.",
+    summary="Редактирование черновика: тип субъекта, юр. наименование, предприятие",
+    description=(
+        "При смене типа субъекта с ООО на ИП или самозанятого очищаются реквизиты "
+        "предприятия и список учредителей."
+    ),
     dependencies=[update_dep],
     responses={200: success_example(APPLICATION_EXAMPLE, "Application updated."), **COMMON_ERRORS},
 )
@@ -104,13 +125,73 @@ async def delete_draft(application_id: int, db: DBDep, user: CurrentUserDep):
 
 
 @router.put(
-    "/{application_id}/location",
-    summary="Место осуществления деятельности (не текущее местоположение!)",
-    description="Отправка заявки невозможна без confirmed=true.",
+    "/{application_id}/bank",
+    summary="Выбор банка для заявки",
+    description=(
+        "Банк берётся из каталога `GET /banks?subject_type=...`: он должен быть активен и "
+        "работать с типом субъекта заявки. После успешного скоринга заявка автоматически "
+        "направляется в выбранный банк. При смене типа субъекта неподходящий банк сбрасывается."
+    ),
     dependencies=[update_dep],
     responses={
         200: success_example(
-            {"lat": 41.311081, "lng": 69.240562, "address": "Ташкент", "confirmed": True},
+            {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"}, "Bank selected."
+        ),
+        **COMMON_ERRORS,
+    },
+)
+async def set_bank(application_id: int, data: ApplicationBankDTO, db: DBDep, user: CurrentUserDep):
+    bank = await ApplicationService(db).set_bank(application_id, user, data)
+    return ResponseBuilder.success(data=bank, message="Bank selected.")
+
+
+@router.put(
+    "/{application_id}/project",
+    summary="Информация о проекте: сумма, срок кредита, стоимость, рабочие места, описание",
+    description=(
+        "Заполняется целиком. Срок кредита — в месяцах, в пределах LOAN_TERM_MIN_MONTHS…"
+        "LOAN_TERM_MAX_MONTHS (по умолчанию 12–36). Запрашиваемая сумма не больше общей стоимости "
+        "проекта. Без этого блока заявку отправить нельзя."
+    ),
+    dependencies=[update_dep],
+    responses={
+        200: success_example(
+            {
+                "requested_amount": 150000000,
+                "loan_term_months": 24,
+                "total_cost": 200000000,
+                "jobs_count": 5,
+                "description": "Открытие швейного цеха: закупка 10 машин и аренда помещения.",
+            },
+            "Project saved.",
+        ),
+        **COMMON_ERRORS,
+    },
+)
+async def set_project(application_id: int, data: ProjectDTO, db: DBDep, user: CurrentUserDep):
+    project = await ApplicationService(db).set_project(application_id, user, data)
+    return ResponseBuilder.success(data=project, message="Project saved.")
+
+
+@router.put(
+    "/{application_id}/location",
+    summary="Место осуществления деятельности (не текущее местоположение!)",
+    description=(
+        "Координаты плюс область, район и махалля; адрес — уточнение. "
+        "Отправка заявки невозможна без confirmed=true."
+    ),
+    dependencies=[update_dep],
+    responses={
+        200: success_example(
+            {
+                "lat": 41.311081,
+                "lng": 69.240562,
+                "region": "Ташкент",
+                "district": "Яккасарайский район",
+                "makhalla": "Махалля Кушбеги",
+                "address": "ул. Бабура, 12",
+                "confirmed": True,
+            },
             "Location saved.",
         ),
         **COMMON_ERRORS,
@@ -119,6 +200,45 @@ async def delete_draft(application_id: int, db: DBDep, user: CurrentUserDep):
 async def set_location(application_id: int, data: LocationDTO, db: DBDep, user: CurrentUserDep):
     location = await ApplicationService(db).set_location(application_id, user, data)
     return ResponseBuilder.success(data=location, message="Location saved.")
+
+
+@router.post(
+    "/{application_id}/founders",
+    summary="Добавить учредителя (только для ООО)",
+    dependencies=[update_dep],
+    responses={201: success_example(FOUNDER_EXAMPLE, "Founder added."), **COMMON_ERRORS},
+)
+async def add_founder(application_id: int, data: FounderCreateDTO, db: DBDep, user: CurrentUserDep):
+    founder = await ApplicationService(db).add_founder(application_id, user, data)
+    return ResponseBuilder.success(data=founder, message="Founder added.", status_code=201)
+
+
+@router.patch(
+    "/{application_id}/founders/{founder_id}",
+    summary="Изменить данные учредителя",
+    dependencies=[update_dep],
+    responses={200: success_example(FOUNDER_EXAMPLE, "Founder updated."), **COMMON_ERRORS},
+)
+async def update_founder(
+    application_id: int,
+    founder_id: int,
+    data: FounderUpdateDTO,
+    db: DBDep,
+    user: CurrentUserDep,
+):
+    founder = await ApplicationService(db).update_founder(application_id, user, founder_id, data)
+    return ResponseBuilder.success(data=founder, message="Founder updated.")
+
+
+@router.delete(
+    "/{application_id}/founders/{founder_id}",
+    summary="Удалить учредителя из черновика",
+    dependencies=[update_dep],
+    responses={200: success_example(None, "Founder deleted."), **COMMON_ERRORS},
+)
+async def delete_founder(application_id: int, founder_id: int, db: DBDep, user: CurrentUserDep):
+    await ApplicationService(db).delete_founder(application_id, user, founder_id)
+    return ResponseBuilder.success(message="Founder deleted.")
 
 
 @router.post(
@@ -171,6 +291,56 @@ async def get_photo_file(application_id: int, photo_id: int, db: DBDep, user: Cu
     return FileResponse(path, media_type=content_type, filename=file_name)
 
 
+@router.post(
+    "/{application_id}/documents",
+    summary="Прикрепить документ (максимум 4; PDF/DOCX до 10 МБ)",
+    dependencies=[update_dep],
+    responses={
+        201: success_example(
+            {
+                "id": 1,
+                "file_name": "business-plan.pdf",
+                "content_type": "application/pdf",
+                "size": 2400000,
+                "url": "/api/v1/applications/12/documents/1/file",
+            },
+            "Document uploaded.",
+        ),
+        **COMMON_ERRORS,
+    },
+)
+async def upload_document(
+    application_id: int, db: DBDep, user: CurrentUserDep, file: UploadFile = File(...)
+):
+    document = await ApplicationService(db).add_document(application_id, user, file)
+    return ResponseBuilder.success(data=document, message="Document uploaded.", status_code=201)
+
+
+@router.delete(
+    "/{application_id}/documents/{document_id}",
+    summary="Удалить документ черновика",
+    dependencies=[update_dep],
+    responses={200: success_example(None, "Document deleted."), **COMMON_ERRORS},
+)
+async def delete_document(application_id: int, document_id: int, db: DBDep, user: CurrentUserDep):
+    await ApplicationService(db).delete_document(application_id, user, document_id)
+    return ResponseBuilder.success(message="Document deleted.")
+
+
+@router.get(
+    "/{application_id}/documents/{document_id}/file",
+    summary="Файл документа (только для тех, кто имеет доступ к заявке)",
+    dependencies=[read_dep],
+    response_class=FileResponse,
+    responses={**COMMON_ERRORS},
+)
+async def get_document_file(application_id: int, document_id: int, db: DBDep, user: CurrentUserDep):
+    path, content_type, file_name = await ApplicationService(db).get_document_path(
+        application_id, user, document_id
+    )
+    return FileResponse(path, media_type=content_type, filename=file_name)
+
+
 @router.get(
     "/{application_id}/submission-check",
     summary="Сводка перед отправкой: выбранные параметры и недостающие поля",
@@ -185,6 +355,8 @@ async def get_photo_file(application_id: int, photo_id: int, db: DBDep, user: Cu
                 "bank": {"id": 1, "name": "Microcreditbank"},
                 "photos_count": 2,
                 "max_photos": 4,
+                "documents_count": 1,
+                "max_documents": 4,
             },
             "Submission check completed.",
         ),

@@ -2,7 +2,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.account.models.user_model import Gender
@@ -14,6 +24,8 @@ if TYPE_CHECKING:
     from src.application.models.bank_model import BankORM
     from src.application.models.council_assignment_model import CouncilAssignmentORM
     from src.application.models.demand_document_model import DemandDocumentORM
+    from src.application.models.document_model import ApplicationDocumentORM
+    from src.application.models.founder_model import ApplicationFounderORM
     from src.application.models.photo_model import ApplicationPhotoORM
     from src.application.models.resource_allocation_model import ResourceAllocationORM
     from src.application.models.scoring_model import ScoringAttemptORM
@@ -58,14 +70,33 @@ class ApplicationORM(TimestampMixin, Base):
     )
     legal_name: Mapped[str | None] = mapped_column(String(255))
 
+    # --- Предприятие и его руководитель (ИП / ООО). Руководитель может не совпадать
+    # с заявителем, поэтому данные вводятся отдельно от снимка профиля. ---
+    company_inn: Mapped[str | None] = mapped_column(String(20))
+    director_full_name: Mapped[str | None] = mapped_column(String(255))
+    director_passport: Mapped[str | None] = mapped_column(String(20))
+    director_phone: Mapped[str | None] = mapped_column(String(20))
+    director_date_of_birth: Mapped[date | None] = mapped_column(Date)
+
     bank_id: Mapped[int | None] = mapped_column(
         ForeignKey("banks.id", ondelete="RESTRICT"),
         index=True,
     )
 
+    # --- Проект: на что запрашивается финансирование ---
+    project_requested_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    project_loan_term_months: Mapped[int | None] = mapped_column(Integer)
+    project_total_cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
+    project_jobs_count: Mapped[int | None] = mapped_column(Integer)
+    project_description: Mapped[str | None] = mapped_column(Text)
+
     # Место осуществления деятельности (не текущее местоположение!)
     location_lat: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     location_lng: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    # Административная привязка (справочники появятся позже — пока текст).
+    location_region: Mapped[str | None] = mapped_column(String(255))
+    location_district: Mapped[str | None] = mapped_column(String(255))
+    location_makhalla: Mapped[str | None] = mapped_column(String(255))
     location_address: Mapped[str | None] = mapped_column(String(500))
     location_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -112,6 +143,16 @@ class ApplicationORM(TimestampMixin, Base):
         back_populates="application",
         cascade="all, delete-orphan",
         order_by="ApplicationPhotoORM.id",
+    )
+    documents: Mapped[list["ApplicationDocumentORM"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationDocumentORM.id",
+    )
+    founders: Mapped[list["ApplicationFounderORM"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationFounderORM.id",
     )
     status_history: Mapped[list["StatusHistoryORM"]] = relationship(
         back_populates="application",

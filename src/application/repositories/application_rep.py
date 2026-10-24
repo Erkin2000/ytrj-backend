@@ -30,6 +30,8 @@ class ApplicationRepository(BaseRepository):
     def _detail_stmt(self) -> Select:
         return select(self.model).options(
             selectinload(self.model.photos),
+            selectinload(self.model.documents),
+            selectinload(self.model.founders),
             selectinload(self.model.council_assignments),
             selectinload(self.model.demand_document),
             selectinload(self.model.resource_allocation),

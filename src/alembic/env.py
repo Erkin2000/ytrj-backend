@@ -17,6 +17,8 @@ from src.application.models.application_model import ApplicationORM  # noqa: E40
 from src.application.models.bank_model import BankORM  # noqa: E402, F401
 from src.application.models.council_assignment_model import CouncilAssignmentORM  # noqa: E402, F401
 from src.application.models.demand_document_model import DemandDocumentORM  # noqa: E402, F401
+from src.application.models.document_model import ApplicationDocumentORM  # noqa: E402, F401
+from src.application.models.founder_model import ApplicationFounderORM  # noqa: E402, F401
 from src.application.models.photo_model import ApplicationPhotoORM  # noqa: E402, F401
 from src.application.models.resource_allocation_model import ResourceAllocationORM  # noqa: E402, F401
 from src.application.models.scoring_model import ScoringAttemptORM  # noqa: E402, F401

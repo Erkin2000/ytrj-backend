@@ -12,6 +12,11 @@ class SubjectType(StrEnum):
 # Для ИП и ООО обязательно юридическое наименование.
 SUBJECT_TYPES_WITH_LEGAL_NAME = {SubjectType.YATT, SubjectType.MCHJ}
 
+# Реквизиты предприятия (СТИР, руководитель) и учредители — только у ООО.
+# ИП и самозанятый действуют от своего имени: данные берутся из профиля заявителя.
+SUBJECT_TYPES_WITH_COMPANY = {SubjectType.MCHJ}
+SUBJECT_TYPES_WITH_FOUNDERS = {SubjectType.MCHJ}
+
 
 class ApplicationStatus(StrEnum):
     DRAFT = "DRAFT"

@@ -7,6 +7,8 @@ from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
 from src.application.models.demand_document_model import DemandDocumentORM
+from src.application.models.document_model import ApplicationDocumentORM
+from src.application.models.founder_model import ApplicationFounderORM
 from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
@@ -22,6 +24,8 @@ __all__ = [
     "BankORM",
     "CouncilAssignmentORM",
     "DemandDocumentORM",
+    "ApplicationDocumentORM",
+    "ApplicationFounderORM",
     "ApplicationPhotoORM",
     "ResourceAllocationORM",
     "ScoringAttemptORM",

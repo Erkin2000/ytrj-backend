@@ -103,12 +103,77 @@
       <div class="text-muted">{{ _("Фотографий нет.") }}</div>
       {% endif %}
     </div>
+    <div class="card-header"><h3 class="card-title">{{ _("Документы") }} <span class="badge bg-secondary-lt ms-2">{{ a.documents | length }}</span></h3></div>
+    {% if a.documents %}
+    <div class="list-group list-group-flush">
+      {% for d in a.documents %}
+      <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{{ admin.base_url }}/application-document/{{ d.id }}" target="_blank">
+        <span><i class="fa-solid {{ 'fa-file-pdf text-red' if d.content_type == 'application/pdf' else 'fa-file-word text-blue' }} me-2"></i>{{ d.file_name }}</span>
+        <span class="text-muted small">{{ fmt_size(d.size) }} · {{ fmt_dt(d.created_at) }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Документов нет.") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Предприятие и руководитель") }}</h3></div>
+    <div class="card-body">
+      {% if a.company_inn or a.director_full_name %}
+      <dl class="jg-kv">
+        <dt>{{ _("СТИР предприятия") }}</dt><dd>{{ a.company_inn or "—" }}</dd>
+        <dt>{{ _("Ф.И.О. руководителя") }}</dt><dd>{{ a.director_full_name or "—" }}</dd>
+        <dt>{{ _("Паспорт руководителя") }}</dt><dd>{{ a.director_passport or "—" }}</dd>
+        <dt>{{ _("Телефон руководителя") }}</dt><dd>{{ a.director_phone or "—" }}</dd>
+        <dt>{{ _("Дата рождения руководителя") }}</dt><dd>{{ a.director_date_of_birth.strftime("%d.%m.%Y") if a.director_date_of_birth else "—" }}</dd>
+      </dl>
+      {% else %}
+      <div class="text-muted">{{ _("Реквизиты предприятия не указаны.") }}</div>
+      {% endif %}
+    </div>
+    <div class="card-header"><h3 class="card-title">{{ _("Учредители") }} <span class="badge bg-secondary-lt ms-2">{{ a.founders | length }}</span></h3></div>
+    {% if a.founders %}
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead><tr><th>{{ _("Ф.И.О.") }}</th><th>{{ _("Паспорт") }}</th><th>{{ _("Дата рождения") }}</th></tr></thead>
+        <tbody>
+          {% for f in a.founders %}
+          <tr><td>{{ f.full_name }}</td><td>{{ f.passport_number }}</td><td>{{ f.date_of_birth.strftime("%d.%m.%Y") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Учредители не указаны.") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Проект") }}</h3></div>
+    <div class="card-body">
+      {% if a.project_requested_amount is not none or a.project_description %}
+      <dl class="jg-kv">
+        <dt>{{ _("Запрашиваемая сумма") }}</dt><dd><strong>{{ fmt_money(a.project_requested_amount) }}</strong></dd>
+        <dt>{{ _("Срок кредита, мес.") }}</dt><dd>{{ a.project_loan_term_months if a.project_loan_term_months is not none else "—" }}</dd>
+        <dt>{{ _("Стоимость проекта") }}</dt><dd>{{ fmt_money(a.project_total_cost) }}</dd>
+        <dt>{{ _("Рабочие места") }}</dt><dd>{{ a.project_jobs_count if a.project_jobs_count is not none else "—" }}</dd>
+        <dt>{{ _("Описание проекта") }}</dt><dd style="white-space: pre-line">{{ a.project_description or "—" }}</dd>
+      </dl>
+      {% else %}
+      <div class="text-muted">{{ _("Информация о проекте не заполнена.") }}</div>
+      {% endif %}
+    </div>
   </div>
 
   <div class="card mt-3">
     <div class="card-header"><h3 class="card-title">{{ _("Место деятельности") }}</h3></div>
     <div class="card-body">
       <dl class="jg-kv">
+        <dt>{{ _("Область") }}</dt><dd>{{ a.location_region or "—" }}</dd>
+        <dt>{{ _("Район") }}</dt><dd>{{ a.location_district or "—" }}</dd>
+        <dt>{{ _("Махалля") }}</dt><dd>{{ a.location_makhalla or "—" }}</dd>
         <dt>{{ _("Адрес деятельности") }}</dt><dd>{{ a.location_address or "—" }}</dd>
         <dt>{{ _("Координаты") }}</dt>
         <dd>{% if a.location_lat and a.location_lng %}<a href="https://www.openstreetmap.org/?mlat={{ a.location_lat }}&mlon={{ a.location_lng }}#map=16/{{ a.location_lat }}/{{ a.location_lng }}" target="_blank">{{ a.location_lat }}, {{ a.location_lng }}</a>{% else %}—{% endif %}
