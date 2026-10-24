@@ -1,10 +1,93 @@
+import re
+
+# Человекочитаемые пояснения к незаполненным полям заявки / профиля (ключи
+# совпадают с `missing` в сводке перед отправкой). Остальные поля — "Required".
+REQUIRED_FIELD_MESSAGES: dict[str, str] = {
+    "subject_type": "Select the subject type",
+    "legal_name": "Legal name is required for this subject type",
+    "bank_id": "Select an active bank that works with this subject type",
+    "location": "Set the business location: coordinates, region, district and makhalla",
+    "location.confirmed": "Confirm that this is the business location",
+    "founders": "Add at least one founder (MCHJ)",
+    "photos": "Too many photos attached",
+    "documents": "Too many documents attached",
+    "company.inn": "Company INN (STIR) is required",
+    "company.director_full_name": "Director full name is required",
+    "company.director_passport": "Director passport is required",
+    "company.director_phone": "Director phone is required",
+    "company.director_date_of_birth": "Director date of birth is required",
+    "project.requested_amount": "Requested amount is required",
+    "project.loan_term_months": "Loan term is required",
+    "project.total_cost": "Total project cost is required",
+    "project.jobs_count": "Number of jobs to be created is required",
+    "project.description": "Project description is required",
+    "applicant.phone": "Fill in your phone in the profile",
+    "applicant.passport_number": "Fill in your passport in the profile",
+    "applicant.inn": "Fill in your INN in the profile",
+    "applicant.email": "Fill in your email in the profile",
+    "applicant.gender": "Fill in your gender in the profile",
+    "applicant.date_of_birth": "Fill in your date of birth in the profile",
+    "phone": "Phone is required",
+    "passport_number": "Passport is required",
+    "inn": "INN is required",
+    "email": "Email is required",
+    "gender": "Gender is required",
+    "date_of_birth": "Date of birth is required",
+}
+
+
+def missing_to_errors(missing: list[str]) -> list[dict]:
+    return [
+        {"field": field, "message": REQUIRED_FIELD_MESSAGES.get(field, "Required")}
+        for field in missing
+    ]
+
+
+def _snake(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+
 class ApiException(Exception):
+    """Базовое исключение API.
+
+    Ответ: ``{"success": false, "message": ..., "code": ..., "errors": [...] | null}``.
+    ``code`` — машиночитаемый код (по умолчанию из имени класса:
+    ``ApplicationNotEditableException`` → ``application_not_editable``).
+    ``field`` — поле запроса, к которому относится ошибка; попадает в ``errors``.
+    """
+
     status_code = 400
     message = "Bad request"
+    code = "bad_request"
+    field: str | None = None
 
-    def __init__(self, message: str | None = None):
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "code" not in cls.__dict__:
+            cls.code = _snake(cls.__name__.removesuffix("Exception"))
+
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        field: str | None = None,
+        errors: list[dict] | None = None,
+    ):
         self.message = message or self.message
+        if field is not None:
+            self.field = field
+        self.errors = errors
         super().__init__(self.message)
+
+    def to_errors(self) -> list[dict] | None:
+        if self.errors:
+            return self.errors
+        missing = getattr(self, "missing", None)
+        if missing:
+            return missing_to_errors(missing)
+        if self.field:
+            return [{"field": self.field, "message": self.message}]
+        return None
 
 
 # ---------- 401 ----------
@@ -88,7 +171,8 @@ class RoleNotFoundException(NotFoundException):
 
 
 class BankNotFoundException(NotFoundException):
-    message = "Bank not found"
+    message = "Bank not found or inactive"
+    field = "bank_id"
 
 
 class ApplicationNotFoundException(NotFoundException):
@@ -96,11 +180,11 @@ class ApplicationNotFoundException(NotFoundException):
 
 
 class PhotoNotFoundException(NotFoundException):
-    message = "Photo not found"
+    message = "Photo not found in this application"
 
 
 class DocumentNotFoundException(NotFoundException):
-    message = "Document not found"
+    message = "Document not found in this application"
 
 
 class DemandDocumentNotFoundException(NotFoundException):
@@ -170,6 +254,11 @@ class BankScopeRequiredException(BadRequestException):
 class ApplicationNotEditableException(BadRequestException):
     message = "Application can be edited only in DRAFT status"
 
+    def __init__(self, current_status: str | None = None, message: str | None = None):
+        if message is None and current_status is not None:
+            message = f"Application can be edited only in DRAFT status (current: {current_status})"
+        super().__init__(message)
+
 
 class InvalidStatusTransitionException(BadRequestException):
     message = "Invalid application status transition"
@@ -177,62 +266,79 @@ class InvalidStatusTransitionException(BadRequestException):
 
 class ApplicationValidationException(BadRequestException):
     message = "Application is not ready for submission"
+    example_missing = ["bank_id", "location.confirmed", "project.requested_amount"]
 
     def __init__(self, missing: list[str] | None = None, message: str | None = None):
         self.missing = missing or []
+        if message is None and self.missing:
+            message = (
+                f"Application is not ready for submission: {len(self.missing)} field(s) missing"
+            )
         super().__init__(message)
 
 
 class BankSubjectTypeMismatchException(BadRequestException):
     message = "Selected bank does not work with this subject type"
+    field = "bank_id"
 
 
 class PhotoLimitExceededException(BadRequestException):
     message = "Maximum number of photos reached"
+    field = "file"
 
 
 class FounderNotFoundException(NotFoundException):
-    message = "Founder not found"
+    message = "Founder not found in this application"
 
 
 class FounderLimitExceededException(BadRequestException):
     message = "Maximum number of founders reached"
+    field = "founders"
 
 
 class FoundersNotAllowedException(BadRequestException):
     message = "Founders are specified only for MCHJ (LLC)"
+    field = "founders"
 
 
 class CompanyNotAllowedException(BadRequestException):
     message = "Company details are specified only for MCHJ (LLC)"
+    field = "company"
 
 
 class InvalidPhotoException(BadRequestException):
     message = "Only JPG, PNG and WEBP images are allowed"
+    field = "file"
 
 
 class PhotoTooLargeException(BadRequestException):
     message = "Photo is too large"
+    field = "file"
 
 
 class DocumentLimitExceededException(BadRequestException):
     message = "Maximum number of documents reached"
+    field = "file"
 
 
 class InvalidDocumentException(BadRequestException):
     message = "Only PDF and DOCX files are allowed"
+    field = "file"
 
 
 class DocumentTooLargeException(BadRequestException):
     message = "Document is too large"
+    field = "file"
 
 
 class LocationNotConfirmedException(BadRequestException):
     message = "Business location must be confirmed"
+    field = "location.confirmed"
 
 
 class LegalNameRequiredException(BadRequestException):
     message = "Legal name is required for this subject type"
+    field = "legal_name"
 
 
 class ScoringNotPendingException(BadRequestException):
@@ -292,7 +398,12 @@ class ApplicantProfileIncompleteException(BadRequestException):
     остальное пользователь заполняет через PATCH /auth/me."""
 
     message = "Complete your profile before creating an application"
+    example_missing = ["phone", "passport_number", "email"]
 
     def __init__(self, missing: list[str] | None = None, message: str | None = None):
         self.missing = missing or []
+        if message is None and self.missing:
+            message = "Complete your profile before creating an application: " + ", ".join(
+                self.missing
+            )
         super().__init__(message)

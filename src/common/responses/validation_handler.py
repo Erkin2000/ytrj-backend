@@ -40,7 +40,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "success": False,
             "message": "Ошибка валидации.",
-            "data": None,
+            "code": "validation_error",
             "errors": errors,
         },
     )

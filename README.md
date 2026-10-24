@@ -94,6 +94,19 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 - Время показывается в часовом поясе Ташкента (UTC+5), суммы — с разделителями разрядов.
 - **Оформление**: собственный сайдбар (группы разделов, перенос длинных названий, футер с текущим пользователем и версией), верхняя панель с окружением, переключателями темы (светлая/тёмная, запоминается в браузере) и языка, заголовки страниц с хлебными крошками, favicon.
 
+## Формат ошибок
+
+```json
+{"success": false, "message": "Bank 'Asakabank' does not work with subject type SELF_EMPLOYED; allowed: YATT, MCHJ",
+ "code": "bank_subject_type_mismatch", "errors": [{"field": "bank_id", "message": "…"}]}
+```
+
+- `code` — машиночитаемый код (snake_case от имени исключения: `application_not_editable`, `founders_not_allowed`,
+  `photo_limit_exceeded`, `applicant_profile_incomplete`, `application_validation`, `validation_error` для 422 …).
+- `errors` — список `{field, message}`: для незаполненных полей заявки/профиля (ключи как в `submission-check`),
+  для ошибок, привязанных к полю (`bank_id`, `company`, `founders`, `file`), и для 422 от pydantic. Иначе `null`.
+- В Scalar у каждой ручки кабинета заявителя перечислены возможные 400/403/404 с примерами по каждому `code`.
+
 ## Роли и scope
 
 | Роль (`code`)     | Scope |

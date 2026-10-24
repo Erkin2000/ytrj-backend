@@ -17,24 +17,68 @@ from src.application.schemas.application_schema import (
 )
 from src.application.services.application_service import ApplicationService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
+from src.common.responses.exceptions import (
+    ApplicantProfileIncompleteException,
+    ApplicationAccessDeniedException,
+    ApplicationNotEditableException,
+    ApplicationNotFoundException,
+    ApplicationValidationException,
+    BankNotFoundException,
+    BankSubjectTypeMismatchException,
+    CompanyNotAllowedException,
+    DocumentLimitExceededException,
+    DocumentNotFoundException,
+    DocumentTooLargeException,
+    FounderLimitExceededException,
+    FounderNotFoundException,
+    FoundersNotAllowedException,
+    InvalidDocumentException,
+    InvalidPhotoException,
+    PhotoLimitExceededException,
+    PhotoNotFoundException,
+    PhotoTooLargeException,
+)
 from src.common.responses.response import ResponseBuilder
-from src.common.swagger.responses import COMMON_ERRORS, paginated_example, success_example
+from src.common.swagger.responses import (
+    COMMON_ERRORS,
+    READ_ERRORS,
+    error_examples,
+    paginated_example,
+    success_example,
+)
 from src.rbac.permissions import Action, Module
 
 router = APIRouter(prefix="/applications", tags=["Заявки: кабинет заявителя"])
 
 FilterDep = Annotated[ApplicationFilterDTO, Depends()]
 
-APPLICATION_EXAMPLE = {
-    "id": 12,
-    "number": "JG-2026-000012",
-    "status": "DRAFT",
-    "subject_type": "YATT",
-    "legal_name": "ИП Алиев",
-    "bank": {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"},
-    "applicant_full_name": "Алиев Али Алиевич",
-    "submitted_at": None,
-    "created_at": "2026-10-19T10:00:00Z",
+BANK_EXAMPLE = {
+    "id": 1,
+    "code": "microcreditbank",
+    "name": "Microcreditbank",
+    "official_name": "АКБ «Микрокредитбанк»",
+    "allowed_subject_types": ["YATT", "MCHJ", "SELF_EMPLOYED"],
+    "is_active": True,
+    "sort_order": 1,
+}
+
+APPLICANT_EXAMPLE = {
+    "full_name": "Алиев Али Алиевич",
+    "phone": "+998901234567",
+    "passport_number": "AA1234567",
+    "pinfl": "30101900000011",
+    "inn": "123456789",
+    "email": "aliev@example.com",
+    "gender": "MALE",
+    "date_of_birth": "1998-05-20",
+}
+
+COMPANY_EXAMPLE = {
+    "inn": "305123456",
+    "director_full_name": "Каримов Бахтиёр Рустамович",
+    "director_passport": "AB7654321",
+    "director_phone": "+998971234567",
+    "director_date_of_birth": "1985-11-02",
 }
 
 FOUNDER_EXAMPLE = {
@@ -44,6 +88,108 @@ FOUNDER_EXAMPLE = {
     "date_of_birth": "1990-07-14",
     "created_at": "2026-10-24T10:00:00Z",
 }
+
+PROJECT_EXAMPLE = {
+    "requested_amount": "150000000.00",
+    "loan_term_months": 24,
+    "total_cost": "200000000.00",
+    "jobs_count": 5,
+    "description": "Открытие швейного цеха: закупка 10 машин и аренда помещения.",
+}
+
+LOCATION_EXAMPLE = {
+    "lat": "41.311081",
+    "lng": "69.240562",
+    "region": "Ташкент",
+    "district": "Яккасарайский район",
+    "makhalla": "Махалля Кушбеги",
+    "address": "ул. Бабура, 12",
+    "confirmed": True,
+}
+
+PHOTO_EXAMPLE = {
+    "id": 1,
+    "file_name": "shop.jpg",
+    "content_type": "image/jpeg",
+    "size": 120000,
+    "url": "/api/v1/applications/12/photos/1/file",
+    "created_at": "2026-10-24T10:00:00Z",
+}
+
+DOCUMENT_EXAMPLE = {
+    "id": 1,
+    "file_name": "business-plan.pdf",
+    "content_type": "application/pdf",
+    "size": 2400000,
+    "url": "/api/v1/applications/12/documents/1/file",
+    "created_at": "2026-10-24T10:00:00Z",
+}
+
+# Элемент списка «Мои заявки».
+APPLICATION_EXAMPLE = {
+    "id": 12,
+    "number": "JG-2026-000012",
+    "status": "DRAFT",
+    "subject_type": "MCHJ",
+    "legal_name": "ООО Tikuv Servis",
+    "bank": BANK_EXAMPLE,
+    "applicant_full_name": "Алиев Али Алиевич",
+    "scoring_retry_required": False,
+    "submitted_at": None,
+    "created_at": "2026-10-24T10:00:00Z",
+    "updated_at": "2026-10-24T10:05:00Z",
+}
+
+# Полная карточка заявки (ответ создания, PATCH, GET /{id}, submit).
+APPLICATION_DETAIL_EXAMPLE = {
+    **APPLICATION_EXAMPLE,
+    "applicant_id": 7,
+    "applicant": APPLICANT_EXAMPLE,
+    "company": COMPANY_EXAMPLE,
+    "founders": [FOUNDER_EXAMPLE],
+    "project": PROJECT_EXAMPLE,
+    "location": LOCATION_EXAMPLE,
+    "photos": [PHOTO_EXAMPLE],
+    "documents": [DOCUMENT_EXAMPLE],
+    "bank_stage": {
+        "sent_to_bank_at": None,
+        "accepted_by": None,
+        "accepted_at": None,
+        "decision": None,
+        "decision_reason": None,
+        "decided_by": None,
+        "decided_at": None,
+    },
+    "council_assignments": [],
+    "council_decided_at": None,
+    "council_reject_reason": None,
+    "demand_document": None,
+    "resource_allocation": None,
+    "completed_at": None,
+    "rejection_reason": None,
+}
+
+SUBMITTED_EXAMPLE = {
+    **APPLICATION_DETAIL_EXAMPLE,
+    "status": "SENT_TO_BANK",
+    "submitted_at": "2026-10-24T11:00:00Z",
+    "bank_stage": {
+        **APPLICATION_DETAIL_EXAMPLE["bank_stage"],
+        "sent_to_bank_at": "2026-10-24T11:00:01Z",
+    },
+}
+
+# Ошибки доступа к заявке по id — одинаковы для всех ручек с {application_id}.
+BY_ID_ERRORS = {
+    403: error_examples(ApplicationAccessDeniedException),
+    404: error_examples(ApplicationNotFoundException),
+}
+
+
+def draft_errors(*extra):
+    """400-ошибки ручек, меняющих черновик: «не черновик» плюс специфичные для ручки."""
+    return {400: error_examples(ApplicationNotEditableException, *extra), **BY_ID_ERRORS}
+
 
 read_dep = Depends(require_permission(Module.APPLICATIONS, Action.READ))
 create_dep = Depends(require_permission(Module.APPLICATIONS, Action.CREATE))
@@ -55,7 +201,10 @@ delete_dep = Depends(require_permission(Module.APPLICATIONS, Action.DELETE))
     "",
     summary="Мои заявки: номер, дата, банк, статус",
     dependencies=[read_dep],
-    responses={200: paginated_example(APPLICATION_EXAMPLE), **COMMON_ERRORS},
+    responses={
+        200: paginated_example(APPLICATION_EXAMPLE, "Applications retrieved successfully."),
+        **READ_ERRORS,
+    },
 )
 async def get_my_applications(
     db: DBDep, user: CurrentUserDep, pagination: PaginationDep, filters: FilterDep
@@ -76,7 +225,16 @@ async def get_my_applications(
         "Для ИП и самозанятого `company` и `founders` не используются."
     ),
     dependencies=[create_dep],
-    responses={201: success_example(APPLICATION_EXAMPLE, "Application created."), **COMMON_ERRORS},
+    responses={
+        201: success_example(APPLICATION_DETAIL_EXAMPLE, "Application created."),
+        **COMMON_ERRORS,
+        400: error_examples(
+            ApplicantProfileIncompleteException,
+            CompanyNotAllowedException,
+            FoundersNotAllowedException,
+            FounderLimitExceededException,
+        ),
+    },
 )
 async def create_application(data: ApplicationCreateDTO, db: DBDep, user: CurrentUserDep):
     application = await ApplicationService(db).create(user, data)
@@ -87,9 +245,13 @@ async def create_application(data: ApplicationCreateDTO, db: DBDep, user: Curren
 
 @router.get(
     "/{application_id}",
-    summary="Карточка заявки: данные, место деятельности, фото, этапы",
+    summary="Карточка заявки: заявитель, предприятие, учредители, проект, место, файлы, этапы",
     dependencies=[read_dep],
-    responses={200: success_example(APPLICATION_EXAMPLE, "Application found."), **COMMON_ERRORS},
+    responses={
+        200: success_example(APPLICATION_DETAIL_EXAMPLE, "Application found."),
+        **READ_ERRORS,
+        **BY_ID_ERRORS,
+    },
 )
 async def get_application(application_id: int, db: DBDep, user: CurrentUserDep):
     application = await ApplicationService(db).get_detail(application_id, user)
@@ -104,7 +266,11 @@ async def get_application(application_id: int, db: DBDep, user: CurrentUserDep):
         "предприятия и список учредителей."
     ),
     dependencies=[update_dep],
-    responses={200: success_example(APPLICATION_EXAMPLE, "Application updated."), **COMMON_ERRORS},
+    responses={
+        200: success_example(APPLICATION_DETAIL_EXAMPLE, "Application updated."),
+        **COMMON_ERRORS,
+        **draft_errors(CompanyNotAllowedException),
+    },
 )
 async def update_application(
     application_id: int, data: ApplicationUpdateDTO, db: DBDep, user: CurrentUserDep
@@ -115,9 +281,13 @@ async def update_application(
 
 @router.delete(
     "/{application_id}",
-    summary="Удаление черновика",
+    summary="Удаление черновика (вместе с фото и документами)",
     dependencies=[delete_dep],
-    responses={200: success_example(None, "Draft deleted."), **COMMON_ERRORS},
+    responses={
+        200: success_example(None, "Draft deleted."),
+        **COMMON_ERRORS,
+        **draft_errors(),
+    },
 )
 async def delete_draft(application_id: int, db: DBDep, user: CurrentUserDep):
     await ApplicationService(db).delete_draft(application_id, user)
@@ -134,10 +304,11 @@ async def delete_draft(application_id: int, db: DBDep, user: CurrentUserDep):
     ),
     dependencies=[update_dep],
     responses={
-        200: success_example(
-            {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"}, "Bank selected."
-        ),
+        200: success_example(BANK_EXAMPLE, "Bank selected."),
         **COMMON_ERRORS,
+        400: error_examples(ApplicationNotEditableException, BankSubjectTypeMismatchException),
+        403: BY_ID_ERRORS[403],
+        404: error_examples(ApplicationNotFoundException, BankNotFoundException),
     },
 )
 async def set_bank(application_id: int, data: ApplicationBankDTO, db: DBDep, user: CurrentUserDep):
@@ -155,17 +326,9 @@ async def set_bank(application_id: int, data: ApplicationBankDTO, db: DBDep, use
     ),
     dependencies=[update_dep],
     responses={
-        200: success_example(
-            {
-                "requested_amount": 150000000,
-                "loan_term_months": 24,
-                "total_cost": 200000000,
-                "jobs_count": 5,
-                "description": "Открытие швейного цеха: закупка 10 машин и аренда помещения.",
-            },
-            "Project saved.",
-        ),
+        200: success_example(PROJECT_EXAMPLE, "Project saved."),
         **COMMON_ERRORS,
+        **draft_errors(),
     },
 )
 async def set_project(application_id: int, data: ProjectDTO, db: DBDep, user: CurrentUserDep):
@@ -182,19 +345,9 @@ async def set_project(application_id: int, data: ProjectDTO, db: DBDep, user: Cu
     ),
     dependencies=[update_dep],
     responses={
-        200: success_example(
-            {
-                "lat": 41.311081,
-                "lng": 69.240562,
-                "region": "Ташкент",
-                "district": "Яккасарайский район",
-                "makhalla": "Махалля Кушбеги",
-                "address": "ул. Бабура, 12",
-                "confirmed": True,
-            },
-            "Location saved.",
-        ),
+        200: success_example(LOCATION_EXAMPLE, "Location saved."),
         **COMMON_ERRORS,
+        **draft_errors(),
     },
 )
 async def set_location(application_id: int, data: LocationDTO, db: DBDep, user: CurrentUserDep):
@@ -206,7 +359,11 @@ async def set_location(application_id: int, data: LocationDTO, db: DBDep, user: 
     "/{application_id}/founders",
     summary="Добавить учредителя (только для ООО)",
     dependencies=[update_dep],
-    responses={201: success_example(FOUNDER_EXAMPLE, "Founder added."), **COMMON_ERRORS},
+    responses={
+        201: success_example(FOUNDER_EXAMPLE, "Founder added."),
+        **COMMON_ERRORS,
+        **draft_errors(FoundersNotAllowedException, FounderLimitExceededException),
+    },
 )
 async def add_founder(application_id: int, data: FounderCreateDTO, db: DBDep, user: CurrentUserDep):
     founder = await ApplicationService(db).add_founder(application_id, user, data)
@@ -217,7 +374,12 @@ async def add_founder(application_id: int, data: FounderCreateDTO, db: DBDep, us
     "/{application_id}/founders/{founder_id}",
     summary="Изменить данные учредителя",
     dependencies=[update_dep],
-    responses={200: success_example(FOUNDER_EXAMPLE, "Founder updated."), **COMMON_ERRORS},
+    responses={
+        200: success_example(FOUNDER_EXAMPLE, "Founder updated."),
+        **COMMON_ERRORS,
+        **draft_errors(),
+        404: error_examples(ApplicationNotFoundException, FounderNotFoundException),
+    },
 )
 async def update_founder(
     application_id: int,
@@ -234,7 +396,12 @@ async def update_founder(
     "/{application_id}/founders/{founder_id}",
     summary="Удалить учредителя из черновика",
     dependencies=[update_dep],
-    responses={200: success_example(None, "Founder deleted."), **COMMON_ERRORS},
+    responses={
+        200: success_example(None, "Founder deleted."),
+        **COMMON_ERRORS,
+        **draft_errors(),
+        404: error_examples(ApplicationNotFoundException, FounderNotFoundException),
+    },
 )
 async def delete_founder(application_id: int, founder_id: int, db: DBDep, user: CurrentUserDep):
     await ApplicationService(db).delete_founder(application_id, user, founder_id)
@@ -243,20 +410,12 @@ async def delete_founder(application_id: int, founder_id: int, db: DBDep, user: 
 
 @router.post(
     "/{application_id}/photos",
-    summary="Прикрепить фотографию (максимум 4; JPG/PNG/WEBP)",
+    summary="Прикрепить фотографию (максимум 4; JPG/PNG/WEBP до 5 МБ)",
     dependencies=[update_dep],
     responses={
-        201: success_example(
-            {
-                "id": 1,
-                "file_name": "shop.jpg",
-                "content_type": "image/jpeg",
-                "size": 120000,
-                "url": "/api/v1/applications/12/photos/1/file",
-            },
-            "Photo uploaded.",
-        ),
+        201: success_example(PHOTO_EXAMPLE, "Photo uploaded."),
         **COMMON_ERRORS,
+        **draft_errors(PhotoLimitExceededException, InvalidPhotoException, PhotoTooLargeException),
     },
 )
 async def upload_photo(
@@ -270,7 +429,12 @@ async def upload_photo(
     "/{application_id}/photos/{photo_id}",
     summary="Удалить фотографию черновика",
     dependencies=[update_dep],
-    responses={200: success_example(None, "Photo deleted."), **COMMON_ERRORS},
+    responses={
+        200: success_example(None, "Photo deleted."),
+        **COMMON_ERRORS,
+        **draft_errors(),
+        404: error_examples(ApplicationNotFoundException, PhotoNotFoundException),
+    },
 )
 async def delete_photo(application_id: int, photo_id: int, db: DBDep, user: CurrentUserDep):
     await ApplicationService(db).delete_photo(application_id, user, photo_id)
@@ -282,7 +446,11 @@ async def delete_photo(application_id: int, photo_id: int, db: DBDep, user: Curr
     summary="Файл фотографии (только для тех, кто имеет доступ к заявке)",
     dependencies=[read_dep],
     response_class=FileResponse,
-    responses={**COMMON_ERRORS},
+    responses={
+        **READ_ERRORS,
+        403: BY_ID_ERRORS[403],
+        404: error_examples(ApplicationNotFoundException, PhotoNotFoundException),
+    },
 )
 async def get_photo_file(application_id: int, photo_id: int, db: DBDep, user: CurrentUserDep):
     path, content_type, file_name = await ApplicationService(db).get_photo_path(
@@ -296,17 +464,11 @@ async def get_photo_file(application_id: int, photo_id: int, db: DBDep, user: Cu
     summary="Прикрепить документ (максимум 4; PDF/DOCX до 10 МБ)",
     dependencies=[update_dep],
     responses={
-        201: success_example(
-            {
-                "id": 1,
-                "file_name": "business-plan.pdf",
-                "content_type": "application/pdf",
-                "size": 2400000,
-                "url": "/api/v1/applications/12/documents/1/file",
-            },
-            "Document uploaded.",
-        ),
+        201: success_example(DOCUMENT_EXAMPLE, "Document uploaded."),
         **COMMON_ERRORS,
+        **draft_errors(
+            DocumentLimitExceededException, InvalidDocumentException, DocumentTooLargeException
+        ),
     },
 )
 async def upload_document(
@@ -320,7 +482,12 @@ async def upload_document(
     "/{application_id}/documents/{document_id}",
     summary="Удалить документ черновика",
     dependencies=[update_dep],
-    responses={200: success_example(None, "Document deleted."), **COMMON_ERRORS},
+    responses={
+        200: success_example(None, "Document deleted."),
+        **COMMON_ERRORS,
+        **draft_errors(),
+        404: error_examples(ApplicationNotFoundException, DocumentNotFoundException),
+    },
 )
 async def delete_document(application_id: int, document_id: int, db: DBDep, user: CurrentUserDep):
     await ApplicationService(db).delete_document(application_id, user, document_id)
@@ -332,7 +499,11 @@ async def delete_document(application_id: int, document_id: int, db: DBDep, user
     summary="Файл документа (только для тех, кто имеет доступ к заявке)",
     dependencies=[read_dep],
     response_class=FileResponse,
-    responses={**COMMON_ERRORS},
+    responses={
+        **READ_ERRORS,
+        403: BY_ID_ERRORS[403],
+        404: error_examples(ApplicationNotFoundException, DocumentNotFoundException),
+    },
 )
 async def get_document_file(application_id: int, document_id: int, db: DBDep, user: CurrentUserDep):
     path, content_type, file_name = await ApplicationService(db).get_document_path(
@@ -349,10 +520,14 @@ async def get_document_file(application_id: int, document_id: int, db: DBDep, us
         200: success_example(
             {
                 "is_ready": False,
-                "missing": ["location.confirmed"],
-                "subject_type": "YATT",
-                "legal_name": "ИП Алиев",
-                "bank": {"id": 1, "name": "Microcreditbank"},
+                "missing": ["bank_id", "location.confirmed", "founders"],
+                "subject_type": "MCHJ",
+                "legal_name": "ООО Tikuv Servis",
+                "bank": None,
+                "company": COMPANY_EXAMPLE,
+                "founders_count": 0,
+                "project": PROJECT_EXAMPLE,
+                "location": {**LOCATION_EXAMPLE, "confirmed": False},
                 "photos_count": 2,
                 "max_photos": 4,
                 "documents_count": 1,
@@ -360,7 +535,8 @@ async def get_document_file(application_id: int, document_id: int, db: DBDep, us
             },
             "Submission check completed.",
         ),
-        **COMMON_ERRORS,
+        **READ_ERRORS,
+        **BY_ID_ERRORS,
     },
 )
 async def submission_check(application_id: int, db: DBDep, user: CurrentUserDep):
@@ -371,12 +547,17 @@ async def submission_check(application_id: int, db: DBDep, user: CurrentUserDep)
 @router.post(
     "/{application_id}/submit",
     summary="Отправить заявку: проверка обязательных полей → SUBMITTED → скоринг",
+    description=(
+        "Недостающие поля — те же ключи, что в `submission-check` (`bank_id`, `location.confirmed`, "
+        "`company.inn`, `project.requested_amount`, `founders`, `applicant.phone` …). "
+        "После отправки запускается скоринг; при успехе заявка автоматически уходит в выбранный "
+        "банк (`SENT_TO_BANK`), при техошибке KATM остаётся в `SCORING_IN_PROGRESS` до повтора."
+    ),
     dependencies=[update_dep],
     responses={
-        200: success_example(
-            {**APPLICATION_EXAMPLE, "status": "SENT_TO_BANK"}, "Application submitted."
-        ),
+        200: success_example(SUBMITTED_EXAMPLE, "Application submitted."),
         **COMMON_ERRORS,
+        **draft_errors(ApplicationValidationException),
     },
 )
 async def submit_application(application_id: int, db: DBDep, user: CurrentUserDep):
@@ -401,13 +582,22 @@ async def submit_application(application_id: int, db: DBDep, user: CurrentUserDe
                         "key": "submitted",
                         "title": "Заявка подана",
                         "state": "done",
-                        "description": "...",
-                    }
+                        "description": "Заявка принята и зарегистрирована.",
+                        "action_required": None,
+                    },
+                    {
+                        "key": "bank_review",
+                        "title": "Банк рассматривает",
+                        "state": "active",
+                        "description": "Ответственный сотрудник банка проводит рассмотрение.",
+                        "action_required": None,
+                    },
                 ],
             },
             "Progress retrieved.",
         ),
-        **COMMON_ERRORS,
+        **READ_ERRORS,
+        **BY_ID_ERRORS,
     },
 )
 async def get_progress(application_id: int, db: DBDep, user: CurrentUserDep):
@@ -428,13 +618,19 @@ async def get_progress(application_id: int, db: DBDep, user: CurrentUserDep):
                     "to_status": "DRAFT",
                     "event": "created",
                     "comment": "Заявка создана",
+                    "actor": {
+                        "id": 7,
+                        "full_name": "Алиев Али Алиевич",
+                        "username": "30101900000011",
+                    },
                     "actor_role": "APPLICANT",
-                    "created_at": "2026-10-19T10:00:00Z",
+                    "created_at": "2026-10-24T10:00:00Z",
                 }
             ],
             "History retrieved.",
         ),
-        **COMMON_ERRORS,
+        **READ_ERRORS,
+        **BY_ID_ERRORS,
     },
 )
 async def get_history(application_id: int, db: DBDep, user: CurrentUserDep):

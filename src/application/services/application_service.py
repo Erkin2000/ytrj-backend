@@ -229,9 +229,12 @@ class ApplicationService(ApplicationBaseService):
     async def _validate_bank(self, subject_type: SubjectType | None, bank_id: int) -> BankDTO:
         bank = await self.db.bank.get_one_or_none(id=bank_id)
         if bank is None or not bank.is_active:
-            raise BankNotFoundException()
+            raise BankNotFoundException(f"Bank {bank_id} not found or inactive")
         if subject_type is not None and subject_type not in bank.allowed_subject_types:
-            raise BankSubjectTypeMismatchException()
+            raise BankSubjectTypeMismatchException(
+                f"Bank '{bank.name}' does not work with subject type {subject_type.value}; "
+                f"allowed: {', '.join(bank.allowed_subject_types)}"
+            )
         return bank
 
     # ---------- учредители ----------
@@ -245,7 +248,8 @@ class ApplicationService(ApplicationBaseService):
         count = await self.db.application_founder.count_for_application(application.id)
         if count >= settings.MAX_APPLICATION_FOUNDERS:
             raise FounderLimitExceededException(
-                f"Maximum number of founders reached ({settings.MAX_APPLICATION_FOUNDERS})"
+                f"Maximum number of founders reached: {count} of "
+                f"{settings.MAX_APPLICATION_FOUNDERS}"
             )
 
         founder = await self.db.application_founder.add(
@@ -342,7 +346,8 @@ class ApplicationService(ApplicationBaseService):
         count = await self.db.application_photo.count_for_application(application.id)
         if count >= settings.MAX_APPLICATION_PHOTOS:
             raise PhotoLimitExceededException(
-                f"Maximum number of photos reached ({settings.MAX_APPLICATION_PHOTOS})"
+                f"Maximum number of photos reached: {count} of {settings.MAX_APPLICATION_PHOTOS}. "
+                "Delete a photo before uploading a new one"
             )
 
         storage_path, size, content_type = await self.storage.save(application.id, upload)
@@ -392,7 +397,8 @@ class ApplicationService(ApplicationBaseService):
         count = await self.db.application_document.count_for_application(application.id)
         if count >= settings.MAX_APPLICATION_DOCUMENTS:
             raise DocumentLimitExceededException(
-                f"Maximum number of documents reached ({settings.MAX_APPLICATION_DOCUMENTS})"
+                f"Maximum number of documents reached: {count} of "
+                f"{settings.MAX_APPLICATION_DOCUMENTS}. Delete a document before uploading a new one"
             )
 
         storage_path, size, content_type = await self.document_storage.save(application.id, upload)
@@ -496,7 +502,7 @@ class ApplicationService(ApplicationBaseService):
     async def _get_editable(self, application_id: int, user: CurrentUserDTO) -> ApplicationORM:
         application = await self.get_for_user(application_id, user)
         if application.status != ApplicationStatus.DRAFT:
-            raise ApplicationNotEditableException()
+            raise ApplicationNotEditableException(current_status=application.status.value)
         return application
 
     @staticmethod
@@ -544,14 +550,20 @@ class ApplicationService(ApplicationBaseService):
         if company is None or not any(company.model_dump(exclude_none=True).values()):
             return
         if subject_type is not None and subject_type not in SUBJECT_TYPES_WITH_COMPANY:
-            raise CompanyNotAllowedException()
+            raise CompanyNotAllowedException(
+                f"Company details are specified only for MCHJ (LLC); "
+                f"subject type is {subject_type.value}"
+            )
 
     @staticmethod
     def _assert_founders_allowed(subject_type: SubjectType | None, founders: list | None) -> None:
         if not founders:
             return
         if subject_type not in SUBJECT_TYPES_WITH_FOUNDERS:
-            raise FoundersNotAllowedException()
+            current = subject_type.value if subject_type else "not set"
+            raise FoundersNotAllowedException(
+                f"Founders are specified only for MCHJ (LLC); subject type is {current}"
+            )
         if len(founders) > settings.MAX_APPLICATION_FOUNDERS:
             raise FounderLimitExceededException(
                 f"Maximum number of founders reached ({settings.MAX_APPLICATION_FOUNDERS})"

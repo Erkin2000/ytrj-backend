@@ -21,18 +21,13 @@ def _add_cors_headers(request: Request, response):
 
 
 async def api_exception_handler(request: Request, exc: ApiException):
-    errors = None
-
-    # Исключения со списком незаполненных полей (заявка, профиль заявителя)
-    # отдают их в errors — фронтенд подсвечивает конкретные поля.
-    missing = getattr(exc, "missing", None)
-    if missing:
-        errors = [{"field": field, "message": "Required"} for field in missing]
-
+    # errors: незаполненные поля (заявка, профиль) либо поле, к которому
+    # относится ошибка (bank_id, company, founders, file) — для подсветки на фронтенде.
     return ResponseBuilder.error(
         message=exc.message,
         status_code=exc.status_code,
-        errors=errors,
+        errors=exc.to_errors(),
+        code=exc.code,
     )
 
 
@@ -45,11 +40,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             message=f"{type(exc).__name__}: {exc}",
             status_code=500,
             errors=traceback.format_exception(type(exc), exc, exc.__traceback__),
+            code="internal_error",
         )
     else:
         response = ResponseBuilder.error(
             message="Internal server error",
             status_code=500,
+            code="internal_error",
         )
 
     return _add_cors_headers(request, response)

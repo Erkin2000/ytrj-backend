@@ -208,8 +208,30 @@ UZ: dict[str, str] = {
     "Подать заявку: создаётся номер и черновик (DRAFT)": (
         "Ariza berish: raqam va qoralama (DRAFT) yaratiladi"
     ),
-    "Карточка заявки: данные, место деятельности, фото, этапы": (
-        "Ariza kartochkasi: maʼlumotlar, faoliyat joyi, suratlar, bosqichlar"
+    "Карточка заявки: заявитель, предприятие, учредители, проект, место, файлы, этапы": (
+        "Ariza kartochkasi: ariza beruvchi, korxona, taʼsischilar, loyiha, joy, fayllar, bosqichlar"
+    ),
+    "Удаление черновика (вместе с фото и документами)": (
+        "Qoralamani oʻchirish (suratlar va hujjatlar bilan birga)"
+    ),
+    "Прикрепить фотографию (максимум 4; JPG/PNG/WEBP до 5 МБ)": (
+        "Surat biriktirish (koʻpi bilan 4 ta; JPG/PNG/WEBP, 5 MB gacha)"
+    ),
+    "Недостающие поля — те же ключи, что в `submission-check` (`bank_id`, `location.confirmed`, "
+    "`company.inn`, `project.requested_amount`, `founders`, `applicant.phone` …). "
+    "После отправки запускается скоринг; при успехе заявка автоматически уходит в выбранный "
+    "банк (`SENT_TO_BANK`), при техошибке KATM остаётся в `SCORING_IN_PROGRESS` до повтора.": (
+        "Yetishmayotgan maydonlar — `submission-check`dagi kalitlar bilan bir xil (`bank_id`, "
+        "`location.confirmed`, `company.inn`, `project.requested_amount`, `founders`, "
+        "`applicant.phone` …). Yuborilgach skoring ishga tushadi; muvaffaqiyatli boʻlsa ariza "
+        "tanlangan bankka avtomatik yuboriladi (`SENT_TO_BANK`), KATM texnik xatosida qayta "
+        "urinishgacha `SCORING_IN_PROGRESS`da qoladi."
+    ),
+    "ООО Tikuv Servis": "«Tikuv Servis» MChJ",
+    "Заявка принята и зарегистрирована.": "Ariza qabul qilindi va roʻyxatga olindi.",
+    "Банк рассматривает": "Bank koʻrib chiqmoqda",
+    "Ответственный сотрудник банка проводит рассмотрение.": (
+        "Bankning masʼul xodimi koʻrib chiqmoqda."
     ),
     "Данные заявителя берутся из профиля (`/auth/me`). Банк выбирается отдельным шагом "
     "(`PUT /applications/{id}/bank`). Для ООО в `company` передаются СТИР предприятия и данные "

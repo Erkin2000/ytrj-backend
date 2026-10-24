@@ -76,21 +76,23 @@ class FileStorage:
         Возвращает (относительный путь, размер, content_type)."""
         content_type = self._detect_type(upload)
         if content_type is None or content_type not in self.allowed_types:
-            raise self.invalid_exception()
+            received = upload.content_type or Path(upload.filename or "").suffix or "unknown"
+            raise self.invalid_exception(f"{self.invalid_exception.message}; received: {received}")
 
         max_size = self.max_size_mb * 1024 * 1024
         content = await upload.read()
 
         if len(content) > max_size:
             raise self.too_large_exception(
-                f"File is too large. Maximum size is {self.max_size_mb} MB"
+                f"File is too large: {len(content) / 1024 / 1024:.1f} MB. "
+                f"Maximum size is {self.max_size_mb} MB"
             )
         if not content:
             raise self.invalid_exception("Empty file")
 
         signature = self.signatures.get(content_type)
         if signature and not content.startswith(signature):
-            raise self.invalid_exception("File content does not match its type")
+            raise self.invalid_exception(f"File content does not match its type ({content_type})")
 
         directory = self._application_dir(application_id)
         await anyio.to_thread.run_sync(lambda: directory.mkdir(parents=True, exist_ok=True))

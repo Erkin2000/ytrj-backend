@@ -23,12 +23,16 @@ class ResponseBuilder:
         message: str,
         status_code: int,
         errors: list | None = None,
+        code: str | None = None,
     ) -> JSONResponse:
+        """Ошибка: ``code`` — машиночитаемый код для фронтенда,
+        ``errors`` — список ``{"field", "message"}`` для подсветки полей."""
         return JSONResponse(
             status_code=status_code,
             content={
                 "success": False,
                 "message": message,
+                "code": code,
                 "errors": errors,
             },
         )
