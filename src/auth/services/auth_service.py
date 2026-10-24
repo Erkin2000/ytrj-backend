@@ -4,7 +4,12 @@ from datetime import UTC, datetime
 
 from src.account.mappers import UserDataMapper
 from src.account.models.user_model import UserORM, UserStatus
-from src.account.schemas.user_schema import CurrentUserDTO, UserAddDTO, UserProfileDTO
+from src.account.schemas.user_schema import (
+    CurrentUserDTO,
+    UserAddDTO,
+    UserProfileDTO,
+    UserProfileUpdateDTO,
+)
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
@@ -184,6 +189,22 @@ class AuthService(BaseService):
             permissions = sorted(current.permissions)
 
         return UserDataMapper.map_to_profile(user, permissions)
+
+    async def update_profile(
+        self, current: CurrentUserDTO, data: UserProfileUpdateDTO
+    ) -> UserProfileDTO:
+        """Пользователь дополняет собственный профиль: телефон, паспорт, ИНН,
+        email, пол, дата рождения. Ф.И.О. и ПИНФЛ приходят из YIA SSO и в DTO
+        отсутствуют (extra=forbid), поэтому изменить их этим методом нельзя."""
+        user = await self.db.user.get_orm_by_id(current.id)
+        if user is None:
+            raise UserNotFoundException()
+
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(user, field, value)
+
+        await self.db.commit()
+        return await self.get_profile(current)
 
     # ---------- YIA SSO ----------
 

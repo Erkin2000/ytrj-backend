@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import UploadFile
 
+from src.account.models.user_model import UserORM
+from src.account.profile import missing_profile_fields
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import (
     SUBJECT_TYPES_WITH_LEGAL_NAME,
@@ -33,6 +35,7 @@ from src.application.services.photo_storage import PhotoStorage
 from src.application.services.scoring_service import ScoringService
 from src.application.workflow import build_progress
 from src.common.responses.exceptions import (
+    ApplicantProfileIncompleteException,
     ApplicationNotEditableException,
     ApplicationValidationException,
     BankNotFoundException,
@@ -96,6 +99,12 @@ class ApplicationService(ApplicationBaseService):
         if applicant is None:
             raise UserNotFoundException()
 
+        # YIA SSO даёт только Ф.И.О. и ПИНФЛ; телефон, паспорт, ИНН, email, пол и дату
+        # рождения заявитель дополняет через PATCH /auth/me до создания заявки.
+        missing = missing_profile_fields(applicant)
+        if missing:
+            raise ApplicantProfileIncompleteException(missing=missing)
+
         await self._validate_bank(data.subject_type, data.bank_id)
 
         number = await self.db.application.next_number()
@@ -104,12 +113,8 @@ class ApplicationService(ApplicationBaseService):
             ApplicationAddDTO(
                 number=number,
                 applicant_id=applicant.id,
-                # Данные из YIA SSO подставляются автоматически и не редактируются заявителем.
-                applicant_full_name=applicant.full_name,
-                applicant_phone=applicant.phone,
-                applicant_passport=applicant.passport_number,
-                applicant_pinfl=applicant.pinfl,
-                applicant_inn=applicant.inn,
+                # Снимок данных заявителя; в заявке они не редактируются.
+                **self._applicant_snapshot(applicant),
                 subject_type=data.subject_type,
                 legal_name=self._legal_name_for(data.subject_type, data.legal_name),
                 bank_id=data.bank_id,
@@ -275,6 +280,11 @@ class ApplicationService(ApplicationBaseService):
         # Повторная проверка соответствия типа субъекта и банка на стороне сервера.
         await self._validate_bank(application.subject_type, application.bank_id)
 
+        # Заявитель мог дополнить профиль после создания черновика —
+        # в снимок попадают актуальные данные на момент отправки.
+        for field, value in self._applicant_snapshot(application.applicant).items():
+            setattr(application, field, value)
+
         application.submitted_at = now()
         await self.transition(
             application,
@@ -297,6 +307,19 @@ class ApplicationService(ApplicationBaseService):
         if application.status != ApplicationStatus.DRAFT:
             raise ApplicationNotEditableException()
         return application
+
+    @staticmethod
+    def _applicant_snapshot(applicant: UserORM) -> dict:
+        return {
+            "applicant_full_name": applicant.full_name,
+            "applicant_phone": applicant.phone,
+            "applicant_passport": applicant.passport_number,
+            "applicant_pinfl": applicant.pinfl,
+            "applicant_inn": applicant.inn,
+            "applicant_email": applicant.email,
+            "applicant_gender": applicant.gender,
+            "applicant_date_of_birth": applicant.date_of_birth,
+        }
 
     @staticmethod
     def _legal_name_for(subject_type: SubjectType | None, legal_name: str | None) -> str | None:
@@ -341,8 +364,11 @@ class ApplicationService(ApplicationBaseService):
         if len(application.photos) > settings.MAX_APPLICATION_PHOTOS:
             missing.append("photos")
 
-        if not application.applicant_full_name or not application.applicant_pinfl:
-            missing.append("applicant")
+        # Проверяем живой профиль, а не снимок: заявитель дополняет данные
+        # через PATCH /auth/me уже после создания черновика.
+        missing.extend(
+            f"applicant.{field}" for field in missing_profile_fields(application.applicant)
+        )
 
         return missing
 

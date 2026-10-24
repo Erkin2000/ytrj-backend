@@ -1,4 +1,5 @@
 from src.account.models.user_model import UserORM
+from src.account.profile import missing_profile_fields
 from src.account.schemas.user_schema import (
     BankShortDTO,
     CurrentUserDTO,
@@ -50,6 +51,8 @@ class UserDataMapper(DataMapper):
             passport_number=model.passport_number,
             pinfl=model.pinfl,
             inn=model.inn,
+            gender=model.gender,
+            date_of_birth=model.date_of_birth,
             updated_at=model.updated_at,
         )
 
@@ -70,6 +73,7 @@ class UserDataMapper(DataMapper):
     @staticmethod
     def map_to_profile(model: UserORM, permissions: list[str]) -> UserProfileDTO:
         role = model.role
+        missing = missing_profile_fields(model)
         return UserProfileDTO(
             id=model.id,
             username=model.username,
@@ -79,10 +83,14 @@ class UserDataMapper(DataMapper):
             pinfl=model.pinfl,
             inn=model.inn,
             email=model.email,
+            gender=model.gender,
+            date_of_birth=model.date_of_birth,
             status=model.status,
             role=RoleDataMapper.map_to_short(role),
             bank=_bank_short(model),
             is_superuser=bool(role and role.is_superuser),
             permissions=permissions,
+            profile_complete=not missing,
+            missing_fields=missing,
             last_login_at=model.last_login_at,
         )

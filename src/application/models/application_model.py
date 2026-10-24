@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.account.models.user_model import Gender
 from src.application.enums import ApplicationStatus, BankDecision, SubjectType
 from src.database import Base, TimestampMixin
 
@@ -38,12 +39,18 @@ class ApplicationORM(TimestampMixin, Base):
         index=True,
     )
 
-    # --- Снимок данных заявителя из YIA SSO (OneID) на момент создания (ТЗ, п. 5-6) ---
+    # --- Снимок данных заявителя на момент создания / отправки (ТЗ, п. 5-6) ---
+    # Ф.И.О. и ПИНФЛ — из YIA SSO; остальное заявитель дополняет в профиле.
     applicant_full_name: Mapped[str | None] = mapped_column(String(255))
     applicant_phone: Mapped[str | None] = mapped_column(String(20))
     applicant_passport: Mapped[str | None] = mapped_column(String(20))
     applicant_pinfl: Mapped[str | None] = mapped_column(String(14))
     applicant_inn: Mapped[str | None] = mapped_column(String(20))
+    applicant_email: Mapped[str | None] = mapped_column(String(255))
+    applicant_gender: Mapped[Gender | None] = mapped_column(
+        Enum(Gender, name="gender", create_type=False)
+    )
+    applicant_date_of_birth: Mapped[date | None] = mapped_column(Date)
 
     # --- Форма заявки ---
     subject_type: Mapped[SubjectType | None] = mapped_column(

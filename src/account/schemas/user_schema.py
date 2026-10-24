@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, StringConstraints
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
-from src.account.models.user_model import UserStatus
+from src.account.models.user_model import Gender, UserStatus
 from src.rbac.schemas.role_schema import RoleShortDTO
 
 PasswordStr = Annotated[str, StringConstraints(min_length=8, max_length=128)]
@@ -13,6 +13,10 @@ UsernameStr = Annotated[
 ]
 PhoneStr = Annotated[str, StringConstraints(pattern=r"^\+998\d{9}$")]
 PinflStr = Annotated[str, StringConstraints(pattern=r"^\d{14}$")]
+# Серия и номер паспорта / ID-карты РУз: две латинские буквы и семь цифр (AA1234567).
+PassportStr = Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}\d{7}$")]
+# ИНН физического лица — 9 цифр.
+InnStr = Annotated[str, StringConstraints(pattern=r"^\d{9}$")]
 
 
 class BankShortDTO(BaseModel):
@@ -42,6 +46,8 @@ class UserDetailDTO(UserDTO):
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
     updated_at: datetime | None = None
 
 
@@ -56,12 +62,53 @@ class UserProfileDTO(BaseModel):
     pinfl: str | None = None
     inn: str | None = None
     email: str | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
     status: UserStatus
     role: RoleShortDTO | None = None
     bank: BankShortDTO | None = None
     is_superuser: bool
     permissions: list[str]
+    profile_complete: bool = Field(
+        description="Все данные заявителя заполнены — можно создавать заявку."
+    )
+    missing_fields: list[str] = Field(
+        default_factory=list,
+        description="Поля профиля, которые нужно дополнить перед подачей заявки.",
+    )
     last_login_at: datetime | None = None
+
+
+class UserProfileUpdateDTO(BaseModel):
+    """Дополнение собственного профиля. Ф.И.О. и ПИНФЛ приходят из YIA SSO
+    и здесь не принимаются (лишние поля отклоняются с 422)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    phone: PhoneStr | None = Field(default=None, examples=["+998901234567"])
+    passport_number: PassportStr | None = Field(
+        default=None,
+        description="Серия и номер паспорта или ID-карты без пробелов.",
+        examples=["AA1234567"],
+    )
+    inn: InnStr | None = Field(default=None, examples=["123456789"])
+    email: EmailStr | None = Field(default=None, examples=["user@example.com"])
+    gender: Gender | None = Field(default=None, examples=["MALE"])
+    date_of_birth: date | None = Field(default=None, examples=["1998-05-20"])
+
+    @field_validator("passport_number", mode="before")
+    @classmethod
+    def _normalize_passport(cls, value):
+        if isinstance(value, str):
+            return value.replace(" ", "").upper()
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _date_in_past(cls, value: date | None) -> date | None:
+        if value is not None and value >= date.today():
+            raise ValueError("Дата рождения должна быть в прошлом")
+        return value
 
 
 class CurrentUserDTO(BaseModel):
@@ -95,6 +142,8 @@ class UserRequestAddDTO(BaseModel):
     full_name: str | None = None
     phone: PhoneStr | None = None
     email: EmailStr | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
     bank_id: int | None = None
     organization: str | None = None
     region: str | None = None
@@ -107,6 +156,8 @@ class UserRequestUpdateDTO(BaseModel):
     full_name: str | None = None
     phone: PhoneStr | None = None
     email: EmailStr | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
     bank_id: int | None = None
     organization: str | None = None
     region: str | None = None
@@ -136,6 +187,8 @@ class UserAddDTO(BaseModel):
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
 
 
 class UserUpdateDTO(BaseModel):
@@ -153,6 +206,8 @@ class UserUpdateDTO(BaseModel):
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
     last_login_at: datetime | None = None
 
 

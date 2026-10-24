@@ -312,6 +312,18 @@ msgstr "JShShIR"
 msgid "ИНН"
 msgstr "STIR"
 
+msgid "Пол"
+msgstr "Jinsi"
+
+msgid "Дата рождения"
+msgstr "Tugʻilgan sana"
+
+msgid "Мужской"
+msgstr "Erkak"
+
+msgid "Женский"
+msgstr "Ayol"
+
 msgid "Статус"
 msgstr "Holat"
 

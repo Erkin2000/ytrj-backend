@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request
 
+from src.account.schemas.user_schema import UserProfileUpdateDTO
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
@@ -70,34 +71,60 @@ async def logout_all(db: DBDep, user: CurrentUserDep):
     return ResponseBuilder.success(message="All sessions closed.")
 
 
+PROFILE_EXAMPLE = {
+    "id": 7,
+    "username": "30101900000011",
+    "full_name": "Алиев Али Алиевич",
+    "pinfl": "30101900000011",
+    "phone": "+998901234567",
+    "passport_number": "AA1234567",
+    "inn": "123456789",
+    "email": "aliev@example.com",
+    "gender": "MALE",
+    "date_of_birth": "1998-05-20",
+    "status": "ACTIVE",
+    "role": {"id": 5, "code": "APPLICANT", "name": "Заявитель", "is_superuser": False},
+    "bank": None,
+    "is_superuser": False,
+    "permissions": ["applications.create", "applications.read"],
+    "profile_complete": True,
+    "missing_fields": [],
+}
+
+
 @router.get(
     "/me",
     summary="Текущий пользователь: профиль, роль, права, scope",
+    description=(
+        "`profile_complete` / `missing_fields` показывают, какие данные заявителю нужно "
+        "дополнить через `PATCH /auth/me`, прежде чем создавать заявку."
+    ),
     responses={
-        200: success_example(
-            {
-                "id": 1,
-                "username": "admin",
-                "full_name": "Администратор",
-                "status": "ACTIVE",
-                "role": {
-                    "id": 1,
-                    "code": "SUPER_ADMIN",
-                    "name": "Super Admin",
-                    "is_superuser": True,
-                },
-                "bank": None,
-                "is_superuser": True,
-                "permissions": ["users.read", "users.update"],
-            },
-            message="Profile retrieved.",
-        ),
+        200: success_example(PROFILE_EXAMPLE, message="Profile retrieved."),
         **COMMON_ERRORS,
     },
 )
 async def me(db: DBDep, user: CurrentUserDep):
     profile = await AuthService(db).get_profile(user)
     return ResponseBuilder.success(data=profile, message="Profile retrieved.")
+
+
+@router.patch(
+    "/me",
+    summary="Дополнить свой профиль: телефон, паспорт, ИНН, email, пол, дата рождения",
+    description=(
+        "YIA Portal передаёт только Ф.И.О. и ПИНФЛ — эти поля обновляются при входе "
+        "и здесь не принимаются (ответ 422). Передавать можно любое подмножество полей; "
+        "`null` очищает поле. Пока профиль не заполнен полностью, создать заявку нельзя."
+    ),
+    responses={
+        200: success_example(PROFILE_EXAMPLE, message="Profile updated."),
+        **COMMON_ERRORS,
+    },
+)
+async def update_me(data: UserProfileUpdateDTO, db: DBDep, user: CurrentUserDep):
+    profile = await AuthService(db).update_profile(user, data)
+    return ResponseBuilder.success(data=profile, message="Profile updated.")
 
 
 @router.post(

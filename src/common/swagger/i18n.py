@@ -78,6 +78,37 @@ UZ: dict[str, str] = {
     "Текущий пользователь: профиль, роль, права, scope": (
         "Joriy foydalanuvchi: profil, rol, ruxsatlar, scope"
     ),
+    "`profile_complete` / `missing_fields` показывают, какие данные заявителю нужно "
+    "дополнить через `PATCH /auth/me`, прежде чем создавать заявку.": (
+        "`profile_complete` / `missing_fields` ariza beruvchi ariza yaratishdan oldin "
+        "`PATCH /auth/me` orqali qaysi maʼlumotlarni toʻldirishi kerakligini koʻrsatadi."
+    ),
+    "Дополнить свой профиль: телефон, паспорт, ИНН, email, пол, дата рождения": (
+        "Oʻz profilini toʻldirish: telefon, pasport, STIR, email, jins, tugʻilgan sana"
+    ),
+    "YIA Portal передаёт только Ф.И.О. и ПИНФЛ — эти поля обновляются при входе "
+    "и здесь не принимаются (ответ 422). Передавать можно любое подмножество полей; "
+    "`null` очищает поле. Пока профиль не заполнен полностью, создать заявку нельзя.": (
+        "YIA Portal faqat F.I.Sh. va JShShIRni uzatadi — bu maydonlar kirishda yangilanadi "
+        "va bu yerda qabul qilinmaydi (javob 422). Maydonlarning istalgan qismini yuborish "
+        "mumkin; `null` maydonni tozalaydi. Profil toʻliq toʻldirilmaguncha ariza yaratib "
+        "boʻlmaydi."
+    ),
+    "Все данные заявителя заполнены — можно создавать заявку.": (
+        "Ariza beruvchining barcha maʼlumotlari toʻldirilgan — ariza yaratish mumkin."
+    ),
+    "Поля профиля, которые нужно дополнить перед подачей заявки.": (
+        "Ariza berishdan oldin toʻldirilishi kerak boʻlgan profil maydonlari."
+    ),
+    "Серия и номер паспорта или ID-карты без пробелов.": (
+        "Pasport yoki ID-karta seriyasi va raqami, probelsiz."
+    ),
+    "Дополнение собственного профиля. Ф.И.О. и ПИНФЛ приходят из YIA SSO\n"
+    "и здесь не принимаются (лишние поля отклоняются с 422).": (
+        "Oʻz profilini toʻldirish. F.I.Sh. va JShShIR YIA SSO dan keladi\n"
+        "va bu yerda qabul qilinmaydi (ortiqcha maydonlar 422 bilan rad etiladi)."
+    ),
+    "Заявитель": "Ariza beruvchi",
     "Администратор": "Administrator",
     "Смена собственного пароля (закрывает прежние сессии)": (
         "Oʻz parolini oʻzgartirish (avvalgi sessiyalar yopiladi)"

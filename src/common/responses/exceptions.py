@@ -253,3 +253,14 @@ class ApplicantRoleNotAssignableException(BadRequestException):
     message = (
         "Applicant role is assigned automatically on YIA Portal sign-in and cannot be set manually"
     )
+
+
+class ApplicantProfileIncompleteException(BadRequestException):
+    """Профиль заявителя не дополнен: YIA SSO передаёт только Ф.И.О. и ПИНФЛ,
+    остальное пользователь заполняет через PATCH /auth/me."""
+
+    message = "Complete your profile before creating an application"
+
+    def __init__(self, missing: list[str] | None = None, message: str | None = None):
+        self.missing = missing or []
+        super().__init__(message)

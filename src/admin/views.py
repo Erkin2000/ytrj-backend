@@ -25,6 +25,7 @@ from src.admin.labels import (
     SUBJECT_LABELS,
     USER_STATUS_LABELS,
     badge,
+    gender_label,
     labeled_badge,
     role_badge,
     status_badge,
@@ -94,6 +95,15 @@ def fmt_role(model, attribute) -> Markup | str:
 
 def fmt_subject(model, attribute) -> str:
     return subject_label(getattr(model, "subject_type", None))
+
+
+def fmt_gender(model, attribute) -> str:
+    return gender_label(_attr_value(model, attribute))
+
+
+def fmt_date(model, attribute) -> str:
+    value = _attr_value(model, attribute)
+    return value.strftime("%d.%m.%Y") if value else "—"
 
 
 def fmt_decision(model, attribute) -> Markup | str:
@@ -186,6 +196,8 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         UserORM.passport_number: "Паспорт",
         UserORM.pinfl: "ПИНФЛ",
         UserORM.inn: "ИНН",
+        UserORM.gender: "Пол",
+        UserORM.date_of_birth: "Дата рождения",
         UserORM.status: "Статус",
         UserORM.role: "Роль",
         UserORM.role_id: "Роль",
@@ -206,6 +218,8 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
     column_formatters_detail = {
         UserORM.status: fmt_user_status,
         UserORM.role: fmt_role,
+        UserORM.gender: fmt_gender,
+        UserORM.date_of_birth: fmt_date,
         UserORM.last_login_at: fmt_datetime,
         UserORM.created_at: fmt_datetime,
         UserORM.updated_at: fmt_datetime,
@@ -417,6 +431,9 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.applicant_passport: "Паспорт",
         ApplicationORM.applicant_pinfl: "ПИНФЛ",
         ApplicationORM.applicant_inn: "ИНН",
+        ApplicationORM.applicant_email: "Email",
+        ApplicationORM.applicant_gender: "Пол",
+        ApplicationORM.applicant_date_of_birth: "Дата рождения",
         ApplicationORM.subject_type: "Тип субъекта",
         ApplicationORM.legal_name: "Юр. наименование",
         ApplicationORM.bank: "Банк",
@@ -459,6 +476,8 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
     column_formatters_detail = {
         ApplicationORM.status: fmt_status,
         ApplicationORM.subject_type: fmt_subject,
+        ApplicationORM.applicant_gender: fmt_gender,
+        ApplicationORM.applicant_date_of_birth: fmt_date,
         ApplicationORM.bank_decision: fmt_decision,
         ApplicationORM.scoring_retry_required: fmt_bool,
         ApplicationORM.location_confirmed: fmt_bool,

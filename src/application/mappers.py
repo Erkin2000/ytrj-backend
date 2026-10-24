@@ -175,6 +175,9 @@ class ApplicationDataMapper(DataMapper):
                 passport_number=model.applicant_passport,
                 pinfl=model.applicant_pinfl,
                 inn=model.applicant_inn,
+                email=model.applicant_email,
+                gender=model.applicant_gender,
+                date_of_birth=model.applicant_date_of_birth,
             ),
             location=LocationResponseDTO(
                 lat=model.location_lat,

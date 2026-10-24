@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from src.account.models.user_model import Gender
 from src.application.enums import (
     ApplicationStatus,
     BankDecision,
@@ -27,6 +28,9 @@ class ApplicantSnapshotDTO(BaseModel):
     passport_number: str | None = None
     pinfl: str | None = None
     inn: str | None = None
+    email: str | None = None
+    gender: Gender | None = None
+    date_of_birth: date | None = None
 
 
 class LocationDTO(BaseModel):
@@ -269,6 +273,9 @@ class ApplicationAddDTO(BaseModel):
     applicant_passport: str | None = None
     applicant_pinfl: str | None = None
     applicant_inn: str | None = None
+    applicant_email: str | None = None
+    applicant_gender: Gender | None = None
+    applicant_date_of_birth: date | None = None
     subject_type: SubjectType | None = None
     legal_name: str | None = None
     bank_id: int | None = None

@@ -68,6 +68,11 @@ USER_STATUS_LABELS: dict[str, tuple[str, str]] = {
     "BLOCKED": ("Заблокирован", "red"),
 }
 
+GENDER_LABELS: dict[str, str] = {
+    "MALE": "Мужской",
+    "FEMALE": "Женский",
+}
+
 ROLE_COLORS: dict[str, str] = {
     "SUPER_ADMIN": "red",
     "FUND_OPERATOR": "blue",
@@ -136,6 +141,13 @@ def subject_label(value) -> str:
         return "—"
     key = _key(value)
     return _(SUBJECT_LABELS.get(key, key))
+
+
+def gender_label(value) -> str:
+    if value is None:
+        return "—"
+    key = _key(value)
+    return _(GENDER_LABELS.get(key, key))
 
 
 def event_label(event: str | None) -> str:

@@ -3,7 +3,7 @@ import traceback
 
 from fastapi import FastAPI, Request
 
-from src.common.responses.exceptions import ApiException, ApplicationValidationException
+from src.common.responses.exceptions import ApiException
 from src.common.responses.response import ResponseBuilder
 from src.config import settings
 
@@ -23,8 +23,11 @@ def _add_cors_headers(request: Request, response):
 async def api_exception_handler(request: Request, exc: ApiException):
     errors = None
 
-    if isinstance(exc, ApplicationValidationException) and exc.missing:
-        errors = [{"field": field, "message": "Required"} for field in exc.missing]
+    # Исключения со списком незаполненных полей (заявка, профиль заявителя)
+    # отдают их в errors — фронтенд подсвечивает конкретные поля.
+    missing = getattr(exc, "missing", None)
+    if missing:
+        errors = [{"field": field, "message": "Required"} for field in missing]
 
     return ResponseBuilder.error(
         message=exc.message,

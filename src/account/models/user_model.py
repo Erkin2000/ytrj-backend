@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base, TimestampMixin
@@ -15,6 +15,11 @@ if TYPE_CHECKING:
 class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"
     BLOCKED = "BLOCKED"
+
+
+class Gender(StrEnum):
+    MALE = "MALE"
+    FEMALE = "FEMALE"
 
 
 class UserORM(TimestampMixin, Base):
@@ -31,13 +36,18 @@ class UserORM(TimestampMixin, Base):
     # проектов портала). Заполняется при первом входе через SSO.
     sso_sub: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
 
-    # Данные из YIA SSO (OneID) / госисточника. Заявитель не может их менять произвольно.
+    # Данные из YIA SSO (OneID): обновляются при каждом входе, пользователь менять не может.
     full_name: Mapped[str | None] = mapped_column(String(255))
+    pinfl: Mapped[str | None] = mapped_column(String(14), unique=True)
+
+    # Данные, которые портал не передаёт: заявитель дополняет их сам в профиле
+    # (PATCH /auth/me). Без них нельзя создать заявку (см. src/account/profile.py).
     phone: Mapped[str | None] = mapped_column(String(20))
     passport_number: Mapped[str | None] = mapped_column(String(20))
-    pinfl: Mapped[str | None] = mapped_column(String(14), unique=True)
     inn: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(255))
+    gender: Mapped[Gender | None] = mapped_column(Enum(Gender, name="gender"))
+    date_of_birth: Mapped[date | None] = mapped_column(Date)
 
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus, name="user_status"),
