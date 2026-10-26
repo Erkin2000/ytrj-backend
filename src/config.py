@@ -11,8 +11,6 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     API_PREFIX: str = "/api/v1"
 
-    # Временная отладка: если True, необработанные ошибки (500)
-    # возвращаются клиенту с типом, текстом и трейсом.
     DEBUG_ERRORS: bool = False
 
     CORS_ORIGINS: list[str] = ["*"]
@@ -31,7 +29,6 @@ class Settings(BaseSettings):
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
-    # Логин суперпользователя, который создаёт `python -m src.account.cli create-superuser`
     SUPERUSER: str = "admin"
 
     JWT_SECRET_KEY: str
@@ -52,7 +49,6 @@ class Settings(BaseSettings):
     PHOTO_MAX_SIZE_MB: int = 5
     PHOTO_ALLOWED_TYPES: list[str] = ["image/jpeg", "image/png", "image/webp"]
 
-    # Документы заявки (PDF / DOCX).
     MAX_APPLICATION_DOCUMENTS: int = 4
     DOCUMENT_MAX_SIZE_MB: int = 10
     DOCUMENT_ALLOWED_TYPES: list[str] = [
@@ -60,16 +56,13 @@ class Settings(BaseSettings):
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]
 
-    # SSO YIA Portal (e-yoshlar.uz): пользователь проходит OneID на стороне
-    # портала, платформа получает code и меняет его на профиль (sso_integration.md).
-    # Пока доступ не выдан — SSO_MOCK=True включает тестовый вход /auth/sso/mock-login.
     SSO_MOCK: bool = True
-    # Prod: https://api.e-yoshlar.uz, dev-стенд портала: https://dev-api.yiaportal.uz
-    SSO_BASE_URL: str = "https://api.e-yoshlar.uz"
-    SSO_CLIENT_ID: str = ""
-    SSO_CLIENT_SECRET: str = ""
-    # Должен в точности совпадать с redirect_uri, зарегистрированным на портале.
-    SSO_REDIRECT_URI: str = "http://localhost:8000/api/auth/one-id/callback"
+
+    SSO_BASE_URL: str
+    SSO_CLIENT_ID: str
+    SSO_CLIENT_SECRET: str
+
+    SSO_REDIRECT_URI: str
     SSO_TIMEOUT_SECONDS: float = 10.0
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600

@@ -1,0 +1,715 @@
+# English translation — Jamg'arma admin panel.
+#
+# Only our own strings (Russian msgid → English): models, columns, statuses,
+# dashboard, application card. SQLAdmin system strings come from the
+# package's own `en` catalog and are merged underneath this one.
+#
+# The .mo file is compiled on application start-up (src/admin/i18n.py).
+msgid ""
+msgstr ""
+"Project-Id-Version: Jamg'arma Admin\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# ===================== Categories and models =====================
+
+msgid "Пользователи и доступ"
+msgstr "Users & access"
+
+msgid "Справочники"
+msgstr "Reference data"
+
+msgid "Заявки"
+msgstr "Applications"
+
+msgid "Пользователь"
+msgstr "User"
+
+msgid "Пользователи"
+msgstr "Users"
+
+msgid "Роль"
+msgstr "Role"
+
+msgid "Роли"
+msgstr "Roles"
+
+msgid "Право"
+msgstr "Permission"
+
+msgid "Права"
+msgstr "Permissions"
+
+msgid "Сессия"
+msgstr "Session"
+
+msgid "Сессии (refresh-токены)"
+msgstr "Sessions (refresh tokens)"
+
+msgid "Банк"
+msgstr "Bank"
+
+msgid "Банки"
+msgstr "Banks"
+
+msgid "Заявка"
+msgstr "Application"
+
+msgid "Запись истории"
+msgstr "History record"
+
+msgid "История статусов"
+msgstr "Status history"
+
+msgid "Попытка скоринга"
+msgstr "Scoring attempt"
+
+msgid "Скоринг KATM"
+msgstr "KATM scoring"
+
+msgid "Назначение Совета"
+msgstr "Council assignment"
+
+msgid "Решения Совета"
+msgstr "Council decisions"
+
+msgid "Фотография"
+msgstr "Photo"
+
+msgid "Фотографии заявок"
+msgstr "Application photos"
+
+msgid "Документ заявки"
+msgstr "Application document"
+
+msgid "Документы заявок"
+msgstr "Application documents"
+
+msgid "Документы"
+msgstr "Documents"
+
+msgid "Документов нет."
+msgstr "No documents."
+
+msgid "Файл документа"
+msgstr "Document file"
+
+msgid "Путь"
+msgstr "Path"
+
+msgid "Загружен"
+msgstr "Uploaded"
+
+msgid "Документ-требование"
+msgstr "Demand document"
+
+msgid "Документы «Требование подтверждено»"
+msgstr "“Demand confirmed” documents"
+
+msgid "Выделение ресурсов"
+msgstr "Resource allocation"
+
+msgid "Файл фотографии"
+msgstr "Photo file"
+
+# ===================== Column labels =====================
+
+msgid "ID"
+msgstr "ID"
+
+msgid "Логин"
+msgstr "Username"
+
+msgid "Ф.И.О."
+msgstr "Full name"
+
+msgid "Телефон"
+msgstr "Phone"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Паспорт"
+msgstr "Passport"
+
+msgid "ПИНФЛ"
+msgstr "PINFL"
+
+msgid "ИНН"
+msgstr "TIN"
+
+msgid "Пол"
+msgstr "Gender"
+
+msgid "Дата рождения"
+msgstr "Date of birth"
+
+msgid "Мужской"
+msgstr "Male"
+
+msgid "Женский"
+msgstr "Female"
+
+msgid "Статус"
+msgstr "Status"
+
+msgid "Банк (scope)"
+msgstr "Bank (scope)"
+
+msgid "Организация"
+msgstr "Organisation"
+
+msgid "Регион"
+msgstr "Region"
+
+msgid "YIA SSO sub"
+msgstr "YIA SSO sub"
+
+msgid "Последний вход"
+msgstr "Last login"
+
+msgid "Создан"
+msgstr "Created"
+
+msgid "Обновлён"
+msgstr "Updated"
+
+msgid "Создана"
+msgstr "Created"
+
+msgid "Обновлена"
+msgstr "Updated"
+
+msgid "Код"
+msgstr "Code"
+
+msgid "Название"
+msgstr "Name"
+
+msgid "Описание"
+msgstr "Description"
+
+msgid "Суперпользователь"
+msgstr "Superuser"
+
+msgid "Системная"
+msgstr "System"
+
+msgid "IP"
+msgstr "IP"
+
+msgid "User-Agent"
+msgstr "User-Agent"
+
+msgid "Вход"
+msgstr "Signed in"
+
+msgid "Истекает"
+msgstr "Expires"
+
+msgid "Отозван"
+msgstr "Revoked"
+
+msgid "Порядок"
+msgstr "Order"
+
+msgid "Официальное название"
+msgstr "Official name"
+
+msgid "Типы субъектов"
+msgstr "Subject types"
+
+msgid "Активен"
+msgstr "Active"
+
+msgid "Номер"
+msgstr "Number"
+
+msgid "Заявитель"
+msgstr "Applicant"
+
+msgid "Ф.И.О. заявителя"
+msgstr "Applicant full name"
+
+msgid "Тип субъекта"
+msgstr "Subject type"
+
+msgid "Юр. наименование"
+msgstr "Legal name"
+
+msgid "СТИР предприятия"
+msgstr "Company TIN"
+
+msgid "Ф.И.О. руководителя"
+msgstr "Director full name"
+
+msgid "Паспорт руководителя"
+msgstr "Director passport"
+
+msgid "Телефон руководителя"
+msgstr "Director phone"
+
+msgid "Дата рождения руководителя"
+msgstr "Director date of birth"
+
+msgid "Учредители"
+msgstr "Founders"
+
+msgid "Учредитель"
+msgstr "Founder"
+
+msgid "Добавлен"
+msgstr "Added"
+
+msgid "Предприятие и руководитель"
+msgstr "Company & director"
+
+msgid "Реквизиты предприятия не указаны."
+msgstr "Company details not provided."
+
+msgid "Учредители не указаны."
+msgstr "No founders listed."
+
+msgid "Проект"
+msgstr "Project"
+
+msgid "Запрашиваемая сумма"
+msgstr "Requested amount"
+
+msgid "Срок кредита, мес."
+msgstr "Loan term, months"
+
+msgid "Стоимость проекта"
+msgstr "Project cost"
+
+msgid "Рабочие места"
+msgstr "Jobs created"
+
+msgid "Описание проекта"
+msgstr "Project description"
+
+msgid "Информация о проекте не заполнена."
+msgstr "Project information not filled in."
+
+msgid "Широта"
+msgstr "Latitude"
+
+msgid "Долгота"
+msgstr "Longitude"
+
+msgid "Область"
+msgstr "Region"
+
+msgid "Район"
+msgstr "District"
+
+msgid "Махалля"
+msgstr "Makhalla"
+
+msgid "Адрес деятельности"
+msgstr "Business address"
+
+msgid "Место подтверждено"
+msgstr "Location confirmed"
+
+msgid "Отправлена"
+msgstr "Submitted"
+
+msgid "Ожидает повтора KATM"
+msgstr "Awaiting KATM retry"
+
+msgid "Ошибка KATM"
+msgstr "KATM error"
+
+msgid "В банк"
+msgstr "Sent to bank"
+
+msgid "Принял (банк)"
+msgstr "Accepted by (bank)"
+
+msgid "Принята банком"
+msgstr "Accepted by bank"
+
+msgid "Решение банка"
+msgstr "Bank decision"
+
+msgid "Причина банка"
+msgstr "Bank reason"
+
+msgid "Решил (банк)"
+msgstr "Decided by (bank)"
+
+msgid "Решение банка (дата)"
+msgstr "Bank decision (date)"
+
+msgid "В Совет"
+msgstr "Sent to Council"
+
+msgid "Направил в Совет"
+msgstr "Sent to Council by"
+
+msgid "Решение Совета (дата)"
+msgstr "Council decision (date)"
+
+msgid "Причина Совета"
+msgstr "Council reason"
+
+msgid "Завершена"
+msgstr "Completed"
+
+msgid "Фотографии"
+msgstr "Photos"
+
+msgid "История"
+msgstr "History"
+
+msgid "Скоринг"
+msgstr "Scoring"
+
+msgid "Члены Совета"
+msgstr "Council members"
+
+msgid "Из статуса"
+msgstr "From status"
+
+msgid "В статус"
+msgstr "To status"
+
+msgid "Новый статус"
+msgstr "New status"
+
+msgid "Событие"
+msgstr "Event"
+
+msgid "Комментарий"
+msgstr "Comment"
+
+msgid "Кто"
+msgstr "By"
+
+msgid "Когда"
+msgstr "When"
+
+msgid "Провайдер"
+msgstr "Provider"
+
+msgid "Результат"
+msgstr "Result"
+
+msgid "Требования Фонда"
+msgstr "Fund requirements"
+
+msgid "Детали"
+msgstr "Details"
+
+msgid "Ошибка"
+msgstr "Error"
+
+msgid "Внёс вручную"
+msgstr "Entered manually by"
+
+msgid "Член Совета"
+msgstr "Council member"
+
+msgid "Направил"
+msgstr "Sent by"
+
+msgid "Направлена"
+msgstr "Sent"
+
+msgid "Решение"
+msgstr "Decision"
+
+msgid "Причина"
+msgstr "Reason"
+
+msgid "Решение (дата)"
+msgstr "Decision (date)"
+
+msgid "Файл"
+msgstr "File"
+
+msgid "Тип"
+msgstr "Type"
+
+msgid "Размер"
+msgstr "Size"
+
+msgid "Загружена"
+msgstr "Uploaded"
+
+msgid "Превью"
+msgstr "Preview"
+
+msgid "Выдан"
+msgstr "Issued"
+
+msgid "Сумма"
+msgstr "Amount"
+
+msgid "Валюта"
+msgstr "Currency"
+
+msgid "Реквизиты"
+msgstr "Details"
+
+msgid "Зафиксировал"
+msgstr "Recorded by"
+
+msgid "Дата"
+msgstr "Date"
+
+# ===================== Statuses and reference values =====================
+
+msgid "Черновик"
+msgstr "Draft"
+
+msgid "Подана"
+msgstr "Submitted"
+
+msgid "Скоринг не пройден"
+msgstr "Scoring failed"
+
+msgid "Не соответствует требованиям"
+msgstr "Not eligible"
+
+msgid "Готова к отправке в банк"
+msgstr "Ready for bank"
+
+msgid "Отправлена в банк"
+msgstr "Sent to bank"
+
+msgid "Банк рассматривает"
+msgstr "Under bank review"
+
+msgid "Банк одобрил"
+msgstr "Approved by bank"
+
+msgid "Банк отказал"
+msgstr "Rejected by bank"
+
+msgid "Рассмотрение Советом"
+msgstr "Under Council review"
+
+msgid "Совет утвердил"
+msgstr "Approved by Council"
+
+msgid "Совет отказал"
+msgstr "Rejected by Council"
+
+msgid "Требование подтверждено"
+msgstr "Demand confirmed"
+
+msgid "Черновики"
+msgstr "Drafts"
+
+msgid "Фонд → Совет"
+msgstr "Fund → Council"
+
+msgid "Финансирование"
+msgstr "Financing"
+
+msgid "Завершены"
+msgstr "Completed"
+
+msgid "Отклонены"
+msgstr "Rejected"
+
+msgid "ИП"
+msgstr "Sole proprietor"
+
+msgid "ООО"
+msgstr "LLC"
+
+msgid "Самозанятый"
+msgstr "Self-employed"
+
+msgid "Одобрено"
+msgstr "Approved"
+
+msgid "Отклонено"
+msgstr "Rejected"
+
+msgid "Пройден"
+msgstr "Passed"
+
+msgid "Не пройден"
+msgstr "Failed"
+
+msgid "Техническая ошибка"
+msgstr "Technical error"
+
+msgid "Сформирован"
+msgstr "Generated"
+
+msgid "Заблокирован"
+msgstr "Blocked"
+
+# ===================== History events =====================
+
+msgid "Заявка создана"
+msgstr "Application created"
+
+msgid "Заявка отправлена"
+msgstr "Application submitted"
+
+msgid "Запущен скоринг KATM"
+msgstr "KATM scoring started"
+
+msgid "Скоринг пройден"
+msgstr "Scoring passed"
+
+msgid "Техническая ошибка KATM"
+msgstr "KATM technical error"
+
+msgid "Повтор скоринга"
+msgstr "Scoring retry"
+
+msgid "Не соответствует требованиям Фонда"
+msgstr "Does not meet Fund requirements"
+
+msgid "Направлена в банк"
+msgstr "Sent to bank"
+
+msgid "Банк принял заявку"
+msgstr "Bank accepted the application"
+
+msgid "Направлена в Совет"
+msgstr "Sent to Council"
+
+msgid "Голос члена Совета"
+msgstr "Council member vote"
+
+msgid "Создан документ «Требование подтверждено»"
+msgstr "“Demand confirmed” document created"
+
+msgid "Ресурсы выделены"
+msgstr "Resources allocated"
+
+msgid "Заявка завершена"
+msgstr "Application completed"
+
+# ===================== Progress indicator (workflow) =====================
+
+msgid "Заявка подана"
+msgstr "Application submitted"
+
+msgid "Проверка KATM"
+msgstr "KATM check"
+
+msgid "Решение Совета"
+msgstr "Council decision"
+
+# ===================== Top bar, login =====================
+
+msgid "Тема"
+msgstr "Theme"
+
+msgid "API-документация"
+msgstr "API documentation"
+
+msgid "Панель управления платформой · только для Super Admin"
+msgstr "Platform control panel · Super Admin only"
+
+msgid "Пароль"
+msgstr "Password"
+
+msgid "Войти"
+msgstr "Sign in"
+
+msgid "Неверный логин или пароль, либо нет доступа в админ-панель"
+msgstr "Invalid username or password, or no access to the admin panel"
+
+# ===================== Dashboard =====================
+
+msgid "Jamg'arma · платформа финансирования"
+msgstr "Jamg'arma · financing platform"
+
+msgid "Панель управления"
+msgstr "Dashboard"
+
+msgid "Заявок всего"
+msgstr "Total applications"
+
+msgid "сегодня"
+msgstr "today"
+
+msgid "за 7 дней"
+msgstr "last 7 days"
+
+msgid "В работе"
+msgstr "In progress"
+
+msgid "Завершено / отклонено"
+msgstr "Completed / rejected"
+
+msgid "Активных пользователей"
+msgstr "Active users"
+
+msgid "Воронка заявок"
+msgstr "Application funnel"
+
+msgid "Требуют внимания"
+msgstr "Needs attention"
+
+msgid "Техническая ошибка KATM, ждут повтора"
+msgstr "KATM technical error, awaiting retry"
+
+msgid "Новые для банков"
+msgstr "New for banks"
+
+msgid "Одобрены банком — направить в Совет"
+msgstr "Approved by bank — send to Council"
+
+msgid "Ожидают выделения ресурсов"
+msgstr "Awaiting resource allocation"
+
+msgid "Последние входы"
+msgstr "Recent logins"
+
+msgid "без роли"
+msgstr "no role"
+
+msgid "Пока никто не входил."
+msgstr "No logins yet."
+
+msgid "Последние изменения заявок"
+msgstr "Recently updated applications"
+
+msgid "Все заявки"
+msgstr "All applications"
+
+msgid "Заявок ещё нет."
+msgstr "No applications yet."
+
+# ===================== Application card =====================
+
+msgid "История пуста."
+msgstr "History is empty."
+
+msgid "Попыток скоринга не было."
+msgstr "No scoring attempts."
+
+msgid "Фотографий нет."
+msgstr "No photos."
+
+msgid "Место деятельности"
+msgstr "Business location"
+
+msgid "Координаты"
+msgstr "Coordinates"
+
+msgid "Совет ещё не назначен."
+msgstr "Council not assigned yet."
+
+msgid "Документ ещё не создан."
+msgstr "Document not created yet."
+
+msgid "Ресурсы ещё не выделены."
+msgstr "Resources not allocated yet."
+
+msgid "Все поля"
+msgstr "All fields"
