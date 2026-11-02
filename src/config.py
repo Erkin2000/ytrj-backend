@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -66,6 +68,24 @@ class Settings(BaseSettings):
     # Куда GET /api/v1/redirect/from-backend пересылает браузер (с code/state/error).
     # Абсолютный URL фронтенда или путь на этом же хосте; по умолчанию встроенная страница.
     SSO_FRONTEND_REDIRECT_URL: str = "/api/auth/one-id/callback"
+
+    @field_validator("SSO_FRONTEND_REDIRECT_URL")
+    @classmethod
+    def _check_frontend_redirect(cls, value: str) -> str:
+        # Пустое значение или относительный путь без "/" дали бы Location вида
+        # "?code=..." — браузер вернулся бы на /redirect/from-backend и зациклился.
+        value = value.strip() or "/api/auth/one-id/callback"
+        parts = urlsplit(value)
+        if parts.scheme:
+            if parts.scheme not in ("http", "https") or not parts.netloc:
+                raise ValueError("SSO_FRONTEND_REDIRECT_URL: нужен http(s) URL или путь от корня")
+            if not parts.path:
+                value = parts._replace(path="/").geturl()
+        elif not value.startswith("/") or value.startswith("//"):
+            raise ValueError("SSO_FRONTEND_REDIRECT_URL: путь должен начинаться с одного '/'")
+        if urlsplit(value).path.rstrip("/").endswith("/redirect/from-backend"):
+            raise ValueError("SSO_FRONTEND_REDIRECT_URL не может указывать на сам /redirect/from-backend")
+        return value
     SSO_TIMEOUT_SECONDS: float = 10.0
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600

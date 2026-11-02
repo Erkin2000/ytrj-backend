@@ -40,4 +40,9 @@ def build_redirect_url(target: str, params: list[tuple[str, str]]) -> str:
 async def redirect_from_backend(request: Request) -> RedirectResponse:
     params = list(request.query_params.multi_items())
     url = build_redirect_url(settings.SSO_FRONTEND_REDIRECT_URL, params)
-    return RedirectResponse(url, status_code=302)
+    # В URL одноразовый code: не кэшируем ответ и не отдаём его в Referer.
+    return RedirectResponse(
+        url,
+        status_code=302,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
