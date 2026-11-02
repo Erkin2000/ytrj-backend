@@ -1,7 +1,8 @@
 """Минимальный веб-фронт для входа через YIA Portal.
 
 Нужен, пока нет отдельного фронтенда: страница входа и страница, на которую
-портал возвращает пользователя (redirect_uri = <host>/api/auth/one-id/callback).
+портал возвращает пользователя через GET /api/v1/redirect/from-backend
+(SSO_FRONTEND_REDIRECT_URL по умолчанию = <host>/api/auth/one-id/callback).
 Страницы работают через публичное API (/api/v1/auth/sso/*) так же, как это
 делал бы SPA, поэтому в схему OpenAPI не попадают.
 """

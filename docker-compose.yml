@@ -76,7 +76,8 @@ services:
       SSO_BASE_URL: ${SSO_BASE_URL:-https://api.e-yoshlar.uz}
       SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
       SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
-      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-http://localhost:8888/api/auth/one-id/callback}
+      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-http://localhost:8888/api/v1/redirect/from-backend}
+      SSO_FRONTEND_REDIRECT_URL: ${SSO_FRONTEND_REDIRECT_URL:-/api/auth/one-id/callback}
       SSO_STATE_TTL_SECONDS: ${SSO_STATE_TTL_SECONDS:-600}
 
       SCORING_MODE: ${SCORING_MODE:-auto_pass}

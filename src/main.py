@@ -16,7 +16,7 @@ from src.application.apis import (
     council_api,
     fund_api,
 )
-from src.auth.apis import auth_api, sso_web_api
+from src.auth.apis import auth_api, redirect_api, sso_web_api
 from src.common.logging_config import configure_logging
 from src.common.responses.handlers import register_exception_handlers
 from src.common.responses.validation_handler import validation_exception_handler
@@ -142,6 +142,7 @@ async def health():
 API_PREFIX = settings.API_PREFIX
 
 app.include_router(auth_api.router, prefix=API_PREFIX)
+app.include_router(redirect_api.router, prefix=API_PREFIX)
 app.include_router(user_api.router, prefix=API_PREFIX)
 app.include_router(role_api.router, prefix=API_PREFIX)
 app.include_router(permission_api.router, prefix=API_PREFIX)

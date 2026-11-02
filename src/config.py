@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     SSO_CLIENT_SECRET: str
 
     SSO_REDIRECT_URI: str
+    # Куда GET /api/v1/redirect/from-backend пересылает браузер (с code/state/error).
+    # Абсолютный URL фронтенда или путь на этом же хосте; по умолчанию встроенная страница.
+    SSO_FRONTEND_REDIRECT_URL: str = "/api/auth/one-id/callback"
     SSO_TIMEOUT_SECONDS: float = 10.0
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600
