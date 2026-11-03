@@ -7,7 +7,7 @@ Backend платформы финансирования: модульный мо
 
 | Модуль        | Что делает |
 |---------------|-----------|
-| `auth`        | Вход всех ролей через SSO YIA Portal (e-yoshlar.uz, OneID на стороне портала; пока mock) с переходом в кабинет роли по одноразовому билету, вход по паролю для внутренних пользователей, JWT access/refresh с ротацией, `/auth/me`, смена пароля, сессии |
+| `auth`        | Вход всех ролей через SSO YIA Portal (e-yoshlar.uz, OneID на стороне портала; пока mock), вход по паролю для внутренних пользователей, JWT access/refresh с ротацией, `/auth/me`, смена пароля, сессии |
 | `rbac`        | Каталог прав `<модуль>.<create\|read\|update\|delete\|approve>`, роли, матрица прав, системные роли |
 | `account`     | Пользователи: поиск/фильтры, назначение роли и scope (банк), блокировка, последний вход, сессии, CLI суперпользователя |
 | `application` | Заявки: черновик → отправка → скоринг KATM → требования Фонда → банк → Фонд → Совет → документ-требование → выделение ресурсов → завершение. История статусов, индикатор прогресса, фото (≤4), место деятельности, каталог банков |
@@ -190,7 +190,7 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 1. Фронтенд вызывает `GET /api/v1/auth/sso/authorize`, сохраняет `state` (например, в sessionStorage) и перенаправляет браузер на `authorize_url`. Пользователь проходит OneID на стороне портала.
 2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале: `https://yoshlarfondi.uz/api/v1/redirect/from-backend`) с `?code=...&state=...` либо `?error=access_denied&state=...`. Эндпоинт `GET /api/v1/redirect/from-backend` отвечает `302` на `SSO_FRONTEND_REDIRECT_URL` (абсолютный URL фронтенда или путь; по умолчанию встроенная страница `/api/auth/one-id/callback`), передавая все query-параметры портала без изменений (ответ с `Cache-Control: no-store` и `Referrer-Policy: no-referrer`).
-3. Страница на адресе `SSO_FRONTEND_REDIRECT_URL` сразу (code живёт 60 секунд) сверяет `state` с сохранённым, отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает пару JWT, `role` и `redirect_url` в кабинет роли (см. ниже).
+3. Страница на адресе `SSO_FRONTEND_REDIRECT_URL` сразу (code живёт 60 секунд) сверяет `state` с сохранённым, отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает `access_token`, `refresh_token` и `expires_in`.
 
 **Два сайта входа.** У `GET /api/v1/auth/sso/authorize` есть параметр `site`:
 
@@ -201,38 +201,11 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 Сайт подписывается внутри `state`, поэтому `POST /auth/sso/callback` меняет `code` тем же клиентом портала, что выдал ссылку входа, а `/redirect/from-backend` по `state` выбирает фронт. У `/redirect/from-backend` тоже есть параметр `site` (`yoshlarfondi` | `admin`): если он передан, фронт выбирается по нему (например, `SSO_REDIRECT_URI_ADMIN=.../redirect/from-backend?site=admin`), а на фронт он не пересылается. Без `SSO_REDIRECT_URI_ADMIN` вход с `site=admin` отклоняется (401 `sso_failed`).
 
-Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — точка возврата с портала: встроенная страница сама вызывает `POST /auth/sso/callback` и кладёт токены в `localStorage`, а также умеет менять `?ticket=` на токены. Сторонний адрес редиректа задаётся только настройкой `SSO_FRONTEND_REDIRECT_URL`, из запроса он не берётся.
+Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — точка возврата с портала: встроенная страница сама вызывает `POST /auth/sso/callback` и кладёт токены в `localStorage`. Сторонний адрес редиректа задаётся только настройкой `SSO_FRONTEND_REDIRECT_URL`, из запроса он не берётся.
 
 Бэкенд проверяет подпись и срок `state` (`SSO_STATE_TTL_SECONDS`), меняет `code` на профиль через `POST {SSO_BASE_URL}/api/v1/users/auth/sso/token/` с `client_secret` (только backend) и находит пользователя по `sub` портала (`users.sso_sub`), затем по ПИНФЛ; если не найден — создаёт заявителя (`username` = ПИНФЛ, при его отсутствии `sso_<sub>`). ПИНФЛ запрашивается у портала как опциональное поле при онбординге; `region/city/makhalla/role` приходят только у ётакчи и сейчас сохраняется только название региона.
 
 Ошибки: неверный/просроченный `state` → 400; `access_denied` → 403; `invalid_grant` (code просрочен или использован), `invalid_client` (неверные креды или IP бэкенда не в allow-list портала), сетевые ошибки → 401, вход можно повторить.
-
-### Кабинет роли после входа (поддомены)
-
-Каждая роль работает в своём кабинете на отдельном поддомене. `localStorage` у поддоменов разный, поэтому токены переносятся одноразовым билетом.
-
-Любой вход (`POST /auth/sso/callback`, `/auth/sso/mock-login`, `/auth/login`) сравнивает сайт кабинета роли (`ROLE_HOME_URLS`) с сайтом страницы входа (заголовок `Origin`, без него — `SSO_FRONTEND_REDIRECT_URL`). Ответ бывает двух видов:
-
-- **тот же сайт** (например, заявитель на `yoshlarfondi.uz`) — только токены:
-  ```json
-  {"access_token": "eyJ...", "refresh_token": "eyJ...", "expires_in": 3600}
-  ```
-- **другой поддомен** (Фонд, банк, Совет) — без токенов, только роль и кабинет с билетом:
-  ```json
-  {"role": "COUNCIL_MEMBER", "redirect_url": "https://council.yoshlarfondi.uz/?ticket=..."}
-  ```
-  Страница входа делает `location.replace(redirect_url)`, кабинет сразу вызывает `POST /api/v1/auth/ticket/exchange` с `{ticket}`, получает свою пару токенов и убирает `ticket` из адресной строки.
-
-Так токены выдаются один раз и только там, где будут использоваться: на каждый вход — одна сессия. Правило для фронта: есть `access_token` — сохранить токены; есть `redirect_url` — перейти по нему.
-
-Билет случайный, в БД хранится только его SHA-256 (`login_tickets`), живёт `LOGIN_TICKET_TTL_SECONDS` (60 с) и гасится атомарно при первом обмене; повторный/просроченный — 401 `invalid_login_ticket`. Адреса кабинетов задаются только настройками:
-
-```
-ROLE_HOME_URLS={"APPLICANT":"https://cabinet.yoshlarfondi.uz/","FUND_OPERATOR":"https://fund.yoshlarfondi.uz/","BANK_EMPLOYEE":"https://bank.yoshlarfondi.uz/","COUNCIL_MEMBER":"https://council.yoshlarfondi.uz/","SUPER_ADMIN":"https://admin.yoshlarfondi.uz/"}
-ROLE_HOME_URL_DEFAULT=/api/auth/one-id/callback   # роль без записи (в т.ч. созданная вручную)
-```
-
-`redirect_url` нужен только для навигации — доступ по-прежнему проверяется RBAC на каждом эндпоинте. Поддомены кабинетов нужно добавить в `CORS_ORIGINS`.
 
 ## Режимы, пока нет интеграций
 
@@ -264,7 +237,7 @@ uv run pytest            # или .venv/Scripts/pytest
 ```
 
 - `tests/test_urls.py` — юнит-тесты адресов редиректа, БД не нужна.
-- Остальные — интеграционные, через настоящее API на локальной БД из `.env`: вход через SSO и билет (`test_auth_sso.py`), админы направлений (`test_direction_admin.py`), полный путь заявки до `COMPLETED` (`test_application_workflow.py`), админ-панель (`test_admin_panel.py`).
+- Остальные — интеграционные, через настоящее API на локальной БД из `.env`: вход через SSO (`test_auth_sso.py`), админы направлений (`test_direction_admin.py`), полный путь заявки до `COMPLETED` (`test_application_workflow.py`), админ-панель (`test_admin_panel.py`).
 - Нужны применённые миграции, `SSO_MOCK=true`, `SCORING_MODE=auto_pass` (для пути заявки) и суперпользователь `admin` (пароль — `TEST_ADMIN_PASSWORD`, по умолчанию `admin12345`). Иначе тесты пропускаются с причиной.
 - Тесты создают только синтетических пользователей (ПИНФЛ `99999…`, логин `test_…`) и после каждого теста удаляют созданное по id вместе с файлами заявок; dev-данные не трогаются.
 

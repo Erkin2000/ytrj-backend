@@ -9,7 +9,6 @@ from src.application.repositories.photo_rep import ApplicationPhotoRepository
 from src.application.repositories.resource_allocation_rep import ResourceAllocationRepository
 from src.application.repositories.scoring_rep import ScoringAttemptRepository
 from src.application.repositories.status_history_rep import StatusHistoryRepository
-from src.auth.repositories.login_ticket_rep import LoginTicketRepository
 from src.auth.repositories.refresh_token_rep import RefreshTokenRepository
 from src.rbac.repositories.permission_rep import PermissionRepository
 from src.rbac.repositories.role_rep import RoleRepository
@@ -28,7 +27,6 @@ class DBManager:
         self.role = RoleRepository(self.session)
         self.permission = PermissionRepository(self.session)
         self.refresh_token = RefreshTokenRepository(self.session)
-        self.login_ticket = LoginTicketRepository(self.session)
 
         self.bank = BankRepository(self.session)
         self.application = ApplicationRepository(self.session)

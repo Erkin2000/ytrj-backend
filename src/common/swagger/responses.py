@@ -28,28 +28,6 @@ def success_example(data, message: str = "Success", description: str = "Success"
     }
 
 
-def success_examples(
-    cases: dict[str, tuple[str, object]],
-    message: str = "Success",
-    description: str = "Success",
-) -> dict:
-    """Несколько успешных ответов одной ручки: {key: (summary, data)}."""
-    return {
-        "description": description,
-        "content": {
-            "application/json": {
-                "examples": {
-                    key: {
-                        "summary": summary,
-                        "value": keep_nulls({"success": True, "message": message, "data": data}),
-                    }
-                    for key, (summary, data) in cases.items()
-                }
-            }
-        },
-    }
-
-
 def paginated_example(item: dict, message: str = "Data retrieved successfully.") -> dict:
     return success_example(
         {

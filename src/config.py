@@ -83,28 +83,6 @@ class Settings(BaseSettings):
     def _check_frontend_redirect(cls, value: str, info) -> str:
         return normalize_redirect_target(value or "/api/auth/one-id/callback", info.field_name)
 
-    # Кабинет каждой роли (свой поддомен). После входа бэкенд отдаёт redirect_url =
-    # адрес кабинета + ?ticket=<одноразовый билет>; кабинет меняет билет на токены
-    # через POST /auth/ticket/exchange. JSON: {"COUNCIL_MEMBER": "https://council.example.uz/"}.
-    # Роль без записи (в т.ч. созданная вручную) уходит на ROLE_HOME_URL_DEFAULT.
-    ROLE_HOME_URLS: dict[str, str] = {}
-    ROLE_HOME_URL_DEFAULT: str = "/api/auth/one-id/callback"
-    # Сколько живёт билет входа: только на один переход браузера.
-    LOGIN_TICKET_TTL_SECONDS: int = 60
-
-    @field_validator("ROLE_HOME_URLS")
-    @classmethod
-    def _check_role_home_urls(cls, value: dict[str, str]) -> dict[str, str]:
-        return {
-            role.strip().upper(): normalize_redirect_target(url, f"ROLE_HOME_URLS[{role}]")
-            for role, url in value.items()
-        }
-
-    @field_validator("ROLE_HOME_URL_DEFAULT")
-    @classmethod
-    def _check_role_home_default(cls, value: str) -> str:
-        return normalize_redirect_target(value, "ROLE_HOME_URL_DEFAULT")
-
     SSO_TIMEOUT_SECONDS: float = 10.0
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600

@@ -61,9 +61,9 @@ def test_empty_frontend_redirect_falls_back_to_builtin_page():
     )
 
 
-def test_role_home_urls_are_validated_and_normalized():
-    s = _settings(ROLE_HOME_URLS={"council_member": "https://council.uz"})
-    assert s.ROLE_HOME_URLS == {"COUNCIL_MEMBER": "https://council.uz/"}
+def test_admin_frontend_redirect_is_validated():
+    s = _settings(SSO_FRONTEND_REDIRECT_URL_ADMIN="https://admin.uz")
+    assert s.SSO_FRONTEND_REDIRECT_URL_ADMIN == "https://admin.uz/"
 
     with pytest.raises(ValueError):
-        _settings(ROLE_HOME_URLS={"APPLICANT": "javascript:alert(1)"})
+        _settings(SSO_FRONTEND_REDIRECT_URL_ADMIN="javascript:alert(1)")

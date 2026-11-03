@@ -24,7 +24,6 @@ from src.application.models.photo_model import ApplicationPhotoORM  # noqa: E402
 from src.application.models.resource_allocation_model import ResourceAllocationORM  # noqa: E402, F401
 from src.application.models.scoring_model import ScoringAttemptORM  # noqa: E402, F401
 from src.application.models.status_history_model import StatusHistoryORM  # noqa: E402, F401
-from src.auth.models.login_ticket_model import LoginTicketORM  # noqa: E402, F401
 from src.auth.models.refresh_token_model import RefreshTokenORM  # noqa: E402, F401
 from src.config import settings  # noqa: E402
 from src.database import Base  # noqa: E402

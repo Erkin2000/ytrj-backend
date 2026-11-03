@@ -1,8 +1,6 @@
 import asyncio
-import hashlib
 import logging
-import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from src.account.mappers import UserDataMapper
 from src.account.models.user_model import UserORM, UserStatus
@@ -15,8 +13,6 @@ from src.account.schemas.user_schema import (
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
-    LoginRedirectDTO,
-    LoginResultDTO,
     LoginTokensDTO,
     RefreshTokenCreateDTO,
     SSOAuthorizeDTO,
@@ -24,7 +20,6 @@ from src.auth.schemas.auth_schema import (
     SSOMockLoginDTO,
     SSOProfileDTO,
     SSOSite,
-    TicketExchangeDTO,
     TokenPairDTO,
 )
 from src.auth.services.password_service import hash_password, verify_password
@@ -35,7 +30,6 @@ from src.common.responses.exceptions import (
     ExpiredRefreshTokenException,
     InvalidCredentialsException,
     InvalidCurrentPasswordException,
-    InvalidLoginTicketException,
     PasswordLoginNotAllowedException,
     RefreshTokenNotFoundException,
     RefreshTokenRevokedException,
@@ -44,7 +38,6 @@ from src.common.responses.exceptions import (
     UserBlockedException,
     UserNotFoundException,
 )
-from src.common.urls import append_query, origin_of
 from src.config import settings
 from src.rbac.permissions import RoleCode
 from src.utils.base_service import BaseService
@@ -95,9 +88,7 @@ class AuthService(BaseService):
         data: LoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-        page_origin: str | None = None,
-        base_url: str | None = None,
-    ) -> LoginResultDTO:
+    ) -> LoginTokensDTO:
         user = await self.db.user.get_orm_by_username(data.username)
 
         is_valid = await asyncio.to_thread(
@@ -116,80 +107,21 @@ class AuthService(BaseService):
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._complete_login(user, user_agent, ip_address, page_origin, base_url)
-
-    # ---------- кабинет роли и билет входа ----------
-
-    @staticmethod
-    def home_url(role_code: str | None) -> str:
-        """Адрес кабинета роли из ROLE_HOME_URLS (иначе ROLE_HOME_URL_DEFAULT)."""
-        return settings.ROLE_HOME_URLS.get(role_code or "", settings.ROLE_HOME_URL_DEFAULT)
-
-    @staticmethod
-    def _hash_ticket(ticket: str) -> str:
-        return hashlib.sha256(ticket.encode()).hexdigest()
-
-    async def _issue_ticket_url(self, user: UserORM) -> str:
-        """Создаёт одноразовый билет и возвращает адрес кабинета роли с ним."""
-        ticket = secrets.token_urlsafe(32)
-        await self.db.login_ticket.purge_stale()
-        await self.db.login_ticket.add(
-            ticket_hash=self._hash_ticket(ticket),
-            user_id=user.id,
-            expires_at=datetime.now(UTC) + timedelta(seconds=settings.LOGIN_TICKET_TTL_SECONDS),
-        )
-        role_code = user.role.code if user.role else None
-        return append_query(self.home_url(role_code), [("ticket", ticket)])
+        return await self._complete_login(user, user_agent, ip_address)
 
     async def _complete_login(
         self,
         user: UserORM,
         user_agent: str | None,
         ip_address: str | None,
-        page_origin: str | None = None,
-        base_url: str | None = None,
-    ) -> LoginResultDTO:
-        """Общий финал входа.
-
-        page_origin — сайт страницы, с которой выполнен вход (заголовок Origin
-        или SSO_FRONTEND_REDIRECT_URL); base_url — адрес бэкенда для относительных
-        ROLE_HOME_URLS. Кабинет на том же сайте — только токены (LoginTokensDTO);
-        на другом поддомене — только role и redirect_url с билетом (LoginRedirectDTO),
-        localStorage у поддоменов свой."""
-        role_code = user.role.code if user.role else None
-        home = self.home_url(role_code)
-
-        if page_origin and origin_of(home, base_url or "") == page_origin:
-            tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
-            return LoginTokensDTO(
-                access_token=tokens.access_token,
-                refresh_token=tokens.refresh_token,
-                expires_in=tokens.expires_in,
-            )
-
-        redirect_url = await self._issue_ticket_url(user)
-        await self.db.user.touch_last_login(user.id)
-        await self.db.commit()
-        return LoginRedirectDTO(role=role_code, redirect_url=redirect_url)
-
-    async def exchange_ticket(
-        self,
-        data: TicketExchangeDTO,
-        user_agent: str | None = None,
-        ip_address: str | None = None,
-    ) -> TokenPairDTO:
-        user_id = await self.db.login_ticket.consume(self._hash_ticket(data.ticket))
-        if user_id is None:
-            raise InvalidLoginTicketException()
-
-        user = await self.db.user.get_orm_by_id(user_id)
-        if user is None:
-            raise InvalidLoginTicketException()
-        if user.status != UserStatus.ACTIVE:
-            raise UserBlockedException()
-
-        # _issue_tokens делает commit — билет гасится в той же транзакции.
-        return await self._issue_tokens(user.id, user_agent, ip_address)
+    ) -> LoginTokensDTO:
+        """Общий финал входа: access/refresh-токены и срок жизни access."""
+        tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
+        return LoginTokensDTO(
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            expires_in=tokens.expires_in,
+        )
 
     @staticmethod
     def _is_applicant(user: UserORM) -> bool:
@@ -299,9 +231,7 @@ class AuthService(BaseService):
         data: SSOCallbackDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-        page_origin: str | None = None,
-        base_url: str | None = None,
-    ) -> LoginResultDTO:
+    ) -> LoginTokensDTO:
         # Порядок как в sso_integration.md: сверяем state, смотрим error,
         # затем сразу меняем code (живёт 60 секунд) на профиль.
         site = self.sso_service.verify_state(data.state)
@@ -310,18 +240,14 @@ class AuthService(BaseService):
             raise SSOException("SSO code is missing")
 
         profile = await self.sso_service.exchange_code(data.code, site)
-        return await self._login_with_sso_profile(
-            profile, user_agent, ip_address, page_origin, base_url
-        )
+        return await self._login_with_sso_profile(profile, user_agent, ip_address)
 
     async def sso_mock_login(
         self,
         data: SSOMockLoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-        page_origin: str | None = None,
-        base_url: str | None = None,
-    ) -> LoginResultDTO:
+    ) -> LoginTokensDTO:
         if not settings.SSO_MOCK:
             raise SSOException("Mock SSO login is disabled")
 
@@ -330,18 +256,14 @@ class AuthService(BaseService):
             full_name=data.full_name,
             pinfl=data.pinfl,
         )
-        return await self._login_with_sso_profile(
-            profile, user_agent, ip_address, page_origin, base_url
-        )
+        return await self._login_with_sso_profile(profile, user_agent, ip_address)
 
     async def _login_with_sso_profile(
         self,
         profile: SSOProfileDTO,
         user_agent: str | None,
         ip_address: str | None,
-        page_origin: str | None = None,
-        base_url: str | None = None,
-    ) -> LoginResultDTO:
+    ) -> LoginTokensDTO:
         # Через YIA Portal входят все роли: заявитель создаётся автоматически,
         # сотрудник (Фонд, банк, Совет) заранее заведён Super Admin по ПИНФЛ.
         user = await self._find_or_create_sso_user(profile)
@@ -349,7 +271,7 @@ class AuthService(BaseService):
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._complete_login(user, user_agent, ip_address, page_origin, base_url)
+        return await self._complete_login(user, user_agent, ip_address)
 
     async def _find_or_create_sso_user(self, profile: SSOProfileDTO) -> UserORM:
         """Определяет существующий профиль по sub портала, затем по ПИНФЛ

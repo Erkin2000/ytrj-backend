@@ -7,7 +7,6 @@ import struct
 import zlib
 from collections.abc import Iterator
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -72,15 +71,6 @@ def data(response):
     return response.json().get("data")
 
 
-def tokens_of(client: TestClient, login: dict) -> dict:
-    if login.get("access_token"):
-        return login
-    ticket = parse_qs(urlsplit(login["redirect_url"]).query)["ticket"][0]
-    r = client.post("/api/v1/auth/ticket/exchange", json={"ticket": ticket})
-    assert r.status_code == 200, r.text
-    return data(r)
-
-
 @pytest.fixture(scope="session")
 def client() -> Iterator[TestClient]:
     if not settings.SSO_MOCK:
@@ -101,7 +91,7 @@ def superadmin(client) -> dict[str, str]:
     )
     if r.status_code != 200:
         pytest.skip(f"Не удалось войти как {ADMIN_USERNAME}: задайте TEST_ADMIN_PASSWORD")
-    return bearer(tokens_of(client, data(r))["access_token"])
+    return bearer(data(r)["access_token"])
 
 
 @pytest.fixture(scope="session")
@@ -157,7 +147,7 @@ class Api:
         )
         assert r.status_code == 200, r.text
         login = data(r)
-        headers = bearer(tokens_of(self.client, login)["access_token"])
+        headers = bearer(login["access_token"])
         me = data(self.client.get("/api/v1/auth/me", headers=headers))
         self.remember_user(me["id"])
         return {**login, "headers": headers}, me

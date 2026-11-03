@@ -10,13 +10,11 @@ from src.auth.schemas.auth_schema import (
     SSOCallbackDTO,
     SSOMockLoginDTO,
     SSOSite,
-    TicketExchangeDTO,
 )
 from src.auth.services.auth_service import AuthService
 from src.common.dependencies import CurrentUserDep, DBDep
 from src.common.responses.response import ResponseBuilder
-from src.common.swagger.responses import COMMON_ERRORS, success_example, success_examples
-from src.common.urls import origin_of
+from src.common.swagger.responses import COMMON_ERRORS, success_example
 from src.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Авторизация и аутентификация"])
@@ -31,43 +29,14 @@ TOKENS_EXAMPLE = success_example(
     message="Logged in successfully.",
 )
 
-LOGIN_EXAMPLE = success_examples(
+LOGIN_EXAMPLE = success_example(
     {
-        "same_site": (
-            "Кабинет на том же сайте, что и страница входа: токены сразу",
-            {
-                "access_token": "eyJhbGciOi...",
-                "refresh_token": "eyJhbGciOi...",
-                "expires_in": 3600,
-            },
-        ),
-        "other_subdomain": (
-            "Кабинет на другом поддомене: токенов нет, только билет в redirect_url",
-            {
-                "role": "COUNCIL_MEMBER",
-                "redirect_url": "https://council.yoshlarfondi.uz/?ticket=k3J9xQ...",
-            },
-        ),
+        "access_token": "eyJhbGciOi...",
+        "refresh_token": "eyJhbGciOi...",
+        "expires_in": 3600,
     },
     message="Logged in successfully.",
 )
-
-LOGIN_DESCRIPTION = "Если кабинет роли (`ROLE_HOME_URLS`) на том же сайте, что и страница входа (заголовок `Origin`, без него — `SSO_FRONTEND_REDIRECT_URL`), в ответе только `access_token`, `refresh_token` и `expires_in`. Если кабинет на другом поддомене, в ответе только `role` и `redirect_url` с одноразовым `?ticket=...`: фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
-
-
-def _login_meta(request: Request) -> dict:
-    """Кто входит и с какой страницы: решает, выдать токены сразу или билет."""
-    base_url = str(request.base_url)
-    page = request.headers.get("origin")
-    if not page or page == "null":
-        page = settings.SSO_FRONTEND_REDIRECT_URL
-    user_agent, ip_address = _client_meta(request)
-    return {
-        "user_agent": user_agent,
-        "ip_address": ip_address,
-        "page_origin": origin_of(page, base_url) or None,
-        "base_url": base_url,
-    }
 
 
 def _client_meta(request: Request) -> tuple[str | None, str | None]:
@@ -77,26 +46,10 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
 @router.post(
     "/login",
     summary="Вход по логину и паролю — только внутренние роли (Super Admin, Фонд, банк, Совет)",
-    description=LOGIN_DESCRIPTION,
     responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
 )
 async def login(data: LoginDTO, db: DBDep, request: Request):
-    tokens = await AuthService(db).login(data, **_login_meta(request))
-    return ResponseBuilder.success(data=tokens, message="Logged in successfully.")
-
-
-@router.post(
-    "/ticket/exchange",
-    summary="Обмен одноразового билета входа на токены (кабинет роли на своём поддомене)",
-    description=(
-        "Кабинет получает `?ticket=...` из `redirect_url` после входа и сразу меняет его "
-        "на пару токенов. Билет одноразовый: повторный, просроченный или чужой билет — 401 "
-        "`invalid_login_ticket`, нужно войти заново."
-    ),
-    responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
-)
-async def exchange_ticket(data: TicketExchangeDTO, db: DBDep, request: Request):
-    tokens = await AuthService(db).exchange_ticket(data, *_client_meta(request))
+    tokens = await AuthService(db).login(data, *_client_meta(request))
     return ResponseBuilder.success(data=tokens, message="Logged in successfully.")
 
 
@@ -237,17 +190,17 @@ async def sso_authorize(
 
 @router.post(
     "/sso/callback",
-    summary="YIA SSO (все роли): обмен code на токены и адрес кабинета роли",
+    summary="YIA SSO (все роли): обмен code на токены",
     description=(
         "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
         "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. "
         "Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть "
-        "заранее заведён Super Admin с его ПИНФЛ.\n\n" + LOGIN_DESCRIPTION
+        "заранее заведён Super Admin с его ПИНФЛ."
     ),
     responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
 )
 async def sso_callback(data: SSOCallbackDTO, db: DBDep, request: Request):
-    tokens = await AuthService(db).sso_callback(data, **_login_meta(request))
+    tokens = await AuthService(db).sso_callback(data, *_client_meta(request))
     return ResponseBuilder.success(data=tokens, message="Logged in via YIA Portal.")
 
 
@@ -258,10 +211,10 @@ if settings.SSO_MOCK:
         summary="YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True",
         description=(
             "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
-            "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет."
+            "ПИНФЛ сотрудника, заведённого Super Admin, входит под его учётной записью."
         ),
         responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
     )
     async def sso_mock_login(data: SSOMockLoginDTO, db: DBDep, request: Request):
-        tokens = await AuthService(db).sso_mock_login(data, **_login_meta(request))
+        tokens = await AuthService(db).sso_mock_login(data, *_client_meta(request))
         return ResponseBuilder.success(data=tokens, message="Logged in via mock YIA SSO.")

@@ -135,11 +135,6 @@ class SSOException(UnauthorizedException):
     message = "YIA Portal authentication failed. Please try again."
 
 
-class InvalidLoginTicketException(UnauthorizedException):
-    message = "Login ticket is invalid, expired or already used. Please sign in again."
-    field = "ticket"
-
-
 # ---------- 403 ----------
 
 

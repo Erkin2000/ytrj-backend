@@ -19,26 +19,11 @@ class TokenPairDTO(BaseModel):
 
 
 class LoginTokensDTO(BaseModel):
-    """Вход, когда кабинет роли на том же сайте, что и страница входа: только токены."""
+    """Ответ на вход (пароль или YIA SSO)."""
 
     access_token: str
     refresh_token: str
     expires_in: int
-
-
-class LoginRedirectDTO(BaseModel):
-    """Вход, когда кабинет роли на другом поддомене: токенов нет, redirect_url содержит
-    одноразовый ?ticket=..., который кабинет меняет через POST /auth/ticket/exchange."""
-
-    role: str | None = None
-    redirect_url: str
-
-
-LoginResultDTO = LoginTokensDTO | LoginRedirectDTO
-
-
-class TicketExchangeDTO(BaseModel):
-    ticket: str = Field(min_length=16, max_length=128, examples=["k3J9x...one-time-ticket"])
 
 
 class RefreshTokenRequestDTO(BaseModel):

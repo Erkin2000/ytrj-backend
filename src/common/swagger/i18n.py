@@ -31,17 +31,6 @@ Avtorizatsiya: `Authorization: Bearer <access_token>` sarlavhasi.
 Hujjat tili chap yuqoridagi tanlovda almashtiriladi (Русский / Oʻzbek).
 """
 
-LOGIN_DESCRIPTION_RU = "Если кабинет роли (`ROLE_HOME_URLS`) на том же сайте, что и страница входа (заголовок `Origin`, без него — `SSO_FRONTEND_REDIRECT_URL`), в ответе только `access_token`, `refresh_token` и `expires_in`. Если кабинет на другом поддомене, в ответе только `role` и `redirect_url` с одноразовым `?ticket=...`: фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
-LOGIN_DESCRIPTION_UZ = "Rol kabineti (`ROLE_HOME_URLS`) kirish sahifasi bilan bir saytda boʻlsa (`Origin` sarlavhasi boʻyicha, u boʻlmasa — `SSO_FRONTEND_REDIRECT_URL` boʻyicha), javobda faqat `access_token`, `refresh_token` va `expires_in` boʻladi. Kabinet boshqa subdomenda boʻlsa, javobda faqat `role` va bir martalik `?ticket=...` bilan `redirect_url` boʻladi: frontend `location.replace(redirect_url)` qiladi, kabinet esa chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi (chipta `LOGIN_TICKET_TTL_SECONDS` davomida amal qiladi)."
-
-SSO_CALLBACK_DESCRIPTION_RU = (
-    "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. `code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть заранее заведён Super Admin с его ПИНФЛ.\n\n"
-    + LOGIN_DESCRIPTION_RU
-)
-SSO_CALLBACK_DESCRIPTION_UZ = (
-    "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring. Ariza beruvchi birinchi kirishda yaratiladi; xodim (Jamgʻarma, bank, Kengash) esa Super Admin tomonidan JShShIRi bilan oldindan qoʻshilgan boʻlishi kerak.\n\n"
-    + LOGIN_DESCRIPTION_UZ
-)
 
 UZ: dict[str, str] = {
     # ---------- теги ----------
@@ -135,9 +124,7 @@ UZ: dict[str, str] = {
         "Frontend `state`ni saqlaydi (sessionStorage) va brauzerni `authorize_url`ga yoʻnaltiradi. "
         "Portal foydalanuvchini `SSO_REDIRECT_URI`ga `code` va `state` bilan qaytaradi."
     ),
-    "YIA SSO (все роли): обмен code на токены и адрес кабинета роли": (
-        "YIA SSO (barcha rollar): code ni tokenlarga va rol kabineti manziliga almashtirish"
-    ),
+    "YIA SSO (все роли): обмен code на токены": "YIA SSO (barcha rollar): code ni tokenlarga almashtirish",
     "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
     "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа.": (
         "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni "
@@ -146,8 +133,7 @@ UZ: dict[str, str] = {
     "YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True": (
         "YIA SSO (test): qoʻlda kiritilgan maʼlumotlar bilan kirish — SSO_MOCK=True boʻlganda"
     ),
-    "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
-    "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет.": "`POST /auth/sso/callback` kabi, lekin portal profili qoʻlda beriladi. Super Admin qoʻshgan xodimning JShShIRi bilan kirilsa, uning kabinetiga yoʻnaltiriladi.",
+    "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. ПИНФЛ сотрудника, заведённого Super Admin, входит под его учётной записью.": "`POST /auth/sso/callback` kabi, lekin portal profili qoʻlda beriladi. Super Admin qoʻshgan xodimning JShShIRi bilan uning hisobiga kiriladi.",
     "Возврат с YIA Portal → редирект на фронтенд": (
         "YIA Portaldan qaytish → frontendga yoʻnaltirish"
     ),
@@ -155,14 +141,7 @@ UZ: dict[str, str] = {
     "Редирект на SSO_FRONTEND_REDIRECT_URL с query портала": (
         "Portal query-parametrlari bilan SSO_FRONTEND_REDIRECT_URLga yoʻnaltirish"
     ),
-    LOGIN_DESCRIPTION_RU: LOGIN_DESCRIPTION_UZ,
-    SSO_CALLBACK_DESCRIPTION_RU: SSO_CALLBACK_DESCRIPTION_UZ,
-    "Обмен одноразового билета входа на токены (кабинет роли на своём поддомене)": (
-        "Bir martalik kirish chiptasini tokenlarga almashtirish (oʻz subdomenidagi rol kabineti)"
-    ),
-    "Кабинет получает `?ticket=...` из `redirect_url` после входа и сразу меняет его "
-    "на пару токенов. Билет одноразовый: повторный, просроченный или чужой билет — 401 "
-    "`invalid_login_ticket`, нужно войти заново.": "Kirishdan soʻng kabinet `redirect_url`dan `?ticket=...`ni oladi va uni darhol tokenlar juftligiga almashtiradi. Chipta bir martalik: takroriy, muddati oʻtgan yoki begona chipta uchun 401 `invalid_login_ticket` qaytadi — qaytadan kirish kerak.",
+    "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. `code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть заранее заведён Super Admin с его ПИНФЛ.": "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring. Ariza beruvchi birinchi kirishda yaratiladi; xodim (Jamgʻarma, bank, Kengash) esa Super Admin tomonidan JShShIRi bilan oldindan qoʻshilgan boʻlishi kerak.",
     "Создание сотрудника (роль + ПИНФЛ для входа через YIA Portal и/или пароль)": (
         "Xodim yaratish (rol + YIA Portal orqali kirish uchun JShShIR va/yoki parol)"
     ),
@@ -470,8 +449,6 @@ UZ: dict[str, str] = {
         "Kengash aʼzosining qarori: «Roziman» / «Rad etaman» (sabab majburiy)"
     ),
     "Обязательна при «Отклоняю».": "«Rad etaman» da majburiy.",
-    "Кабинет на том же сайте, что и страница входа: токены сразу": "Kabinet kirish sahifasi bilan bir saytda: tokenlar darhol beriladi",
-    "Кабинет на другом поддомене: токенов нет, только билет в redirect_url": "Kabinet boshqa subdomenda: tokenlar yoʻq, redirect_url ichida faqat chipta",
     "Сайт, с которого начат вход: `yoshlarfondi` — основной (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — админка (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Сайт подписывается в `state`: `POST /auth/sso/callback` меняет `code` тем же клиентом портала, а `/redirect/from-backend` возвращает браузер на фронт этого сайта.": "Kirish boshlangan sayt: `yoshlarfondi` — asosiy sayt (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — admin panel (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Sayt `state` ichida imzolanadi: `POST /auth/sso/callback` `code`ni portalning oʻsha mijozi orqali almashtiradi, `/redirect/from-backend` esa brauzerni shu saytning frontendiga qaytaradi.",
     "Фронт, на который вернуть браузер: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Без параметра сайт берётся из подписанного `state` (тот, что передан в `GET /auth/sso/authorize?site=`). Сам `site` на фронт не пересылается.": "Brauzer qaytariladigan frontend: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Parametr berilmasa, sayt imzolangan `state`dan olinadi (`GET /auth/sso/authorize?site=` da berilgan sayt). `site`ning oʻzi frontendga uzatilmaydi.",
 }

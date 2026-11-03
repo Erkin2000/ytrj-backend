@@ -1,6 +1,6 @@
 """Адреса, на которые бэкенд отправляет браузер (редиректы после входа)."""
 
-from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 def append_query(target: str, params: list[tuple[str, str]]) -> str:
@@ -28,12 +28,3 @@ def normalize_redirect_target(value: str, name: str) -> str:
     if urlsplit(value).path.rstrip("/").endswith("/redirect/from-backend"):
         raise ValueError(f"{name} не может указывать на сам /redirect/from-backend")
     return value
-
-
-def origin_of(url: str, base: str = "") -> str:
-    """scheme://host[:port] адреса; относительный путь разрешается от base.
-    Пустая строка, если origin определить нельзя."""
-    parts = urlsplit(urljoin(base, url))
-    if not parts.scheme or not parts.netloc:
-        return ""
-    return f"{parts.scheme}://{parts.netloc}".lower()
