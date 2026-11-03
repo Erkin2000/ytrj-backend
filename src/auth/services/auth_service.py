@@ -15,12 +15,15 @@ from src.account.schemas.user_schema import (
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
+    LoginRedirectDTO,
     LoginResultDTO,
+    LoginTokensDTO,
     RefreshTokenCreateDTO,
     SSOAuthorizeDTO,
     SSOCallbackDTO,
     SSOMockLoginDTO,
     SSOProfileDTO,
+    SSOSite,
     TicketExchangeDTO,
     TokenPairDTO,
 )
@@ -41,7 +44,7 @@ from src.common.responses.exceptions import (
     UserBlockedException,
     UserNotFoundException,
 )
-from src.common.urls import append_query
+from src.common.urls import append_query, origin_of
 from src.config import settings
 from src.rbac.permissions import RoleCode
 from src.utils.base_service import BaseService
@@ -92,6 +95,8 @@ class AuthService(BaseService):
         data: LoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
+        page_origin: str | None = None,
+        base_url: str | None = None,
     ) -> LoginResultDTO:
         user = await self.db.user.get_orm_by_username(data.username)
 
@@ -111,7 +116,7 @@ class AuthService(BaseService):
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._complete_login(user, user_agent, ip_address)
+        return await self._complete_login(user, user_agent, ip_address, page_origin, base_url)
 
     # ---------- кабинет роли и билет входа ----------
 
@@ -141,17 +146,31 @@ class AuthService(BaseService):
         user: UserORM,
         user_agent: str | None,
         ip_address: str | None,
+        page_origin: str | None = None,
+        base_url: str | None = None,
     ) -> LoginResultDTO:
-        """Общий финал входа: пара токенов для текущей страницы и redirect_url
-        в кабинет роли с одноразовым билетом (кабинет живёт на своём поддомене,
-        localStorage у него свой, поэтому токены переносятся только билетом)."""
+        """Общий финал входа.
+
+        page_origin — сайт страницы, с которой выполнен вход (заголовок Origin
+        или SSO_FRONTEND_REDIRECT_URL); base_url — адрес бэкенда для относительных
+        ROLE_HOME_URLS. Кабинет на том же сайте — только токены (LoginTokensDTO);
+        на другом поддомене — только role и redirect_url с билетом (LoginRedirectDTO),
+        localStorage у поддоменов свой."""
+        role_code = user.role.code if user.role else None
+        home = self.home_url(role_code)
+
+        if page_origin and origin_of(home, base_url or "") == page_origin:
+            tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
+            return LoginTokensDTO(
+                access_token=tokens.access_token,
+                refresh_token=tokens.refresh_token,
+                expires_in=tokens.expires_in,
+            )
+
         redirect_url = await self._issue_ticket_url(user)
-        tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
-        return LoginResultDTO(
-            **tokens.model_dump(),
-            role=user.role.code if user.role else None,
-            redirect_url=redirect_url,
-        )
+        await self.db.user.touch_last_login(user.id)
+        await self.db.commit()
+        return LoginRedirectDTO(role=role_code, redirect_url=redirect_url)
 
     async def exchange_ticket(
         self,
@@ -272,30 +291,36 @@ class AuthService(BaseService):
 
     # ---------- YIA SSO ----------
 
-    def sso_authorize(self) -> SSOAuthorizeDTO:
-        return self.sso_service.build_authorize_url()
+    def sso_authorize(self, site: SSOSite = SSOSite.MAIN) -> SSOAuthorizeDTO:
+        return self.sso_service.build_authorize_url(site)
 
     async def sso_callback(
         self,
         data: SSOCallbackDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
+        page_origin: str | None = None,
+        base_url: str | None = None,
     ) -> LoginResultDTO:
         # Порядок как в sso_integration.md: сверяем state, смотрим error,
         # затем сразу меняем code (живёт 60 секунд) на профиль.
-        self.sso_service.verify_state(data.state)
+        site = self.sso_service.verify_state(data.state)
         self.sso_service.check_callback_error(data.error)
         if not data.code:
             raise SSOException("SSO code is missing")
 
-        profile = await self.sso_service.exchange_code(data.code)
-        return await self._login_with_sso_profile(profile, user_agent, ip_address)
+        profile = await self.sso_service.exchange_code(data.code, site)
+        return await self._login_with_sso_profile(
+            profile, user_agent, ip_address, page_origin, base_url
+        )
 
     async def sso_mock_login(
         self,
         data: SSOMockLoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
+        page_origin: str | None = None,
+        base_url: str | None = None,
     ) -> LoginResultDTO:
         if not settings.SSO_MOCK:
             raise SSOException("Mock SSO login is disabled")
@@ -305,13 +330,17 @@ class AuthService(BaseService):
             full_name=data.full_name,
             pinfl=data.pinfl,
         )
-        return await self._login_with_sso_profile(profile, user_agent, ip_address)
+        return await self._login_with_sso_profile(
+            profile, user_agent, ip_address, page_origin, base_url
+        )
 
     async def _login_with_sso_profile(
         self,
         profile: SSOProfileDTO,
         user_agent: str | None,
         ip_address: str | None,
+        page_origin: str | None = None,
+        base_url: str | None = None,
     ) -> LoginResultDTO:
         # Через YIA Portal входят все роли: заявитель создаётся автоматически,
         # сотрудник (Фонд, банк, Совет) заранее заведён Super Admin по ПИНФЛ.
@@ -320,7 +349,7 @@ class AuthService(BaseService):
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._complete_login(user, user_agent, ip_address)
+        return await self._complete_login(user, user_agent, ip_address, page_origin, base_url)
 
     async def _find_or_create_sso_user(self, profile: SSOProfileDTO) -> UserORM:
         """Определяет существующий профиль по sub портала, затем по ПИНФЛ

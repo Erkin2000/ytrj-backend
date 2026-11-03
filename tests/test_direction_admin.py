@@ -41,9 +41,7 @@ def test_creates_staff_in_own_direction_with_chosen_permissions(api, fund_admin)
 
     login, me = api.sso_login(pinfl)
     assert me["permissions"] == ["applications.read"]
-    users = api.client.get(
-        "/api/v1/users", headers={"Authorization": f"Bearer {login['access_token']}"}
-    )
+    users = api.client.get("/api/v1/users", headers=login["headers"])
     assert users.status_code == 403
 
 

@@ -66,16 +66,22 @@ class Settings(BaseSettings):
     SSO_CLIENT_SECRET: str
 
     SSO_REDIRECT_URI: str
+
+    # Второй сайт входа — admin.yoshlarfondi.uz (GET /auth/sso/authorize?site=admin).
+    # Свой клиент портала; пустые ID/секрет — используется основной клиент.
+    SSO_CLIENT_ID_ADMIN: str = ""
+    SSO_CLIENT_SECRET_ADMIN: str = ""
+    SSO_REDIRECT_URI_ADMIN: str = ""
+    # Куда /redirect/from-backend пересылает браузер, если вход начат с site=admin.
+    SSO_FRONTEND_REDIRECT_URL_ADMIN: str = "/api/auth/one-id/callback"
     # Куда GET /api/v1/redirect/from-backend пересылает браузер (с code/state/error).
     # Абсолютный URL фронтенда или путь на этом же хосте; по умолчанию встроенная страница.
     SSO_FRONTEND_REDIRECT_URL: str = "/api/auth/one-id/callback"
 
-    @field_validator("SSO_FRONTEND_REDIRECT_URL")
+    @field_validator("SSO_FRONTEND_REDIRECT_URL", "SSO_FRONTEND_REDIRECT_URL_ADMIN")
     @classmethod
-    def _check_frontend_redirect(cls, value: str) -> str:
-        return normalize_redirect_target(
-            value or "/api/auth/one-id/callback", "SSO_FRONTEND_REDIRECT_URL"
-        )
+    def _check_frontend_redirect(cls, value: str, info) -> str:
+        return normalize_redirect_target(value or "/api/auth/one-id/callback", info.field_name)
 
     # Кабинет каждой роли (свой поддомен). После входа бэкенд отдаёт redirect_url =
     # адрес кабинета + ?ticket=<одноразовый билет>; кабинет меняет билет на токены

@@ -1,12 +1,50 @@
 """Примеры ответов для документации (Scalar / OpenAPI)."""
 
+# FastAPI собирает схему с exclude_none=True и выбрасывает null из примеров.
+# Поэтому в примерах None заменяется этой меткой, а после генерации схемы
+# restore_nulls() (src/common/swagger/openapi.py) превращает её обратно в null.
+NULL_MARKER = "__openapi_null__"
+
+
+def keep_nulls(value):
+    """Копия примера, где None заменён на NULL_MARKER."""
+    if value is None:
+        return NULL_MARKER
+    if isinstance(value, dict):
+        return {key: keep_nulls(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [keep_nulls(item) for item in value]
+    return value
+
 
 def success_example(data, message: str = "Success", description: str = "Success") -> dict:
     return {
         "description": description,
         "content": {
             "application/json": {
-                "example": {"success": True, "message": message, "data": data},
+                "example": keep_nulls({"success": True, "message": message, "data": data}),
+            }
+        },
+    }
+
+
+def success_examples(
+    cases: dict[str, tuple[str, object]],
+    message: str = "Success",
+    description: str = "Success",
+) -> dict:
+    """Несколько успешных ответов одной ручки: {key: (summary, data)}."""
+    return {
+        "description": description,
+        "content": {
+            "application/json": {
+                "examples": {
+                    key: {
+                        "summary": summary,
+                        "value": keep_nulls({"success": True, "message": message, "data": data}),
+                    }
+                    for key, (summary, data) in cases.items()
+                }
             }
         },
     }
@@ -27,7 +65,9 @@ def _error(description: str, message: str, code: str = "bad_request") -> dict:
         "description": description,
         "content": {
             "application/json": {
-                "example": {"success": False, "message": message, "code": code, "errors": None},
+                "example": keep_nulls(
+                    {"success": False, "message": message, "code": code, "errors": None}
+                ),
             }
         },
     }
@@ -50,12 +90,14 @@ def error_examples(*exceptions, description: str | None = None) -> dict:
         instance = exc_cls(missing=example_missing) if example_missing else exc_cls()
         examples[exc_cls.code] = {
             "summary": exc_cls.code,
-            "value": {
-                "success": False,
-                "message": instance.message,
-                "code": exc_cls.code,
-                "errors": instance.to_errors(),
-            },
+            "value": keep_nulls(
+                {
+                    "success": False,
+                    "message": instance.message,
+                    "code": exc_cls.code,
+                    "errors": instance.to_errors(),
+                }
+            ),
         }
 
     return {

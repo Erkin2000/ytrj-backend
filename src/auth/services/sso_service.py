@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 import httpx
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from src.auth.schemas.auth_schema import SSOAuthorizeDTO, SSOProfileDTO
+from src.auth.schemas.auth_schema import SSOAuthorizeDTO, SSOProfileDTO, SSOSite
 from src.common.responses.exceptions import (
     SSOAccessDeniedException,
     SSOException,
@@ -35,11 +35,27 @@ class YiaSSOService:
 
     # ---------- шаг 1: ссылка на страницу входа ----------
 
-    def build_authorize_url(self) -> SSOAuthorizeDTO:
-        state = self._state_serializer.dumps(secrets.token_urlsafe(16))
+    @staticmethod
+    def client(site: SSOSite) -> tuple[str, str, str]:
+        """(client_id, client_secret, redirect_uri) клиента портала для сайта входа."""
+        if site == SSOSite.ADMIN:
+            return (
+                settings.SSO_CLIENT_ID_ADMIN or settings.SSO_CLIENT_ID,
+                settings.SSO_CLIENT_SECRET_ADMIN or settings.SSO_CLIENT_SECRET,
+                settings.SSO_REDIRECT_URI_ADMIN,
+            )
+        return settings.SSO_CLIENT_ID, settings.SSO_CLIENT_SECRET, settings.SSO_REDIRECT_URI
+
+    def build_authorize_url(self, site: SSOSite = SSOSite.MAIN) -> SSOAuthorizeDTO:
+        client_id, _, redirect_uri = self.client(site)
+        if not redirect_uri:
+            raise SSOException(f"YIA SSO is not configured for site '{site}'")
+        # Сайт подписан в state: callback меняет code тем же клиентом портала,
+        # а /redirect/from-backend возвращает браузер на фронт этого сайта.
+        state = self._state_serializer.dumps({"n": secrets.token_urlsafe(16), "site": site.value})
         params = {
-            "client_id": settings.SSO_CLIENT_ID,
-            "redirect_uri": settings.SSO_REDIRECT_URI,
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
             "state": state,
         }
         return SSOAuthorizeDTO(
@@ -49,15 +65,28 @@ class YiaSSOService:
 
     # ---------- шаг 2: проверка ответа портала ----------
 
-    def verify_state(self, state: str | None) -> None:
+    def verify_state(self, state: str | None) -> SSOSite:
+        """Проверяет подпись и срок state; возвращает сайт, с которого начат вход."""
         if not state:
             raise SSOInvalidStateException()
         try:
-            self._state_serializer.loads(state, max_age=settings.SSO_STATE_TTL_SECONDS)
+            payload = self._state_serializer.loads(state, max_age=settings.SSO_STATE_TTL_SECONDS)
         except SignatureExpired:
             raise SSOInvalidStateException("SSO state expired, start sign-in again") from None
         except BadSignature:
             raise SSOInvalidStateException() from None
+        try:
+            return SSOSite(payload["site"])
+        except (TypeError, KeyError, ValueError):
+            raise SSOInvalidStateException() from None
+
+    def site_of(self, state: str | None) -> SSOSite:
+        """Сайт из state без исключений: для выбора фронта в /redirect/from-backend.
+        Неверный или просроченный state — основной сайт (ошибку покажет callback)."""
+        try:
+            return self.verify_state(state)
+        except SSOInvalidStateException:
+            return SSOSite.MAIN
 
     @staticmethod
     def check_callback_error(error: str | None) -> None:
@@ -70,10 +99,12 @@ class YiaSSOService:
 
     # ---------- шаг 3: обмен code на профиль ----------
 
-    async def exchange_code(self, code: str) -> SSOProfileDTO:
+    async def exchange_code(self, code: str, site: SSOSite = SSOSite.MAIN) -> SSOProfileDTO:
         """POST /sso/token/ → {sub, full_name, pinfl?, region?, city?, makhalla?, role?}.
+        code меняется тем же клиентом портала, что выдал ссылку входа (site из state).
         Любая ошибка портала → SSOException (вход прекращается, можно повторить)."""
-        if not settings.SSO_CLIENT_ID or not settings.SSO_CLIENT_SECRET:
+        client_id, client_secret, _ = self.client(site)
+        if not client_id or not client_secret:
             raise SSOException("YIA SSO is not configured")
 
         try:
@@ -81,8 +112,8 @@ class YiaSSOService:
                 response = await client.post(
                     f"{settings.SSO_BASE_URL}{TOKEN_PATH}",
                     json={
-                        "client_id": settings.SSO_CLIENT_ID,
-                        "client_secret": settings.SSO_CLIENT_SECRET,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
                         "code": code,
                     },
                 )

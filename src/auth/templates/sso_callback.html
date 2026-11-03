@@ -49,7 +49,15 @@
       // code живёт 60 секунд — отправляем сразу
       const tokens = await api("/auth/sso/callback", { method: "POST", body: JSON.stringify({ code, state, error }) });
       sessionStorage.removeItem(STATE_KEY);
-      await showMe(tokens, "Вход выполнен.");
+      if (tokens.access_token) {
+        // Кабинет на этом же сайте: токены выданы сразу.
+        await showMe(tokens, "Вход выполнен.");
+      } else {
+        // Кабинет на другом поддомене: токены выдаст он сам по билету.
+        hint.textContent = "Вход выполнен, кабинет роли — на другом поддомене.";
+        showStatus(status, "ok", "Роль " + (tokens.role || "—") + ": перейдите в кабинет", tokens);
+        history.replaceState(null, "", window.location.pathname);
+      }
       // Настоящий фронтенд сразу делает location.replace(tokens.redirect_url);
       // здесь показываем кнопку, чтобы можно было посмотреть ответ.
       if (tokens.redirect_url) {

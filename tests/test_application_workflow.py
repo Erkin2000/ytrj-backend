@@ -3,7 +3,7 @@ import random
 import pytest
 
 from src.config import settings
-from tests.conftest import bearer, data
+from tests.conftest import data
 
 pytestmark = pytest.mark.skipif(
     settings.SCORING_MODE != "auto_pass", reason="Нужен SCORING_MODE=auto_pass"
@@ -23,7 +23,7 @@ def bank(banks):
 @pytest.fixture
 def applicant(api):
     login, _ = api.sso_login(full_name="TEST Applicant")
-    headers = bearer(login["access_token"])
+    headers = login["headers"]
     r = api.client.patch(
         "/api/v1/auth/me",
         headers=headers,

@@ -1,11 +1,19 @@
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from src.account.models.user_model import UserORM
 from src.config import settings
-from tests.conftest import bearer, data, db_all
+from tests.conftest import (
+    ADMIN_PASSWORD,
+    ADMIN_USERNAME,
+    bearer,
+    data,
+    db_all,
+    db_scalar,
+    tokens_of,
+)
 
 ROLE_URLS = {
     "COUNCIL_MEMBER": "https://council.example.uz/",
@@ -14,9 +22,13 @@ ROLE_URLS = {
 }
 
 
+FRONT_LOGIN = "https://front.example.uz/login"
+
+
 @pytest.fixture
 def role_urls(monkeypatch):
     monkeypatch.setattr(settings, "ROLE_HOME_URLS", ROLE_URLS)
+    monkeypatch.setattr(settings, "SSO_FRONTEND_REDIRECT_URL", FRONT_LOGIN)
     return ROLE_URLS
 
 
@@ -30,13 +42,14 @@ LOGIN_PAGE = "https://front.uz/login?lang=uz"
 @pytest.fixture
 def portal(monkeypatch):
     """Подменяет обмен code у YIA Portal: profile задаёт тест (portal["profile"])."""
-    from src.auth.schemas.auth_schema import SSOProfileDTO
+    from src.auth.schemas.auth_schema import SSOProfileDTO, SSOSite
     from src.auth.services.sso_service import YiaSSOService
 
-    state = {"profile": None, "codes": []}
+    state = {"profile": None, "codes": [], "clients": []}
 
-    async def fake_exchange(self, code):
+    async def fake_exchange(self, code, site=SSOSite.MAIN):
         state["codes"].append(code)
+        state["clients"].append(self.client(site)[0])
         return SSOProfileDTO(**state["profile"])
 
     monkeypatch.setattr(YiaSSOService, "exchange_code", fake_exchange)
@@ -65,7 +78,9 @@ def test_sso_callback_exchanges_code_and_returns_cabinet_url(api, role_ids, role
     assert portal["codes"] == ["CODE1"]
     assert login["role"] == "COUNCIL_MEMBER"
     assert login["redirect_url"].startswith("https://council.example.uz/?ticket=")
-    me = data(api.client.get("/api/v1/auth/me", headers=bearer(login["access_token"])))
+    assert set(login) == {"role", "redirect_url"}
+    tokens = tokens_of(api.client, login)
+    me = data(api.client.get("/api/v1/auth/me", headers=bearer(tokens["access_token"])))
     assert me["id"] == staff_id
 
 
@@ -126,15 +141,16 @@ def test_staff_created_by_pinfl_signs_in_via_sso(api, role_ids, role_urls):
     assert r.status_code == 201, r.text
     staff_id = data(r)["id"]
 
-    login, _ = api.sso_login(pinfl)
+    login, me = api.sso_login(pinfl)
     assert login["role"] == "COUNCIL_MEMBER"
     assert login["redirect_url"].startswith("https://council.example.uz/?ticket=")
+    assert set(login) - {"headers"} == {"role", "redirect_url"}
+    assert me["id"] == staff_id
 
-    tokens = api.client.post(
+    reused = api.client.post(
         "/api/v1/auth/ticket/exchange", json={"ticket": ticket_of(login["redirect_url"])}
     )
-    me = data(api.client.get("/api/v1/auth/me", headers=bearer(data(tokens)["access_token"])))
-    assert me["id"] == staff_id
+    assert reused.status_code == 401
 
     stored = db_all(select(UserORM.sso_sub).where(UserORM.id == staff_id))
     assert stored[0][0] == f"mock-{pinfl}"
@@ -189,6 +205,7 @@ def test_applicant_auto_created_and_cabinet_query_kept(api, role_urls):
 
 def test_role_without_url_goes_to_default(api, monkeypatch):
     monkeypatch.setattr(settings, "ROLE_HOME_URLS", {})
+    monkeypatch.setattr(settings, "SSO_FRONTEND_REDIRECT_URL", FRONT_LOGIN)
     login, _ = api.sso_login()
     assert login["redirect_url"].startswith(settings.ROLE_HOME_URL_DEFAULT + "?ticket=")
 
@@ -196,3 +213,180 @@ def test_role_without_url_goes_to_default(api, monkeypatch):
 def test_builtin_pages_render(client):
     assert client.get("/api/auth/one-id/login").status_code == 200
     assert client.get("/api/auth/one-id/callback").status_code == 200
+
+
+def _count(table, user_id):
+    return db_scalar(text(f"SELECT count(*) FROM {table} WHERE user_id = :u"), {"u": user_id})
+
+
+def test_same_site_cabinet_gets_tokens_without_ticket(api, monkeypatch):
+    monkeypatch.setattr(settings, "ROLE_HOME_URLS", {"APPLICANT": "https://yoshlarfondi.test/"})
+    monkeypatch.setattr(settings, "SSO_FRONTEND_REDIRECT_URL", "https://yoshlarfondi.test/login")
+
+    r = api.client.post(
+        "/api/v1/auth/sso/mock-login", json={"pinfl": api.fresh_pinfl(), "full_name": "TEST"}
+    )
+    login = data(r)
+    assert set(login) == {"access_token", "refresh_token", "expires_in"}
+
+    me = data(api.client.get("/api/v1/auth/me", headers=bearer(login["access_token"])))
+    api.remember_user(me["id"])
+    assert _count("login_tickets", me["id"]) == 0
+    assert _count("refresh_tokens", me["id"]) == 1
+
+
+def test_other_subdomain_gets_only_ticket_and_one_session(api, role_urls):
+    r = api.client.post(
+        "/api/v1/auth/sso/mock-login", json={"pinfl": api.fresh_pinfl(), "full_name": "TEST"}
+    )
+    login = data(r)
+    assert set(login) == {"role", "redirect_url"}
+    assert "?" in login["redirect_url"] and "ticket=" in login["redirect_url"]
+
+    tokens = tokens_of(api.client, login)
+    me = data(api.client.get("/api/v1/auth/me", headers=bearer(tokens["access_token"])))
+    api.remember_user(me["id"])
+    assert _count("refresh_tokens", me["id"]) == 1
+
+
+def test_origin_header_decides_for_password_login(client, role_urls):
+    body = {"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD}
+
+    same = data(
+        client.post("/api/v1/auth/login", json=body, headers={"Origin": "https://admin.example.uz"})
+    )
+    assert set(same) == {"access_token", "refresh_token", "expires_in"}
+
+    other = data(client.post("/api/v1/auth/login", json=body))
+    assert set(other) == {"role", "redirect_url"}
+    assert other["redirect_url"].startswith("https://admin.example.uz/?ticket=")
+
+
+ADMIN_FRONT = "https://admin.example.uz/login"
+
+
+@pytest.fixture
+def sites(monkeypatch):
+    monkeypatch.setattr(settings, "SSO_CLIENT_ID", "main-client")
+    monkeypatch.setattr(settings, "SSO_CLIENT_SECRET", "main-secret")
+    monkeypatch.setattr(
+        settings, "SSO_REDIRECT_URI", "https://yoshlarfondi.uz/api/v1/redirect/from-backend"
+    )
+    monkeypatch.setattr(settings, "SSO_CLIENT_ID_ADMIN", "admin-client")
+    monkeypatch.setattr(settings, "SSO_CLIENT_SECRET_ADMIN", "admin-secret")
+    monkeypatch.setattr(
+        settings,
+        "SSO_REDIRECT_URI_ADMIN",
+        "https://admin.yoshlarfondi.uz/api/v1/redirect/from-backend",
+    )
+    monkeypatch.setattr(settings, "SSO_FRONTEND_REDIRECT_URL", FRONT_LOGIN)
+    monkeypatch.setattr(settings, "SSO_FRONTEND_REDIRECT_URL_ADMIN", ADMIN_FRONT)
+
+
+def _authorize(client, **params):
+    r = client.get("/api/v1/auth/sso/authorize", params=params)
+    assert r.status_code == 200, r.text
+    auth = data(r)
+    return auth, parse_qs(urlsplit(auth["authorize_url"]).query)
+
+
+def test_authorize_uses_client_of_selected_site(client, sites):
+    _, main = _authorize(client)
+    assert main["client_id"] == ["main-client"]
+    assert main["redirect_uri"] == ["https://yoshlarfondi.uz/api/v1/redirect/from-backend"]
+
+    _, main_explicit = _authorize(client, site="yoshlarfondi")
+    assert main_explicit["client_id"] == ["main-client"]
+
+    _, admin = _authorize(client, site="admin")
+    assert admin["client_id"] == ["admin-client"]
+    assert admin["redirect_uri"] == ["https://admin.yoshlarfondi.uz/api/v1/redirect/from-backend"]
+
+
+def test_authorize_rejects_unknown_site(client, sites):
+    assert client.get("/api/v1/auth/sso/authorize", params={"site": "bank"}).status_code == 422
+
+
+def test_admin_site_without_redirect_uri_is_not_configured(client, sites, monkeypatch):
+    monkeypatch.setattr(settings, "SSO_REDIRECT_URI_ADMIN", "")
+    r = client.get("/api/v1/auth/sso/authorize", params={"site": "admin"})
+    assert r.status_code == 401
+    assert r.json()["code"] == "sso_failed"
+
+
+def test_admin_site_falls_back_to_main_client(client, sites, monkeypatch):
+    monkeypatch.setattr(settings, "SSO_CLIENT_ID_ADMIN", "")
+    monkeypatch.setattr(settings, "SSO_CLIENT_SECRET_ADMIN", "")
+    _, admin = _authorize(client, site="admin")
+    assert admin["client_id"] == ["main-client"]
+    assert admin["redirect_uri"] == ["https://admin.yoshlarfondi.uz/api/v1/redirect/from-backend"]
+
+
+def test_redirect_from_backend_returns_to_front_of_site(client, sites):
+    admin_auth, _ = _authorize(client, site="admin")
+    r = client.get(
+        "/api/v1/redirect/from-backend",
+        params={"code": "C", "state": admin_auth["state"]},
+        follow_redirects=False,
+    )
+    assert r.headers["location"].startswith(ADMIN_FRONT + "?code=C&state=")
+
+    main_auth, _ = _authorize(client)
+    r = client.get(
+        "/api/v1/redirect/from-backend",
+        params={"code": "C", "state": main_auth["state"]},
+        follow_redirects=False,
+    )
+    assert r.headers["location"].startswith(FRONT_LOGIN + "?code=C&state=")
+
+    r = client.get(
+        "/api/v1/redirect/from-backend",
+        params={"code": "C", "state": "forged"},
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == FRONT_LOGIN + "?code=C&state=forged"
+
+
+def test_callback_exchanges_code_with_client_of_site(api, role_ids, sites, portal):
+    pinfl = api.fresh_pinfl()
+    api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"])
+    portal["profile"] = {"sub": f"sub-{pinfl}", "full_name": "TEST", "pinfl": pinfl}
+
+    for site, client_id in (("admin", "admin-client"), ("yoshlarfondi", "main-client")):
+        auth, _ = _authorize(api.client, site=site)
+        r = api.client.post("/api/v1/auth/sso/callback", json={"code": "C", "state": auth["state"]})
+        assert r.status_code == 200, r.text
+        assert portal["clients"][-1] == client_id
+
+
+def test_redirect_site_param_selects_front_and_is_not_forwarded(client, sites):
+    main_auth, _ = _authorize(client)
+    r = client.get(
+        "/api/v1/redirect/from-backend",
+        params={"site": "admin", "code": "C", "state": main_auth["state"]},
+        follow_redirects=False,
+    )
+    location = r.headers["location"]
+    assert location.startswith(ADMIN_FRONT + "?code=C&state=")
+    assert "site=" not in location
+
+    admin_auth, _ = _authorize(client, site="admin")
+    r = client.get(
+        "/api/v1/redirect/from-backend",
+        params={"site": "yoshlarfondi", "code": "C", "state": admin_auth["state"]},
+        follow_redirects=False,
+    )
+    assert r.headers["location"].startswith(FRONT_LOGIN + "?code=C&state=")
+
+
+def test_redirect_site_param_from_registered_redirect_uri(client, sites):
+    r = client.get(
+        "/api/v1/redirect/from-backend?site=admin&error=access_denied&state=forged",
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == ADMIN_FRONT + "?error=access_denied&state=forged"
+
+
+def test_redirect_rejects_unknown_site(client, sites):
+    r = client.get("/api/v1/redirect/from-backend", params={"site": "bank"}, follow_redirects=False)
+    assert r.status_code == 422

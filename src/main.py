@@ -21,6 +21,7 @@ from src.common.logging_config import configure_logging
 from src.common.responses.handlers import register_exception_handlers
 from src.common.responses.validation_handler import validation_exception_handler
 from src.common.swagger.i18n import DESCRIPTION_UZ, translate_openapi
+from src.common.swagger.openapi import restore_nulls
 from src.config import settings
 from src.rbac.apis import permission_api, role_api
 
@@ -88,6 +89,18 @@ app.add_middleware(
 register_exception_handlers(app)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
+
+_generate_openapi = app.openapi
+
+
+def openapi_with_nulls() -> dict:
+    """app.openapi(): null-поля в примерах ответов не теряются (см. NULL_MARKER)."""
+    if app.openapi_schema is None:
+        restore_nulls(_generate_openapi())
+    return app.openapi_schema
+
+
+app.openapi = openapi_with_nulls
 
 _openapi_uz_cache: dict | None = None
 

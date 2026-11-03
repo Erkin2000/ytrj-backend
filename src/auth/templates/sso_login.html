@@ -44,9 +44,15 @@
       const payload = { pinfl: mockForm.pinfl.value.trim(), full_name: mockForm.full_name.value.trim() };
       try {
         const tokens = await api("/auth/sso/mock-login", { method: "POST", body: JSON.stringify(payload) });
-        localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
-        const me = await api("/auth/me", { headers: { Authorization: "Bearer " + tokens.access_token } });
-        showStatus(st, "ok", "Вход выполнен: " + (me.full_name || me.username) + " (" + (me.role ? me.role.code : "без роли") + ")", tokens);
+        if (tokens.access_token) {
+          // Кабинет на этом же сайте: токены выданы сразу.
+          localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+          const me = await api("/auth/me", { headers: { Authorization: "Bearer " + tokens.access_token } });
+          showStatus(st, "ok", "Вход выполнен: " + (me.full_name || me.username) + " (" + (me.role ? me.role.code : "без роли") + ")", tokens);
+        } else {
+          // Кабинет на другом поддомене: токены выдаст он сам по билету.
+          showStatus(st, "ok", "Вход выполнен, роль " + (tokens.role || "—") + ": кабинет на другом поддомене", tokens);
+        }
         if (tokens.redirect_url) {
           const link = document.createElement("a");
           link.className = "btn";

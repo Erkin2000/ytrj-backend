@@ -192,6 +192,15 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале: `https://yoshlarfondi.uz/api/v1/redirect/from-backend`) с `?code=...&state=...` либо `?error=access_denied&state=...`. Эндпоинт `GET /api/v1/redirect/from-backend` отвечает `302` на `SSO_FRONTEND_REDIRECT_URL` (абсолютный URL фронтенда или путь; по умолчанию встроенная страница `/api/auth/one-id/callback`), передавая все query-параметры портала без изменений (ответ с `Cache-Control: no-store` и `Referrer-Policy: no-referrer`).
 3. Страница на адресе `SSO_FRONTEND_REDIRECT_URL` сразу (code живёт 60 секунд) сверяет `state` с сохранённым, отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает пару JWT, `role` и `redirect_url` в кабинет роли (см. ниже).
 
+**Два сайта входа.** У `GET /api/v1/auth/sso/authorize` есть параметр `site`:
+
+| `site` | Клиент портала | `redirect_uri` | Куда `/redirect/from-backend` вернёт браузер |
+|---|---|---|---|
+| `yoshlarfondi` (по умолчанию) | `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` | `SSO_REDIRECT_URI` | `SSO_FRONTEND_REDIRECT_URL` |
+| `admin` | `SSO_CLIENT_ID_ADMIN` / `SSO_CLIENT_SECRET_ADMIN` (пусто — основной клиент) | `SSO_REDIRECT_URI_ADMIN` | `SSO_FRONTEND_REDIRECT_URL_ADMIN` |
+
+Сайт подписывается внутри `state`, поэтому `POST /auth/sso/callback` меняет `code` тем же клиентом портала, что выдал ссылку входа, а `/redirect/from-backend` по `state` выбирает фронт. У `/redirect/from-backend` тоже есть параметр `site` (`yoshlarfondi` | `admin`): если он передан, фронт выбирается по нему (например, `SSO_REDIRECT_URI_ADMIN=.../redirect/from-backend?site=admin`), а на фронт он не пересылается. Без `SSO_REDIRECT_URI_ADMIN` вход с `site=admin` отклоняется (401 `sso_failed`).
+
 Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — точка возврата с портала: встроенная страница сама вызывает `POST /auth/sso/callback` и кладёт токены в `localStorage`, а также умеет менять `?ticket=` на токены. Сторонний адрес редиректа задаётся только настройкой `SSO_FRONTEND_REDIRECT_URL`, из запроса он не берётся.
 
 Бэкенд проверяет подпись и срок `state` (`SSO_STATE_TTL_SECONDS`), меняет `code` на профиль через `POST {SSO_BASE_URL}/api/v1/users/auth/sso/token/` с `client_secret` (только backend) и находит пользователя по `sub` портала (`users.sso_sub`), затем по ПИНФЛ; если не найден — создаёт заявителя (`username` = ПИНФЛ, при его отсутствии `sso_<sub>`). ПИНФЛ запрашивается у портала как опциональное поле при онбординге; `region/city/makhalla/role` приходят только у ётакчи и сейчас сохраняется только название региона.
@@ -200,11 +209,21 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 ### Кабинет роли после входа (поддомены)
 
-Каждая роль работает в своём кабинете на отдельном поддомене. `localStorage` у поддоменов разный, поэтому токены переносятся одноразовым билетом:
+Каждая роль работает в своём кабинете на отдельном поддомене. `localStorage` у поддоменов разный, поэтому токены переносятся одноразовым билетом.
 
-1. Любой вход (`POST /auth/sso/callback`, `/auth/sso/mock-login`, `/auth/login`) кроме токенов возвращает `role` и `redirect_url` = адрес кабинета роли + `?ticket=...`.
-2. Страница входа делает `location.replace(redirect_url)`.
-3. Кабинет сразу вызывает `POST /api/v1/auth/ticket/exchange` с `{ticket}` и получает свою пару токенов, затем убирает `ticket` из адресной строки.
+Любой вход (`POST /auth/sso/callback`, `/auth/sso/mock-login`, `/auth/login`) сравнивает сайт кабинета роли (`ROLE_HOME_URLS`) с сайтом страницы входа (заголовок `Origin`, без него — `SSO_FRONTEND_REDIRECT_URL`). Ответ бывает двух видов:
+
+- **тот же сайт** (например, заявитель на `yoshlarfondi.uz`) — только токены:
+  ```json
+  {"access_token": "eyJ...", "refresh_token": "eyJ...", "expires_in": 3600}
+  ```
+- **другой поддомен** (Фонд, банк, Совет) — без токенов, только роль и кабинет с билетом:
+  ```json
+  {"role": "COUNCIL_MEMBER", "redirect_url": "https://council.yoshlarfondi.uz/?ticket=..."}
+  ```
+  Страница входа делает `location.replace(redirect_url)`, кабинет сразу вызывает `POST /api/v1/auth/ticket/exchange` с `{ticket}`, получает свою пару токенов и убирает `ticket` из адресной строки.
+
+Так токены выдаются один раз и только там, где будут использоваться: на каждый вход — одна сессия. Правило для фронта: есть `access_token` — сохранить токены; есть `redirect_url` — перейти по нему.
 
 Билет случайный, в БД хранится только его SHA-256 (`login_tickets`), живёт `LOGIN_TICKET_TTL_SECONDS` (60 с) и гасится атомарно при первом обмене; повторный/просроченный — 401 `invalid_login_ticket`. Адреса кабинетов задаются только настройками:
 

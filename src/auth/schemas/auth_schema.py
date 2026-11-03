@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -17,15 +18,23 @@ class TokenPairDTO(BaseModel):
     expires_in: int
 
 
-class LoginResultDTO(TokenPairDTO):
-    """Ответ на вход (пароль или YIA SSO): токены + куда отправить браузер.
+class LoginTokensDTO(BaseModel):
+    """Вход, когда кабинет роли на том же сайте, что и страница входа: только токены."""
 
-    redirect_url — кабинет роли (ROLE_HOME_URLS) с одноразовым ?ticket=...;
-    кабинет на своём поддомене меняет билет на токены через POST /auth/ticket/exchange.
-    """
+    access_token: str
+    refresh_token: str
+    expires_in: int
+
+
+class LoginRedirectDTO(BaseModel):
+    """Вход, когда кабинет роли на другом поддомене: токенов нет, redirect_url содержит
+    одноразовый ?ticket=..., который кабинет меняет через POST /auth/ticket/exchange."""
 
     role: str | None = None
     redirect_url: str
+
+
+LoginResultDTO = LoginTokensDTO | LoginRedirectDTO
 
 
 class TicketExchangeDTO(BaseModel):
@@ -61,6 +70,14 @@ class RefreshTokenCreateDTO(BaseModel):
 
 
 # ---------- YIA SSO ----------
+
+
+class SSOSite(StrEnum):
+    """Сайт, с которого начат вход через YIA Portal: у каждого свой клиент портала
+    и свой redirect_uri."""
+
+    MAIN = "yoshlarfondi"
+    ADMIN = "admin"
 
 
 class SSOAuthorizeDTO(BaseModel):
