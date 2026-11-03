@@ -66,9 +66,8 @@ class Settings(BaseSettings):
     SSO_CLIENT_SECRET: str
 
     SSO_REDIRECT_URI: str
-    # Страница входа фронтенда: сюда GET /api/v1/redirect/from-backend отправляет браузер
-    # при ошибке входа (?error=<code>). При успехе браузер уходит в кабинет роли
-    # (ROLE_HOME_URLS). Абсолютный URL или путь; по умолчанию встроенная страница.
+    # Куда GET /api/v1/redirect/from-backend пересылает браузер (с code/state/error).
+    # Абсолютный URL фронтенда или путь на этом же хосте; по умолчанию встроенная страница.
     SSO_FRONTEND_REDIRECT_URL: str = "/api/auth/one-id/callback"
 
     @field_validator("SSO_FRONTEND_REDIRECT_URL")

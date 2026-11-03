@@ -46,6 +46,7 @@
 </main>
 <script>
   const API = {{ api_prefix | tojson }};
+  const STATE_KEY = "yia_sso_state";
   const TOKENS_KEY = "jamgarma_tokens";
   async function api(path, opts = {}) {
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
