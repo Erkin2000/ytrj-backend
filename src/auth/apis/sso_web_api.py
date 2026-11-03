@@ -40,7 +40,6 @@ async def sso_login_page(request: Request):
 
 @router.get("/callback")
 async def sso_callback_page(request: Request):
-    # Сервер здесь ничего не обменивает: code одноразовый и живёт 60 секунд,
-    # поэтому страница сама сразу вызывает POST /api/v1/auth/sso/callback
-    # с code/state/error из query и кладёт токены в localStorage.
+    # Кабинет по умолчанию (ROLE_HOME_URL_DEFAULT) и страница ошибок входа:
+    # меняет ?ticket= на токены или показывает ?error= от /redirect/from-backend.
     return templates.TemplateResponse(request, "sso_callback.html", _context(request))

@@ -131,6 +131,7 @@ class ExpiredRefreshTokenException(UnauthorizedException):
 
 
 class SSOException(UnauthorizedException):
+    code = "sso_failed"
     message = "YIA Portal authentication failed. Please try again."
 
 
@@ -277,7 +278,9 @@ class RoleRequiredException(BadRequestException):
 
 
 class DirectionAdminRoleException(BadRequestException):
-    message = "Direction admin must have a direction role (FUND_OPERATOR, BANK_EMPLOYEE, COUNCIL_MEMBER)"
+    message = (
+        "Direction admin must have a direction role (FUND_OPERATOR, BANK_EMPLOYEE, COUNCIL_MEMBER)"
+    )
     field = "is_direction_admin"
 
 
@@ -406,10 +409,12 @@ class ApplicantLoginViaSSOException(ForbiddenException):
 
 
 class SSOAccessDeniedException(ForbiddenException):
+    code = "sso_access_denied"
     message = "YIA Portal denied access: user is not allowed to sign in to this project"
 
 
 class SSOInvalidStateException(BadRequestException):
+    code = "sso_invalid_state"
     message = "Invalid SSO state, start sign-in again"
 
 

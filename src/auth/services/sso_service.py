@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 import httpx
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from src.auth.schemas.auth_schema import SSOAuthorizeDTO, SSOProfileDTO
+from src.auth.schemas.auth_schema import SSOProfileDTO
 from src.common.responses.exceptions import (
     SSOAccessDeniedException,
     SSOException,
@@ -35,29 +35,31 @@ class YiaSSOService:
 
     # ---------- шаг 1: ссылка на страницу входа ----------
 
-    def build_authorize_url(self) -> SSOAuthorizeDTO:
-        state = self._state_serializer.dumps(secrets.token_urlsafe(16))
+    def build_authorize_url(self, nonce: str) -> str:
+        """nonce — значение cookie браузера: state подписывает его, и при возврате
+        принимается только state, выданный этому же браузеру."""
+        state = self._state_serializer.dumps(nonce)
         params = {
             "client_id": settings.SSO_CLIENT_ID,
             "redirect_uri": settings.SSO_REDIRECT_URI,
             "state": state,
         }
-        return SSOAuthorizeDTO(
-            authorize_url=f"{settings.SSO_BASE_URL}{AUTHORIZE_PATH}?{urlencode(params)}",
-            state=state,
-        )
+        return f"{settings.SSO_BASE_URL}{AUTHORIZE_PATH}?{urlencode(params)}"
 
     # ---------- шаг 2: проверка ответа портала ----------
 
-    def verify_state(self, state: str | None) -> None:
+    def verify_state(self, state: str | None, expected_nonce: str) -> None:
         if not state:
             raise SSOInvalidStateException()
         try:
-            self._state_serializer.loads(state, max_age=settings.SSO_STATE_TTL_SECONDS)
+            nonce = self._state_serializer.loads(state, max_age=settings.SSO_STATE_TTL_SECONDS)
         except SignatureExpired:
             raise SSOInvalidStateException("SSO state expired, start sign-in again") from None
         except BadSignature:
             raise SSOInvalidStateException() from None
+        if not secrets.compare_digest(str(nonce), expected_nonce):
+            # state выдан другому браузеру: чужая ссылка возврата (login CSRF).
+            raise SSOInvalidStateException()
 
     @staticmethod
     def check_callback_error(error: str | None) -> None:

@@ -33,8 +33,6 @@ Hujjat tili chap yuqoridagi tanlovda almashtiriladi (Русский / Oʻzbek).
 
 LOGIN_DESCRIPTION_RU = "Кроме пары токенов возвращает `role` и `redirect_url` — кабинет роли (`ROLE_HOME_URLS`) с одноразовым `?ticket=...`. Если кабинет на другом поддомене, фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
 LOGIN_DESCRIPTION_UZ = "Tokenlar juftligidan tashqari `role` va `redirect_url` qaytaradi — rol kabineti (`ROLE_HOME_URLS`) bir martalik `?ticket=...` bilan. Kabinet boshqa subdomenda boʻlsa, frontend `location.replace(redirect_url)` qiladi, kabinet esa chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi (chipta `LOGIN_TICKET_TTL_SECONDS` amal qiladi)."
-SSO_CALLBACK_DESCRIPTION_RU = "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. `code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть заранее заведён Super Admin с его ПИНФЛ.\n\nКроме пары токенов возвращает `role` и `redirect_url` — кабинет роли (`ROLE_HOME_URLS`) с одноразовым `?ticket=...`. Если кабинет на другом поддомене, фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
-SSO_CALLBACK_DESCRIPTION_UZ = "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring. Ariza beruvchi birinchi kirishda yaratiladi; xodim (Jamgʻarma, bank, Kengash) Super Admin tomonidan JShShIR bilan oldindan qoʻshilgan boʻlishi kerak.\n\nTokenlar juftligidan tashqari `role` va `redirect_url` qaytaradi — rol kabineti (`ROLE_HOME_URLS`) bir martalik `?ticket=...` bilan. Kabinet boshqa subdomenda boʻlsa, frontend `location.replace(redirect_url)` qiladi, kabinet esa chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi (chipta `LOGIN_TICKET_TTL_SECONDS` amal qiladi)."
 
 UZ: dict[str, str] = {
     # ---------- теги ----------
@@ -120,32 +118,21 @@ UZ: dict[str, str] = {
     "Смена собственного пароля (закрывает прежние сессии)": (
         "Oʻz parolini oʻzgartirish (avvalgi sessiyalar yopiladi)"
     ),
-    "YIA SSO: ссылка на страницу входа портала и подписанный state": (
-        "YIA SSO: portal kirish sahifasiga havola va imzolangan state"
-    ),
-    "Фронтенд сохраняет `state` (sessionStorage) и перенаправляет браузер на `authorize_url`. "
-    "Портал вернёт пользователя на `SSO_REDIRECT_URI` с `code` и `state`.": (
-        "Frontend `state`ni saqlaydi (sessionStorage) va brauzerni `authorize_url`ga yoʻnaltiradi. "
-        "Portal foydalanuvchini `SSO_REDIRECT_URI`ga `code` va `state` bilan qaytaradi."
-    ),
-    "YIA SSO (все роли): обмен code на токены и адрес кабинета роли": (
-        "YIA SSO (barcha rollar): code ni tokenlarga va rol kabineti manziliga almashtirish"
-    ),
-    "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
-    "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа.": (
-        "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni "
-        "uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring."
-    ),
     "YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True": (
         "YIA SSO (test): qoʻlda kiritilgan maʼlumotlar bilan kirish — SSO_MOCK=True boʻlganda"
     ),
-    "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
+    "Вход без YIA Portal: профиль портала задаётся вручную. "
     "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет.": (
-        "`POST /auth/sso/callback` kabi, lekin portal profili qoʻlda beriladi. "
+        "YIA Portalsiz kirish: portal profili qoʻlda beriladi. "
         "Super Admin qoʻshgan xodimning JShShIR bilan uning kabinetiga kiriladi."
     ),
+    "YIA SSO: начать вход (переход браузера на портал)": "YIA SSO: kirishni boshlash (brauzerni portalga oʻtkazish)",
+    "Открывается **переходом браузера** (`location.href`), не через fetch. Ставит HttpOnly cookie, привязывающую `state` к этому браузеру, и отвечает `302` на страницу входа портала. После входа портал вернёт браузер на `GET /redirect/from-backend`, а тот — в кабинет роли пользователя с `?ticket=`.": "fetch orqali emas, **brauzer oʻtishi** (`location.href`) bilan ochiladi. `state`ni ushbu brauzerga bogʻlovchi HttpOnly cookie oʻrnatadi va portalning kirish sahifasiga `302` qaytaradi. Kirishdan soʻng portal brauzerni `GET /redirect/from-backend`ga, u esa foydalanuvchi rolining kabinetiga `?ticket=` bilan qaytaradi.",
+    "Редирект на страницу входа YIA Portal": "YIA Portal kirish sahifasiga yoʻnaltirish",
+    "Возврат с YIA Portal: обмен code на бэкенде → кабинет роли": "YIA Portaldan qaytish: code backendda almashtiriladi → rol kabineti",
+    "Адрес, зарегистрированный на портале как `SSO_REDIRECT_URI`. Сверяет `state` с cookie браузера, меняет `code` (живёт 60 секунд) на профиль, находит пользователя по `sub`/ПИНФЛ (заявитель создаётся при первом входе) и отвечает `302` на `ROLE_HOME_URLS[роль]?ticket=...`. Кабинет меняет билет на токены через `POST /auth/ticket/exchange`. При ошибке — `302` на `SSO_FRONTEND_REDIRECT_URL?error=<code>` (`sso_invalid_state`, `sso_access_denied`, `sso_failed`, `user_blocked`, `server_error`).": "Portalda `SSO_REDIRECT_URI` sifatida roʻyxatdan oʻtgan manzil. `state`ni brauzer cookiesi bilan solishtiradi, `code`ni (60 soniya amal qiladi) profilga almashtiradi, foydalanuvchini `sub`/JShShIR boʻyicha topadi (ariza beruvchi birinchi kirishda yaratiladi) va `ROLE_HOME_URLS[rol]?ticket=...`ga `302` qaytaradi. Kabinet chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi. Xatoda — `SSO_FRONTEND_REDIRECT_URL?error=<code>`ga `302` (`sso_invalid_state`, `sso_access_denied`, `sso_failed`, `user_blocked`, `server_error`).",
+    "Кабинет роли с ?ticket=... или страница входа с ?error=...": "?ticket=... bilan rol kabineti yoki ?error=... bilan kirish sahifasi",
     LOGIN_DESCRIPTION_RU: LOGIN_DESCRIPTION_UZ,
-    SSO_CALLBACK_DESCRIPTION_RU: SSO_CALLBACK_DESCRIPTION_UZ,
     "Обмен одноразового билета входа на токены (кабинет роли на своём поддомене)": (
         "Bir martalik kirish chiptasini tokenlarga almashtirish (oʻz subdomenidagi rol kabineti)"
     ),
@@ -185,9 +172,6 @@ UZ: dict[str, str] = {
         "Xodimni yaratish/tahrirlash shakli uchun. Yoʻnalish administratori oʻz rolining "
         "oʻzida mavjud huquqlarini oladi (`role_id` berilmasligi mumkin). "
         "Super Admin `role_id` beradi va ushbu rolning barcha huquqlarini oladi."
-    ),
-    "Параметры, с которыми YIA Portal вернул пользователя на redirect_uri.": (
-        "YIA Portal foydalanuvchini redirect_uri ga qaytargan parametrlar."
     ),
     "Стабильный идентификатор пользователя портала; по умолчанию mock-<pinfl>": (
         "Portal foydalanuvchisining barqaror identifikatori; sukut boʻyicha mock-<pinfl>"

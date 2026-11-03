@@ -188,13 +188,18 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 ### Вход через YIA Portal (SSO)
 
-1. Фронтенд вызывает `GET /api/v1/auth/sso/authorize`, сохраняет `state` (например, в sessionStorage) и перенаправляет браузер на `authorize_url`. Пользователь проходит OneID на стороне портала.
-2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале: `https://yoshlarfondi.uz/api/v1/redirect/from-backend`) с `?code=...&state=...` либо `?error=access_denied&state=...`. Эндпоинт `GET /api/v1/redirect/from-backend` отвечает `302` на `SSO_FRONTEND_REDIRECT_URL` (абсолютный URL фронтенда или путь; по умолчанию встроенная страница `/api/auth/one-id/callback`), передавая все query-параметры портала без изменений.
-3. Страница на адресе `SSO_FRONTEND_REDIRECT_URL` сразу (code живёт 60 секунд) сверяет `state` с сохранённым, отправляет `POST /api/v1/auth/sso/callback` с `{code, state, error}` и получает пару JWT. Если `SSO_REDIRECT_URI` указывает на страницу фронтенда, то же самое делает фронтенд.
+Обмен `code` выполняет бэкенд, фронтенду не нужна страница обработки входа:
 
-Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — точка возврата с портала: встроенная страница сама вызывает `POST /auth/sso/callback` и кладёт токены в `localStorage`. Сторонний адрес редиректа задаётся только настройкой `SSO_FRONTEND_REDIRECT_URL`, из запроса он не берётся.
+1. Кнопка «Войти» — **переход браузера** (не fetch) на `GET /api/v1/auth/sso/login`. Бэкенд ставит HttpOnly-cookie `yia_sso_nonce` (путь `/api/v1/redirect`, SameSite=Lax, Secure при https), подписывает её значение в `state` и отвечает `302` на страницу входа портала. Пользователь проходит OneID на стороне портала.
+2. Портал возвращает браузер на `SSO_REDIRECT_URI` (в точности как зарегистрировано на портале: `https://yoshlarfondi.uz/api/v1/redirect/from-backend`). Эндпоинт сверяет `state` с cookie **этого же браузера** (защита от подсунутой ссылки возврата), меняет `code` на профиль, находит пользователя по `sub`/ПИНФЛ и отвечает `302` на `ROLE_HOME_URLS[роль]?ticket=...`. Токены на этом шаге не выдаются.
+3. Кабинет роли меняет `ticket` на токены (`POST /api/v1/auth/ticket/exchange`, см. ниже).
+4. При любой ошибке — `302` на `SSO_FRONTEND_REDIRECT_URL?error=<code>`: `sso_invalid_state` (истёк/чужой state или нет cookie), `sso_access_denied` (отказ на портале), `sso_failed` (code просрочен, портал недоступен), `user_blocked`, `server_error`.
 
-Бэкенд проверяет подпись и срок `state` (`SSO_STATE_TTL_SECONDS`), меняет `code` на профиль через `POST {SSO_BASE_URL}/api/v1/users/auth/sso/token/` с `client_secret` (только backend) и находит пользователя по `sub` портала (`users.sso_sub`), затем по ПИНФЛ; если не найден — создаёт заявителя (`username` = ПИНФЛ, при его отсутствии `sso_<sub>`). ПИНФЛ запрашивается у портала как опциональное поле при онбординге; `region/city/makhalla/role` приходят только у ётакчи и сейчас сохраняется только название региона.
+`/auth/sso/login` и `SSO_REDIRECT_URI` должны быть на одном хосте (cookie ставится на путь `/api/v1/redirect`).
+
+Встроенные страницы (вне OpenAPI, `src/auth/apis/sso_web_api.py`): `GET /api/auth/one-id/login` — кнопка входа через портал (ведёт на `/auth/sso/login`) и, при `SSO_MOCK=true`, форма тестового входа; `GET /api/auth/one-id/callback` — показывает `?error=` и умеет менять `?ticket=` на токены (кабинет по умолчанию, `ROLE_HOME_URL_DEFAULT`). Адреса редиректа задаются только настройками, из запроса они не берутся.
+
+Бэкенд проверяет подпись, срок (`SSO_STATE_TTL_SECONDS`) и привязку `state` к браузеру, меняет `code` на профиль через `POST {SSO_BASE_URL}/api/v1/users/auth/sso/token/` с `client_secret` (только backend) и находит пользователя по `sub` портала (`users.sso_sub`), затем по ПИНФЛ; если не найден — создаёт заявителя (`username` = ПИНФЛ, при его отсутствии `sso_<sub>`). ПИНФЛ запрашивается у портала как опциональное поле при онбординге; `region/city/makhalla/role` приходят только у ётакчи и сейчас сохраняется только название региона.
 
 Ошибки: неверный/просроченный `state` → 400; `access_denied` → 403; `invalid_grant` (code просрочен или использован), `invalid_client` (неверные креды или IP бэкенда не в allow-list портала), сетевые ошибки → 401, вход можно повторить.
 
@@ -202,8 +207,8 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 Каждая роль работает в своём кабинете на отдельном поддомене. `localStorage` у поддоменов разный, поэтому токены переносятся одноразовым билетом:
 
-1. Любой вход (`POST /auth/sso/callback`, `/auth/sso/mock-login`, `/auth/login`) кроме токенов возвращает `role` и `redirect_url` = адрес кабинета роли + `?ticket=...`.
-2. Страница входа делает `location.replace(redirect_url)`.
+1. Вход через YIA Portal: `GET /redirect/from-backend` сам отправляет браузер на `ROLE_HOME_URLS[роль]?ticket=...` (см. выше). Вход по API (`/auth/login`, `/auth/sso/mock-login`) кроме токенов возвращает `role` и такой же `redirect_url`.
+2. Для входа по API страница входа делает `location.replace(redirect_url)`.
 3. Кабинет сразу вызывает `POST /api/v1/auth/ticket/exchange` с `{ticket}` и получает свою пару токенов, затем убирает `ticket` из адресной строки.
 
 Билет случайный, в БД хранится только его SHA-256 (`login_tickets`), живёт `LOGIN_TICKET_TTL_SECONDS` (60 с) и гасится атомарно при первом обмене; повторный/просроченный — 401 `invalid_login_ticket`. Адреса кабинетов задаются только настройками:

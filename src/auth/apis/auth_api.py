@@ -5,7 +5,6 @@ from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
     RefreshTokenRequestDTO,
-    SSOCallbackDTO,
     SSOMockLoginDTO,
     TicketExchangeDTO,
 )
@@ -176,55 +175,13 @@ async def change_password(data: ChangePasswordDTO, db: DBDep, user: CurrentUserD
 # ---------- YIA Portal SSO ----------
 
 
-@router.get(
-    "/sso/authorize",
-    summary="YIA SSO: ссылка на страницу входа портала и подписанный state",
-    description=(
-        "Фронтенд сохраняет `state` (sessionStorage) и перенаправляет браузер на "
-        "`authorize_url`. Портал вернёт пользователя на `SSO_REDIRECT_URI` с `code` и `state`."
-    ),
-    responses={
-        200: success_example(
-            {
-                "authorize_url": (
-                    "https://api.e-yoshlar.uz/api/v1/users/auth/sso/authorize/"
-                    "?client_id=...&redirect_uri=...&state=..."
-                ),
-                "state": "ImFiYyI.aBcD...",
-            },
-            message="Authorize URL generated.",
-        ),
-        **COMMON_ERRORS,
-    },
-)
-async def sso_authorize(db: DBDep):
-    data = AuthService(db).sso_authorize()
-    return ResponseBuilder.success(data=data, message="Authorize URL generated.")
-
-
-@router.post(
-    "/sso/callback",
-    summary="YIA SSO (все роли): обмен code на токены и адрес кабинета роли",
-    description=(
-        "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
-        "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. "
-        "Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть "
-        "заранее заведён Super Admin с его ПИНФЛ.\n\n" + LOGIN_DESCRIPTION
-    ),
-    responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
-)
-async def sso_callback(data: SSOCallbackDTO, db: DBDep, request: Request):
-    tokens = await AuthService(db).sso_callback(data, *_client_meta(request))
-    return ResponseBuilder.success(data=tokens, message="Logged in via YIA Portal.")
-
-
 if settings.SSO_MOCK:
 
     @router.post(
         "/sso/mock-login",
         summary="YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True",
         description=(
-            "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
+            "Вход без YIA Portal: профиль портала задаётся вручную. "
             "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет."
         ),
         responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},

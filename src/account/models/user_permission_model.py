@@ -5,7 +5,6 @@ from src.database import Base
 
 
 class UserPermissionORM(Base):
-
     __tablename__ = "user_permissions"
 
     user_id: Mapped[int] = mapped_column(

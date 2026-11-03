@@ -26,14 +26,8 @@
   const status = document.getElementById("status");
   document.getElementById("btn-sso").addEventListener("click", async (ev) => {
     const btn = ev.currentTarget; btn.disabled = true;
-    try {
-      const data = await api("/auth/sso/authorize");
-      sessionStorage.setItem(STATE_KEY, data.state);
-      window.location.assign(data.authorize_url);
-    } catch (e) {
-      showStatus(status, "err", "Не удалось начать вход: " + e.message, e.body);
-      btn.disabled = false;
-    }
+    // Обмен code и проверка state — на бэкенде; браузер просто переходит.
+    window.location.assign(API + "/auth/sso/login");
   });
 
   const mockForm = document.getElementById("mock-form");

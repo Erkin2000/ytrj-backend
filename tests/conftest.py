@@ -71,7 +71,6 @@ def data(response):
     return response.json().get("data")
 
 
-
 @pytest.fixture(scope="session")
 def client() -> Iterator[TestClient]:
     if not settings.SSO_MOCK:
@@ -111,15 +110,12 @@ def banks(client, superadmin) -> list[dict]:
     return items
 
 
-
 class Api:
-
     def __init__(self, client: TestClient, superadmin: dict[str, str]):
         self.client = client
         self.superadmin = superadmin
         self.user_ids: list[int] = []
         self.application_ids: list[int] = []
-
 
     @staticmethod
     def fresh_pinfl() -> str:
@@ -135,7 +131,6 @@ class Api:
     def remember_user(self, user_id: int) -> None:
         if user_id not in self.user_ids:
             self.user_ids.append(user_id)
-
 
     def create_user(self, headers: dict[str, str] | None = None, **body):
         body.setdefault("username", self.username())
@@ -162,7 +157,6 @@ class Api:
         assert r.status_code == 201, r.text
         login, me = self.sso_login(pinfl)
         return bearer(login["access_token"]), me
-
 
     def cleanup(self) -> None:
         async def run(session):

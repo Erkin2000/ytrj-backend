@@ -63,19 +63,6 @@ class RefreshTokenCreateDTO(BaseModel):
 # ---------- YIA SSO ----------
 
 
-class SSOAuthorizeDTO(BaseModel):
-    authorize_url: str
-    state: str
-
-
-class SSOCallbackDTO(BaseModel):
-    """Параметры, с которыми YIA Portal вернул пользователя на redirect_uri."""
-
-    code: str | None = Field(default=None, examples=["ONE_TIME_CODE"])
-    state: str = Field(examples=["eyJ...signed-state"])
-    error: str | None = Field(default=None, examples=[None])
-
-
 class SSOProfileDTO(BaseModel):
     """Данные, которые платформа получает от YIA Portal после входа.
     Гарантированы sub и full_name; pinfl — по договорённости с порталом;

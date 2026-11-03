@@ -17,8 +17,6 @@ from src.auth.schemas.auth_schema import (
     LoginDTO,
     LoginResultDTO,
     RefreshTokenCreateDTO,
-    SSOAuthorizeDTO,
-    SSOCallbackDTO,
     SSOMockLoginDTO,
     SSOProfileDTO,
     TicketExchangeDTO,
@@ -38,6 +36,7 @@ from src.common.responses.exceptions import (
     RefreshTokenRevokedException,
     SamePasswordException,
     SSOException,
+    SSOInvalidStateException,
     UserBlockedException,
     UserNotFoundException,
 )
@@ -124,6 +123,18 @@ class AuthService(BaseService):
     def _hash_ticket(ticket: str) -> str:
         return hashlib.sha256(ticket.encode()).hexdigest()
 
+    async def _issue_ticket_url(self, user: UserORM) -> str:
+        """Создаёт одноразовый билет и возвращает адрес кабинета роли с ним."""
+        ticket = secrets.token_urlsafe(32)
+        await self.db.login_ticket.purge_stale()
+        await self.db.login_ticket.add(
+            ticket_hash=self._hash_ticket(ticket),
+            user_id=user.id,
+            expires_at=datetime.now(UTC) + timedelta(seconds=settings.LOGIN_TICKET_TTL_SECONDS),
+        )
+        role_code = user.role.code if user.role else None
+        return append_query(self.home_url(role_code), [("ticket", ticket)])
+
     async def _complete_login(
         self,
         user: UserORM,
@@ -133,21 +144,12 @@ class AuthService(BaseService):
         """Общий финал входа: пара токенов для текущей страницы и redirect_url
         в кабинет роли с одноразовым билетом (кабинет живёт на своём поддомене,
         localStorage у него свой, поэтому токены переносятся только билетом)."""
-        role_code = user.role.code if user.role else None
-
-        ticket = secrets.token_urlsafe(32)
-        await self.db.login_ticket.purge_stale()
-        await self.db.login_ticket.add(
-            ticket_hash=self._hash_ticket(ticket),
-            user_id=user.id,
-            expires_at=datetime.now(UTC) + timedelta(seconds=settings.LOGIN_TICKET_TTL_SECONDS),
-        )
-
+        redirect_url = await self._issue_ticket_url(user)
         tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
         return LoginResultDTO(
             **tokens.model_dump(),
-            role=role_code,
-            redirect_url=append_query(self.home_url(role_code), [("ticket", ticket)]),
+            role=user.role.code if user.role else None,
+            redirect_url=redirect_url,
         )
 
     async def exchange_ticket(
@@ -269,24 +271,36 @@ class AuthService(BaseService):
 
     # ---------- YIA SSO ----------
 
-    def sso_authorize(self) -> SSOAuthorizeDTO:
-        return self.sso_service.build_authorize_url()
+    def sso_authorize_url(self, nonce: str) -> str:
+        return self.sso_service.build_authorize_url(nonce)
 
-    async def sso_callback(
+    async def sso_browser_callback(
         self,
-        data: SSOCallbackDTO,
-        user_agent: str | None = None,
-        ip_address: str | None = None,
-    ) -> LoginResultDTO:
-        # Порядок как в sso_integration.md: сверяем state, смотрим error,
-        # затем сразу меняем code (живёт 60 секунд) на профиль.
-        self.sso_service.verify_state(data.state)
-        self.sso_service.check_callback_error(data.error)
-        if not data.code:
+        code: str | None,
+        state: str | None,
+        error: str | None,
+        nonce: str | None,
+    ) -> str:
+        """Возврат браузера с портала (обмен на бэкенде): проверяет state против
+        cookie браузера, меняет code на профиль, находит пользователя по sub/ПИНФЛ
+        и возвращает адрес кабинета его роли с одноразовым билетом.
+        Токены здесь не выдаются — их получает кабинет по билету."""
+        if not nonce:
+            raise SSOInvalidStateException()
+        self.sso_service.verify_state(state, expected_nonce=nonce)
+        self.sso_service.check_callback_error(error)
+        if not code:
             raise SSOException("SSO code is missing")
 
-        profile = await self.sso_service.exchange_code(data.code)
-        return await self._login_with_sso_profile(profile, user_agent, ip_address)
+        profile = await self.sso_service.exchange_code(code)
+        user = await self._find_or_create_sso_user(profile)
+        if user.status != UserStatus.ACTIVE:
+            raise UserBlockedException()
+
+        redirect_url = await self._issue_ticket_url(user)
+        await self.db.user.touch_last_login(user.id)
+        await self.db.commit()
+        return redirect_url
 
     async def sso_mock_login(
         self,
