@@ -7,21 +7,13 @@
 Адрес назначения берётся только из настроек, поэтому открытого редиректа нет.
 """
 
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
+from src.common.urls import append_query
 from src.config import settings
 
 router = APIRouter(prefix="/redirect", tags=["Auth"])
-
-
-def build_redirect_url(target: str, params: list[tuple[str, str]]) -> str:
-    """Добавляет params к target, сохраняя его собственные query-параметры и fragment."""
-    parts = urlsplit(target)
-    query = parse_qsl(parts.query, keep_blank_values=True) + params
-    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 @router.get(
@@ -39,7 +31,7 @@ def build_redirect_url(target: str, params: list[tuple[str, str]]) -> str:
 )
 async def redirect_from_backend(request: Request) -> RedirectResponse:
     params = list(request.query_params.multi_items())
-    url = build_redirect_url(settings.SSO_FRONTEND_REDIRECT_URL, params)
+    url = append_query(settings.SSO_FRONTEND_REDIRECT_URL, params)
     # В URL одноразовый code: не кэшируем ответ и не отдаём его в Referer.
     return RedirectResponse(
         url,

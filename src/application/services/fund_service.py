@@ -25,7 +25,10 @@ from src.common.responses.exceptions import (
     ResourceAllocationNotAllowedException,
     UserNotFoundException,
 )
+from src.rbac.access import effective_permissions
 from src.rbac.permissions import RoleCode
+
+COUNCIL_VOTE = "council_review.approve"
 
 
 class FundService(ApplicationBaseService):
@@ -140,11 +143,17 @@ class FundService(ApplicationBaseService):
                     member is None
                     or member.role is None
                     or member.role.code != RoleCode.COUNCIL_MEMBER
+                    or COUNCIL_VOTE not in effective_permissions(member)
                 ):
                     raise UserNotFoundException(f"Council member not found: {member_id}")
                 members.append(member)
         else:
-            members = await self.db.user.get_active_by_role_code(RoleCode.COUNCIL_MEMBER)
+            # Голосуют только члены Совета с правом решения (права выдаются поштучно).
+            members = [
+                member
+                for member in await self.db.user.get_active_by_role_code(RoleCode.COUNCIL_MEMBER)
+                if COUNCIL_VOTE in effective_permissions(member)
+            ]
 
         if not members:
             raise NoCouncilMembersException()

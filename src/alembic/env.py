@@ -13,6 +13,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Модели должны быть импортированы, чтобы попасть в Base.metadata (autogenerate).
 from src.account.models.user_model import UserORM  # noqa: E402, F401
+from src.account.models.user_permission_model import UserPermissionORM  # noqa: E402, F401
 from src.application.models.application_model import ApplicationORM  # noqa: E402, F401
 from src.application.models.bank_model import BankORM  # noqa: E402, F401
 from src.application.models.council_assignment_model import CouncilAssignmentORM  # noqa: E402, F401
@@ -23,6 +24,7 @@ from src.application.models.photo_model import ApplicationPhotoORM  # noqa: E402
 from src.application.models.resource_allocation_model import ResourceAllocationORM  # noqa: E402, F401
 from src.application.models.scoring_model import ScoringAttemptORM  # noqa: E402, F401
 from src.application.models.status_history_model import StatusHistoryORM  # noqa: E402, F401
+from src.auth.models.login_ticket_model import LoginTicketORM  # noqa: E402, F401
 from src.auth.models.refresh_token_model import RefreshTokenORM  # noqa: E402, F401
 from src.config import settings  # noqa: E402
 from src.database import Base  # noqa: E402

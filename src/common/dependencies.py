@@ -83,3 +83,17 @@ def require_any_permission(*codes: str):
         return user
 
     return check_permission
+
+
+def require_user_admin(action: Action):
+    """Управление пользователями: право users.<action> (глобально) или флаг
+    админа направления. Границы направления проверяет UserService."""
+
+    code = permission_code(Module.USERS, action)
+
+    async def check_permission(user: CurrentUserDep) -> CurrentUserDTO:
+        if not (user.has_permission(code) or user.is_direction_admin):
+            raise PermissionDeniedException()
+        return user
+
+    return check_permission

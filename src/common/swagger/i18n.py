@@ -31,6 +31,11 @@ Avtorizatsiya: `Authorization: Bearer <access_token>` sarlavhasi.
 Hujjat tili chap yuqoridagi tanlovda almashtiriladi (Русский / Oʻzbek).
 """
 
+LOGIN_DESCRIPTION_RU = "Кроме пары токенов возвращает `role` и `redirect_url` — кабинет роли (`ROLE_HOME_URLS`) с одноразовым `?ticket=...`. Если кабинет на другом поддомене, фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
+LOGIN_DESCRIPTION_UZ = "Tokenlar juftligidan tashqari `role` va `redirect_url` qaytaradi — rol kabineti (`ROLE_HOME_URLS`) bir martalik `?ticket=...` bilan. Kabinet boshqa subdomenda boʻlsa, frontend `location.replace(redirect_url)` qiladi, kabinet esa chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi (chipta `LOGIN_TICKET_TTL_SECONDS` amal qiladi)."
+SSO_CALLBACK_DESCRIPTION_RU = "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. `code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть заранее заведён Super Admin с его ПИНФЛ.\n\nКроме пары токенов возвращает `role` и `redirect_url` — кабинет роли (`ROLE_HOME_URLS`) с одноразовым `?ticket=...`. Если кабинет на другом поддомене, фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
+SSO_CALLBACK_DESCRIPTION_UZ = "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring. Ariza beruvchi birinchi kirishda yaratiladi; xodim (Jamgʻarma, bank, Kengash) Super Admin tomonidan JShShIR bilan oldindan qoʻshilgan boʻlishi kerak.\n\nTokenlar juftligidan tashqari `role` va `redirect_url` qaytaradi — rol kabineti (`ROLE_HOME_URLS`) bir martalik `?ticket=...` bilan. Kabinet boshqa subdomenda boʻlsa, frontend `location.replace(redirect_url)` qiladi, kabinet esa chiptani `POST /auth/ticket/exchange` orqali tokenlarga almashtiradi (chipta `LOGIN_TICKET_TTL_SECONDS` amal qiladi)."
+
 UZ: dict[str, str] = {
     # ---------- теги ----------
     "Авторизация и аутентификация": "Avtorizatsiya va autentifikatsiya",
@@ -123,18 +128,63 @@ UZ: dict[str, str] = {
         "Frontend `state`ni saqlaydi (sessionStorage) va brauzerni `authorize_url`ga yoʻnaltiradi. "
         "Portal foydalanuvchini `SSO_REDIRECT_URI`ga `code` va `state` bilan qaytaradi."
     ),
-    "YIA SSO (только заявители): обмен code на токены, профиль определяется или создаётся": (
-        "YIA SSO (faqat ariza beruvchilar): code ni tokenlarga almashtirish, "
-        "profil aniqlanadi yoki yaratiladi"
+    "YIA SSO (все роли): обмен code на токены и адрес кабинета роли": (
+        "YIA SSO (barcha rollar): code ni tokenlarga va rol kabineti manziliga almashtirish"
     ),
     "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
     "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа.": (
         "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni "
         "uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring."
     ),
-    "YIA SSO (тест, только заявители): вход с ручными данными — при SSO_MOCK=True": (
-        "YIA SSO (test, faqat ariza beruvchilar): qoʻlda kiritilgan maʼlumotlar bilan kirish — "
-        "SSO_MOCK=True boʻlganda"
+    "YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True": (
+        "YIA SSO (test): qoʻlda kiritilgan maʼlumotlar bilan kirish — SSO_MOCK=True boʻlganda"
+    ),
+    "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
+    "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет.": (
+        "`POST /auth/sso/callback` kabi, lekin portal profili qoʻlda beriladi. "
+        "Super Admin qoʻshgan xodimning JShShIR bilan uning kabinetiga kiriladi."
+    ),
+    LOGIN_DESCRIPTION_RU: LOGIN_DESCRIPTION_UZ,
+    SSO_CALLBACK_DESCRIPTION_RU: SSO_CALLBACK_DESCRIPTION_UZ,
+    "Обмен одноразового билета входа на токены (кабинет роли на своём поддомене)": (
+        "Bir martalik kirish chiptasini tokenlarga almashtirish (oʻz subdomenidagi rol kabineti)"
+    ),
+    "Кабинет получает `?ticket=...` из `redirect_url` после входа и сразу меняет его "
+    "на пару токенов. Билет одноразовый: повторный, просроченный или чужой билет — 401 "
+    "`invalid_login_ticket`, нужно войти заново.": (
+        "Kabinet kirishdan soʻng `redirect_url`dan `?ticket=...` oladi va uni darhol tokenlar "
+        "juftligiga almashtiradi. Chipta bir martalik: takroriy, muddati oʻtgan yoki notoʻgʻri "
+        "chipta — 401 `invalid_login_ticket`, qaytadan kirish kerak."
+    ),
+    "Создание сотрудника (роль + ПИНФЛ для входа через YIA Portal и/или пароль)": (
+        "Xodim yaratish (rol + YIA Portal orqali kirish uchun JShShIR va/yoki parol)"
+    ),
+    "Сотрудник Фонда, банка или Совета входит через YIA Portal: при входе он "
+    "находится по `pinfl` и попадает в кабинет своей роли. `password` нужен только "
+    "для входа по логину и паролю; хотя бы одно из полей обязательно. "
+    "Смена `pinfl` снимает привязку к учётке портала и закрывает сессии.\n\n"
+    "**Админ направления** создаёт сотрудников только своего направления: роль "
+    "(и банк) подставляются его собственные, `permissions` — только из его прав. "
+    "Без `permissions` выдаются все права, которые создающий может выдать для роли. "
+    "`is_direction_admin` назначает только Super Admin.": (
+        "Jamgʻarma, bank yoki Kengash xodimi YIA Portal orqali kiradi: kirishda u `pinfl` "
+        "boʻyicha topiladi va oʻz rolining kabinetiga tushadi. `password` faqat login va parol "
+        "bilan kirish uchun kerak; ulardan kamida bittasi majburiy. `pinfl` oʻzgartirilsa, "
+        "portal hisobiga bogʻlanish olib tashlanadi va sessiyalar yopiladi.\n\n"
+        "**Yoʻnalish administratori** faqat oʻz yoʻnalishi xodimlarini yaratadi: rol (va bank) "
+        "uning oʻziniki qoʻyiladi, `permissions` — faqat oʻz huquqlaridan. `permissions` "
+        "berilmasa, yaratuvchi ushbu rol uchun bera oladigan barcha huquqlar beriladi. "
+        "`is_direction_admin`ni faqat Super Admin belgilaydi."
+    ),
+    "Права, которые текущий пользователь может выдать сотруднику роли": (
+        "Joriy foydalanuvchi rol xodimiga bera oladigan huquqlar"
+    ),
+    "Для формы создания/редактирования сотрудника. Админ направления получает права "
+    "своей роли, которые есть у него самого (`role_id` можно не передавать). "
+    "Super Admin передаёт `role_id` и получает все права этой роли.": (
+        "Xodimni yaratish/tahrirlash shakli uchun. Yoʻnalish administratori oʻz rolining "
+        "oʻzida mavjud huquqlarini oladi (`role_id` berilmasligi mumkin). "
+        "Super Admin `role_id` beradi va ushbu rolning barcha huquqlarini oladi."
     ),
     "Параметры, с которыми YIA Portal вернул пользователя на redirect_uri.": (
         "YIA Portal foydalanuvchini redirect_uri ga qaytargan parametrlar."

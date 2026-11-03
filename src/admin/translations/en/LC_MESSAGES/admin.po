@@ -713,3 +713,18 @@ msgstr "Resources not allocated yet."
 
 msgid "Все поля"
 msgstr "All fields"
+
+msgid "ПИНФЛ должен состоять из 14 цифр"
+msgstr "PINFL must consist of 14 digits"
+
+msgid "Пользователь с таким ПИНФЛ уже существует"
+msgstr "A user with this PINFL already exists"
+
+msgid "Админ направления"
+msgstr "Direction admin"
+
+msgid "Личные права"
+msgstr "Personal permissions"
+
+msgid "Админ направления должен иметь роль направления"
+msgstr "A direction admin must have a direction role"

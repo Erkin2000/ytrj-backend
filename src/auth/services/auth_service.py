@@ -1,6 +1,8 @@
 import asyncio
+import hashlib
 import logging
-from datetime import UTC, datetime
+import secrets
+from datetime import UTC, datetime, timedelta
 
 from src.account.mappers import UserDataMapper
 from src.account.models.user_model import UserORM, UserStatus
@@ -13,11 +15,13 @@ from src.account.schemas.user_schema import (
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
     LoginDTO,
+    LoginResultDTO,
     RefreshTokenCreateDTO,
     SSOAuthorizeDTO,
     SSOCallbackDTO,
     SSOMockLoginDTO,
     SSOProfileDTO,
+    TicketExchangeDTO,
     TokenPairDTO,
 )
 from src.auth.services.password_service import hash_password, verify_password
@@ -28,15 +32,16 @@ from src.common.responses.exceptions import (
     ExpiredRefreshTokenException,
     InvalidCredentialsException,
     InvalidCurrentPasswordException,
+    InvalidLoginTicketException,
     PasswordLoginNotAllowedException,
     RefreshTokenNotFoundException,
     RefreshTokenRevokedException,
     SamePasswordException,
     SSOException,
-    SSONotForInternalUsersException,
     UserBlockedException,
     UserNotFoundException,
 )
+from src.common.urls import append_query
 from src.config import settings
 from src.rbac.permissions import RoleCode
 from src.utils.base_service import BaseService
@@ -87,7 +92,7 @@ class AuthService(BaseService):
         data: LoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-    ) -> TokenPairDTO:
+    ) -> LoginResultDTO:
         user = await self.db.user.get_orm_by_username(data.username)
 
         is_valid = await asyncio.to_thread(
@@ -106,7 +111,63 @@ class AuthService(BaseService):
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
+        return await self._complete_login(user, user_agent, ip_address)
+
+    # ---------- кабинет роли и билет входа ----------
+
+    @staticmethod
+    def home_url(role_code: str | None) -> str:
+        """Адрес кабинета роли из ROLE_HOME_URLS (иначе ROLE_HOME_URL_DEFAULT)."""
+        return settings.ROLE_HOME_URLS.get(role_code or "", settings.ROLE_HOME_URL_DEFAULT)
+
+    @staticmethod
+    def _hash_ticket(ticket: str) -> str:
+        return hashlib.sha256(ticket.encode()).hexdigest()
+
+    async def _complete_login(
+        self,
+        user: UserORM,
+        user_agent: str | None,
+        ip_address: str | None,
+    ) -> LoginResultDTO:
+        """Общий финал входа: пара токенов для текущей страницы и redirect_url
+        в кабинет роли с одноразовым билетом (кабинет живёт на своём поддомене,
+        localStorage у него свой, поэтому токены переносятся только билетом)."""
+        role_code = user.role.code if user.role else None
+
+        ticket = secrets.token_urlsafe(32)
+        await self.db.login_ticket.purge_stale()
+        await self.db.login_ticket.add(
+            ticket_hash=self._hash_ticket(ticket),
+            user_id=user.id,
+            expires_at=datetime.now(UTC) + timedelta(seconds=settings.LOGIN_TICKET_TTL_SECONDS),
+        )
+
+        tokens = await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
+        return LoginResultDTO(
+            **tokens.model_dump(),
+            role=role_code,
+            redirect_url=append_query(self.home_url(role_code), [("ticket", ticket)]),
+        )
+
+    async def exchange_ticket(
+        self,
+        data: TicketExchangeDTO,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> TokenPairDTO:
+        user_id = await self.db.login_ticket.consume(self._hash_ticket(data.ticket))
+        if user_id is None:
+            raise InvalidLoginTicketException()
+
+        user = await self.db.user.get_orm_by_id(user_id)
+        if user is None:
+            raise InvalidLoginTicketException()
+        if user.status != UserStatus.ACTIVE:
+            raise UserBlockedException()
+
+        # _issue_tokens делает commit — билет гасится в той же транзакции.
+        return await self._issue_tokens(user.id, user_agent, ip_address)
 
     @staticmethod
     def _is_applicant(user: UserORM) -> bool:
@@ -216,7 +277,7 @@ class AuthService(BaseService):
         data: SSOCallbackDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-    ) -> TokenPairDTO:
+    ) -> LoginResultDTO:
         # Порядок как в sso_integration.md: сверяем state, смотрим error,
         # затем сразу меняем code (живёт 60 секунд) на профиль.
         self.sso_service.verify_state(data.state)
@@ -232,7 +293,7 @@ class AuthService(BaseService):
         data: SSOMockLoginDTO,
         user_agent: str | None = None,
         ip_address: str | None = None,
-    ) -> TokenPairDTO:
+    ) -> LoginResultDTO:
         if not settings.SSO_MOCK:
             raise SSOException("Mock SSO login is disabled")
 
@@ -248,23 +309,21 @@ class AuthService(BaseService):
         profile: SSOProfileDTO,
         user_agent: str | None,
         ip_address: str | None,
-    ) -> TokenPairDTO:
+    ) -> LoginResultDTO:
+        # Через YIA Portal входят все роли: заявитель создаётся автоматически,
+        # сотрудник (Фонд, банк, Совет) заранее заведён Super Admin по ПИНФЛ.
         user = await self._find_or_create_sso_user(profile)
-
-        # Через YIA Portal входят только заявители. Сотрудник Фонда, банка или
-        # Совета с таким же ПИНФЛ входит по логину и паролю.
-        if not self._is_applicant(user):
-            raise SSONotForInternalUsersException()
 
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
-        return await self._issue_tokens(user.id, user_agent, ip_address, touch_login=True)
+        return await self._complete_login(user, user_agent, ip_address)
 
     async def _find_or_create_sso_user(self, profile: SSOProfileDTO) -> UserORM:
         """Определяет существующий профиль по sub портала, затем по ПИНФЛ
         (пользователь, заведённый до перехода на YIA SSO), иначе создаёт
-        заявителя. Ф.И.О. и ПИНФЛ всегда обновляются из источника."""
+        заявителя. Сотрудники находятся по ПИНФЛ, который указал Super Admin.
+        Ф.И.О. и ПИНФЛ всегда обновляются из источника."""
         user = await self.db.user.get_orm_by_sso_sub(profile.sub)
 
         if user is None and profile.pinfl:
@@ -273,9 +332,14 @@ class AuthService(BaseService):
         if user is None:
             return await self._create_applicant(profile)
 
-        if not self._is_applicant(user):
-            raise SSONotForInternalUsersException()
-
+        if user.sso_sub and user.sso_sub != profile.sub:
+            # Профиль с этим ПИНФЛ был привязан к другой учётке портала.
+            logger.warning(
+                "YIA SSO sub changed for user %s (pinfl match): %s -> %s",
+                user.id,
+                user.sso_sub,
+                profile.sub,
+            )
         user.sso_sub = profile.sub
         user.full_name = profile.full_name
         if profile.pinfl and profile.pinfl != user.pinfl:

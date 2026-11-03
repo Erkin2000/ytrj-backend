@@ -47,6 +47,13 @@
         localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
         const me = await api("/auth/me", { headers: { Authorization: "Bearer " + tokens.access_token } });
         showStatus(st, "ok", "Вход выполнен: " + (me.full_name || me.username) + " (" + (me.role ? me.role.code : "без роли") + ")", tokens);
+        if (tokens.redirect_url) {
+          const link = document.createElement("a");
+          link.className = "btn";
+          link.href = tokens.redirect_url;
+          link.textContent = "Перейти в кабинет роли";
+          st.appendChild(link);
+        }
       } catch (e) {
         showStatus(st, "err", "Ошибка: " + e.message, e.body);
       }

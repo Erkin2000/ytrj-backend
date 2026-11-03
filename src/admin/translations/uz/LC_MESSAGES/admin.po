@@ -908,3 +908,18 @@ msgstr "Mablagʻ hali ajratilmagan."
 
 msgid "Все поля"
 msgstr "Barcha maydonlar"
+
+msgid "ПИНФЛ должен состоять из 14 цифр"
+msgstr "JShShIR 14 ta raqamdan iborat boʻlishi kerak"
+
+msgid "Пользователь с таким ПИНФЛ уже существует"
+msgstr "Bunday JShShIRli foydalanuvchi allaqachon mavjud"
+
+msgid "Админ направления"
+msgstr "Yoʻnalish administratori"
+
+msgid "Личные права"
+msgstr "Shaxsiy huquqlar"
+
+msgid "Админ направления должен иметь роль направления"
+msgstr "Yoʻnalish administratori yoʻnalish roliga ega boʻlishi kerak"

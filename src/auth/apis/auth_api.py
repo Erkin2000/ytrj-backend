@@ -7,6 +7,7 @@ from src.auth.schemas.auth_schema import (
     RefreshTokenRequestDTO,
     SSOCallbackDTO,
     SSOMockLoginDTO,
+    TicketExchangeDTO,
 )
 from src.auth.services.auth_service import AuthService
 from src.common.dependencies import CurrentUserDep, DBDep
@@ -26,6 +27,25 @@ TOKENS_EXAMPLE = success_example(
     message="Logged in successfully.",
 )
 
+LOGIN_EXAMPLE = success_example(
+    {
+        "access_token": "eyJhbGciOi...",
+        "refresh_token": "eyJhbGciOi...",
+        "token_type": "bearer",
+        "expires_in": 3600,
+        "role": "COUNCIL_MEMBER",
+        "redirect_url": "https://council.yoshlarfondi.uz/?ticket=k3J9x...",
+    },
+    message="Logged in successfully.",
+)
+
+LOGIN_DESCRIPTION = (
+    "Кроме пары токенов возвращает `role` и `redirect_url` — кабинет роли "
+    "(`ROLE_HOME_URLS`) с одноразовым `?ticket=...`. Если кабинет на другом поддомене, "
+    "фронтенд делает `location.replace(redirect_url)`, а кабинет меняет билет на "
+    "токены через `POST /auth/ticket/exchange` (билет живёт `LOGIN_TICKET_TTL_SECONDS`)."
+)
+
 
 def _client_meta(request: Request) -> tuple[str | None, str | None]:
     return request.headers.get("user-agent"), request.client.host if request.client else None
@@ -34,10 +54,26 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
 @router.post(
     "/login",
     summary="Вход по логину и паролю — только внутренние роли (Super Admin, Фонд, банк, Совет)",
-    responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
+    description=LOGIN_DESCRIPTION,
+    responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
 )
 async def login(data: LoginDTO, db: DBDep, request: Request):
     tokens = await AuthService(db).login(data, *_client_meta(request))
+    return ResponseBuilder.success(data=tokens, message="Logged in successfully.")
+
+
+@router.post(
+    "/ticket/exchange",
+    summary="Обмен одноразового билета входа на токены (кабинет роли на своём поддомене)",
+    description=(
+        "Кабинет получает `?ticket=...` из `redirect_url` после входа и сразу меняет его "
+        "на пару токенов. Билет одноразовый: повторный, просроченный или чужой билет — 401 "
+        "`invalid_login_ticket`, нужно войти заново."
+    ),
+    responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
+)
+async def exchange_ticket(data: TicketExchangeDTO, db: DBDep, request: Request):
+    tokens = await AuthService(db).exchange_ticket(data, *_client_meta(request))
     return ResponseBuilder.success(data=tokens, message="Logged in successfully.")
 
 
@@ -168,12 +204,14 @@ async def sso_authorize(db: DBDep):
 
 @router.post(
     "/sso/callback",
-    summary="YIA SSO (только заявители): обмен code на токены, профиль определяется или создаётся",
+    summary="YIA SSO (все роли): обмен code на токены и адрес кабинета роли",
     description=(
         "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
-        "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа."
+        "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа. "
+        "Заявитель создаётся при первом входе; сотрудник (Фонд, банк, Совет) должен быть "
+        "заранее заведён Super Admin с его ПИНФЛ.\n\n" + LOGIN_DESCRIPTION
     ),
-    responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
+    responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
 )
 async def sso_callback(data: SSOCallbackDTO, db: DBDep, request: Request):
     tokens = await AuthService(db).sso_callback(data, *_client_meta(request))
@@ -184,8 +222,12 @@ if settings.SSO_MOCK:
 
     @router.post(
         "/sso/mock-login",
-        summary="YIA SSO (тест, только заявители): вход с ручными данными — при SSO_MOCK=True",
-        responses={200: TOKENS_EXAMPLE, **COMMON_ERRORS},
+        summary="YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True",
+        description=(
+            "Как `POST /auth/sso/callback`, но профиль портала задаётся вручную. "
+            "ПИНФЛ сотрудника, заведённого Super Admin, входит в его кабинет."
+        ),
+        responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
     )
     async def sso_mock_login(data: SSOMockLoginDTO, db: DBDep, request: Request):
         tokens = await AuthService(db).sso_mock_login(data, *_client_meta(request))

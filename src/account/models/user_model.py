@@ -2,13 +2,15 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, String
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.account.models.user_permission_model import UserPermissionORM
 from src.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from src.application.models.bank_model import BankORM
+    from src.rbac.models.permission_model import PermissionORM
     from src.rbac.models.role_model import RoleORM
 
 
@@ -27,21 +29,14 @@ class UserORM(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Логин для входа по паролю (внутренние пользователи). Для заявителей,
-    # созданных через YIA SSO, равен ПИНФЛ (или sso_<sub>, если ПИНФЛ не передан).
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # Стабильный идентификатор пользователя YIA Portal (sub, общий для всех
-    # проектов портала). Заполняется при первом входе через SSO.
     sso_sub: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
 
-    # Данные из YIA SSO (OneID): обновляются при каждом входе, пользователь менять не может.
     full_name: Mapped[str | None] = mapped_column(String(255))
     pinfl: Mapped[str | None] = mapped_column(String(14), unique=True)
 
-    # Данные, которые портал не передаёт: заявитель дополняет их сам в профиле
-    # (PATCH /auth/me). Без них нельзя создать заявку (см. src/account/profile.py).
     phone: Mapped[str | None] = mapped_column(String(20))
     passport_number: Mapped[str | None] = mapped_column(String(20))
     inn: Mapped[str | None] = mapped_column(String(20))
@@ -57,17 +52,23 @@ class UserORM(TimestampMixin, Base):
 
     role_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id", ondelete="SET NULL"))
 
-    # Scope: сотрудник банка видит только заявки своего банка.
     bank_id: Mapped[int | None] = mapped_column(ForeignKey("banks.id", ondelete="SET NULL"))
 
-    # Scope: организация / регион (справочники появятся позже).
     organization: Mapped[str | None] = mapped_column(String(255))
     region: Mapped[str | None] = mapped_column(String(255))
+
+    is_direction_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     role: Mapped["RoleORM | None"] = relationship(back_populates="users", lazy="selectin")
     bank: Mapped["BankORM | None"] = relationship(lazy="selectin")
+
+    permissions: Mapped[list["PermissionORM"]] = relationship(
+        secondary=UserPermissionORM.__table__, lazy="selectin"
+    )
 
     def __str__(self) -> str:
         return self.full_name or self.username

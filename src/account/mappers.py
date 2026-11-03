@@ -7,6 +7,7 @@ from src.account.schemas.user_schema import (
     UserDTO,
     UserProfileDTO,
 )
+from src.rbac.access import effective_permissions
 from src.rbac.mappers import RoleDataMapper
 from src.utils.base_rep.mappers.base import DataMapper
 
@@ -31,6 +32,7 @@ def _base_fields(model: UserORM) -> dict:
         "region": model.region,
         "has_password": model.hashed_password is not None,
         "sso_linked": model.sso_sub is not None,
+        "is_direction_admin": model.is_direction_admin,
         "last_login_at": model.last_login_at,
         "created_at": model.created_at,
     }
@@ -54,6 +56,7 @@ class UserDataMapper(DataMapper):
             gender=model.gender,
             date_of_birth=model.date_of_birth,
             updated_at=model.updated_at,
+            permissions=sorted(effective_permissions(model)),
         )
 
     @staticmethod
@@ -65,9 +68,10 @@ class UserDataMapper(DataMapper):
             full_name=model.full_name,
             status=model.status,
             is_superuser=bool(role and role.is_superuser),
-            permissions={p.code for p in role.permissions} if role else set(),
+            permissions=effective_permissions(model),
             role=RoleDataMapper.map_to_short(role),
             bank_id=model.bank_id,
+            is_direction_admin=model.is_direction_admin,
         )
 
     @staticmethod
@@ -89,6 +93,7 @@ class UserDataMapper(DataMapper):
             role=RoleDataMapper.map_to_short(role),
             bank=_bank_short(model),
             is_superuser=bool(role and role.is_superuser),
+            is_direction_admin=model.is_direction_admin,
             permissions=permissions,
             profile_complete=not missing,
             missing_fields=missing,

@@ -7,9 +7,12 @@
 
 from __future__ import annotations
 
+import re
+
 from markupsafe import Markup, escape
 from sqladmin import BaseView, ModelView, expose
 from sqladmin.filters import BooleanFilter, ForeignKeyFilter, StaticValuesFilter
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
@@ -45,6 +48,7 @@ from src.application.models.status_history_model import StatusHistoryORM
 from src.application.services.photo_storage import DocumentStorage, PhotoStorage
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
+from src.rbac.access import DIRECTION_ROLES
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 
@@ -172,6 +176,9 @@ def fmt_subject_types(model, attribute) -> Markup | str:
 # ---------- Пользователи и доступ ----------
 
 
+PINFL_RE = re.compile(r"\d{14}")
+
+
 class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
     name = _l("Пользователь")
     name_plural = _l("Пользователи")
@@ -184,6 +191,7 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         UserORM.full_name,
         UserORM.role,
         UserORM.bank,
+        UserORM.is_direction_admin,
         UserORM.status,
         UserORM.last_login_at,
     ]
@@ -219,6 +227,8 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         UserORM.organization: "Организация",
         UserORM.region: "Регион",
         UserORM.sso_sub: "YIA SSO sub",
+        UserORM.is_direction_admin: "Админ направления",
+        UserORM.permissions: "Личные права",
         UserORM.last_login_at: "Последний вход",
         UserORM.created_at: "Создан",
         UserORM.updated_at: "Обновлён",
@@ -226,9 +236,11 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
     column_formatters = {
         UserORM.status: fmt_user_status,
         UserORM.role: fmt_role,
+        UserORM.is_direction_admin: fmt_bool,
         UserORM.last_login_at: fmt_datetime,
     }
     column_formatters_detail = {
+        UserORM.is_direction_admin: fmt_bool,
         UserORM.status: fmt_user_status,
         UserORM.role: fmt_role,
         UserORM.gender: fmt_gender,
@@ -244,7 +256,47 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         UserORM.updated_at,
         UserORM.last_login_at,
     ]
+    # Личные права действуют только в пределах прав роли (src/rbac/access.py),
+    # поэтому лишнее право, отмеченное здесь, ни на что не повлияет.
+    form_ajax_refs = {
+        "permissions": {"fields": ("code", "name"), "order_by": "code"},
+    }
     page_size = 25
+
+    async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
+        await self._check_direction_admin(data, model)
+
+        # По ПИНФЛ сотрудник входит через YIA Portal: проверяем формат и
+        # уникальность до записи, чтобы показать понятную ошибку в форме.
+        if "pinfl" not in data:
+            return
+        pinfl = (data["pinfl"] or "").strip() or None
+        if pinfl is not None and not PINFL_RE.fullmatch(pinfl):
+            raise ValueError(_("ПИНФЛ должен состоять из 14 цифр"))
+        data["pinfl"] = pinfl
+
+        if pinfl is not None:
+            async with async_session_maker() as session:
+                owner_id = await session.scalar(select(UserORM.id).where(UserORM.pinfl == pinfl))
+            if owner_id is not None and (is_created or owner_id != model.id):
+                raise ValueError(_("Пользователь с таким ПИНФЛ уже существует"))
+
+        if not is_created and pinfl != model.pinfl:
+            # Новый ПИНФЛ — другой человек на портале: снимаем старую привязку SSO.
+            data["sso_sub"] = None
+
+    @staticmethod
+    async def _check_direction_admin(data: dict, model) -> None:
+        is_admin = data.get("is_direction_admin", getattr(model, "is_direction_admin", False))
+        if not is_admin:
+            return
+        role = data["role"] if "role" in data else getattr(model, "role", None)
+        if role is not None and not hasattr(role, "code"):
+            # Форма передаёт id выбранной роли.
+            async with async_session_maker() as session:
+                role = await session.get(RoleORM, int(role))
+        if role is None or role.code not in DIRECTION_ROLES:
+            raise ValueError(_("Админ направления должен иметь роль направления"))
 
 
 class RoleAdmin(LocalizedLabelsMixin, ModelView, model=RoleORM):

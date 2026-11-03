@@ -134,6 +134,11 @@ class SSOException(UnauthorizedException):
     message = "YIA Portal authentication failed. Please try again."
 
 
+class InvalidLoginTicketException(UnauthorizedException):
+    message = "Login ticket is invalid, expired or already used. Please sign in again."
+    field = "ticket"
+
+
 # ---------- 403 ----------
 
 
@@ -144,6 +149,19 @@ class ForbiddenException(ApiException):
 
 class PermissionDeniedException(ForbiddenException):
     message = "You do not have permission to perform this action"
+
+
+class UserOutOfScopeException(ForbiddenException):
+    message = "You can manage only regular staff of your own direction"
+
+
+class PermissionsNotGrantableException(ForbiddenException):
+    message = "You cannot grant permissions you do not have"
+    field = "permissions"
+
+
+class AdminManagementException(ForbiddenException):
+    message = "Only Super Admin can manage administrators and administrator roles"
 
 
 class UserBlockedException(ForbiddenException):
@@ -224,6 +242,11 @@ class UsernameAlreadyExistsException(ConflictException):
     message = "Username already exists"
 
 
+class PinflAlreadyExistsException(ConflictException):
+    message = "User with this PINFL already exists"
+    field = "pinfl"
+
+
 class RoleCodeAlreadyExistsException(ConflictException):
     message = "Role with this code already exists"
 
@@ -246,6 +269,16 @@ class SelfBlockException(BadRequestException):
 
 class BankScopeRequiredException(BadRequestException):
     message = "Bank employee must be linked to a bank"
+
+
+class RoleRequiredException(BadRequestException):
+    message = "Role is required"
+    field = "role_id"
+
+
+class DirectionAdminRoleException(BadRequestException):
+    message = "Direction admin must have a direction role (FUND_OPERATOR, BANK_EMPLOYEE, COUNCIL_MEMBER)"
+    field = "is_direction_admin"
 
 
 # ---------- заявки ----------
@@ -370,13 +403,6 @@ class ResourceAllocationNotAllowedException(BadRequestException):
 
 class ApplicantLoginViaSSOException(ForbiddenException):
     message = "Applicants sign in via YIA Portal only"
-
-
-class SSONotForInternalUsersException(ForbiddenException):
-    message = (
-        "YIA Portal sign-in is for applicants only. "
-        "Internal users sign in with username and password"
-    )
 
 
 class SSOAccessDeniedException(ForbiddenException):

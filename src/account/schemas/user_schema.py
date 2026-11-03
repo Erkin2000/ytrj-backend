@@ -1,7 +1,15 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from src.account.models.user_model import Gender, UserStatus
 from src.rbac.schemas.role_schema import RoleShortDTO
@@ -38,6 +46,7 @@ class UserDTO(BaseModel):
     region: str | None = None
     has_password: bool = False
     sso_linked: bool = False
+    is_direction_admin: bool = False
     last_login_at: datetime | None = None
     created_at: datetime | None = None
 
@@ -49,6 +58,8 @@ class UserDetailDTO(UserDTO):
     gender: Gender | None = None
     date_of_birth: date | None = None
     updated_at: datetime | None = None
+    # Действующие права (личные права в пределах прав роли).
+    permissions: list[str] = []
 
 
 class UserProfileDTO(BaseModel):
@@ -68,6 +79,7 @@ class UserProfileDTO(BaseModel):
     role: RoleShortDTO | None = None
     bank: BankShortDTO | None = None
     is_superuser: bool
+    is_direction_admin: bool = False
     permissions: list[str]
     profile_complete: bool = Field(
         description="Все данные заявителя заполнены — можно создавать заявку."
@@ -122,6 +134,7 @@ class CurrentUserDTO(BaseModel):
     permissions: set[str]
     role: RoleShortDTO | None = None
     bank_id: int | None = None
+    is_direction_admin: bool = False
 
     @property
     def is_active(self) -> bool:
@@ -136,9 +149,18 @@ class CurrentUserDTO(BaseModel):
 
 
 class UserRequestAddDTO(BaseModel):
+    """Сотрудник входит через YIA Portal (по ПИНФЛ) и/или по логину и паролю:
+    нужен хотя бы один из способов."""
+
     username: UsernameStr
-    password: PasswordStr
-    role_id: int
+    password: PasswordStr | None = None
+    pinfl: PinflStr | None = Field(default=None, examples=["30101900000011"])
+    # Админ направления может не передавать: подставляется его роль.
+    role_id: int | None = None
+    # Коды прав; None — все права, которые создающий может выдать для этой роли.
+    permissions: list[str] | None = Field(default=None, examples=[["applications.read"]])
+    # Назначает только Super Admin; роль должна быть ролью направления.
+    is_direction_admin: bool = False
     full_name: str | None = None
     phone: PhoneStr | None = None
     email: EmailStr | None = None
@@ -148,10 +170,20 @@ class UserRequestAddDTO(BaseModel):
     organization: str | None = None
     region: str | None = None
 
+    @model_validator(mode="after")
+    def _login_method_required(self):
+        if not self.password and not self.pinfl:
+            raise ValueError("Укажите ПИНФЛ (вход через YIA Portal) и/или пароль")
+        return self
+
 
 class UserRequestUpdateDTO(BaseModel):
     username: UsernameStr | None = None
     password: PasswordStr | None = None
+    pinfl: PinflStr | None = None
+    # Полная замена личных прав.
+    permissions: list[str] | None = None
+    is_direction_admin: bool | None = None
     role_id: int | None = None
     full_name: str | None = None
     phone: PhoneStr | None = None
@@ -177,6 +209,7 @@ class UserAddDTO(BaseModel):
     username: str
     hashed_password: str | None = None
     role_id: int | None = None
+    is_direction_admin: bool = False
     full_name: str | None = None
     phone: str | None = None
     email: str | None = None
@@ -195,6 +228,7 @@ class UserUpdateDTO(BaseModel):
     username: str | None = None
     hashed_password: str | None = None
     role_id: int | None = None
+    is_direction_admin: bool | None = None
     full_name: str | None = None
     phone: str | None = None
     email: str | None = None
@@ -209,6 +243,12 @@ class UserUpdateDTO(BaseModel):
     gender: Gender | None = None
     date_of_birth: date | None = None
     last_login_at: datetime | None = None
+
+
+class GrantablePermissionsDTO(BaseModel):
+    role_id: int
+    role_code: str
+    permissions: list[str]
 
 
 class UserSessionDTO(BaseModel):

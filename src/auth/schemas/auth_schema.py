@@ -17,6 +17,21 @@ class TokenPairDTO(BaseModel):
     expires_in: int
 
 
+class LoginResultDTO(TokenPairDTO):
+    """Ответ на вход (пароль или YIA SSO): токены + куда отправить браузер.
+
+    redirect_url — кабинет роли (ROLE_HOME_URLS) с одноразовым ?ticket=...;
+    кабинет на своём поддомене меняет билет на токены через POST /auth/ticket/exchange.
+    """
+
+    role: str | None = None
+    redirect_url: str
+
+
+class TicketExchangeDTO(BaseModel):
+    ticket: str = Field(min_length=16, max_length=128, examples=["k3J9x...one-time-ticket"])
+
+
 class RefreshTokenRequestDTO(BaseModel):
     refresh_token: str
 

@@ -1,5 +1,6 @@
 from sqlalchemy import delete, insert, select
 
+from src.account.models.user_permission_model import UserPermissionORM
 from src.rbac.mappers import PermissionDataMapper
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_permission_model import RolePermissionORM
@@ -27,4 +28,14 @@ class PermissionRepository(BaseRepository):
             await self.session.execute(
                 insert(RolePermissionORM),
                 [{"role_id": role_id, "permission_id": pid} for pid in permission_ids],
+            )
+
+    async def set_user_permissions(self, user_id: int, permission_ids: list[int]) -> None:
+        await self.session.execute(
+            delete(UserPermissionORM).where(UserPermissionORM.user_id == user_id)
+        )
+        if permission_ids:
+            await self.session.execute(
+                insert(UserPermissionORM),
+                [{"user_id": user_id, "permission_id": pid} for pid in permission_ids],
             )
