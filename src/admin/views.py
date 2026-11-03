@@ -48,7 +48,7 @@ from src.application.models.status_history_model import StatusHistoryORM
 from src.application.services.photo_storage import DocumentStorage, PhotoStorage
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
-from src.rbac.access import DIRECTION_ROLES
+from src.rbac.access import DIRECTION_ROLES, uses_personal_permissions
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 
@@ -265,6 +265,7 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
 
     async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
         await self._check_direction_admin(data, model)
+        await self._default_permissions(data, model, is_created)
 
         # По ПИНФЛ сотрудник входит через YIA Portal: проверяем формат и
         # уникальность до записи, чтобы показать понятную ошибку в форме.
@@ -297,6 +298,26 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
                 role = await session.get(RoleORM, int(role))
         if role is None or role.code not in DIRECTION_ROLES:
             raise ValueError(_("Админ направления должен иметь роль направления"))
+
+    @staticmethod
+    async def _default_permissions(data: dict, model, is_created: bool) -> None:
+        """Права сотрудника хранятся поштучно (src/rbac/access.py). Если в форме
+        «Личные права» не отмечены, а пользователь создаётся, получает другую роль
+        (например, заявитель становится оператором Фонда) или прав у него ещё нет,
+        выдаём все права роли — как это делает API. Отмеченные вручную не трогаем."""
+        if "permissions" not in data or data["permissions"]:
+            return
+        role_value = data.get("role")
+        if not role_value:
+            return
+        role_id = int(role_value.id if hasattr(role_value, "id") else role_value)
+        if not (is_created or role_id != model.role_id or not model.permissions):
+            return
+        async with async_session_maker() as session:
+            role = await session.get(RoleORM, role_id)
+            if role is None or not uses_personal_permissions(role):
+                return
+            data["permissions"] = [str(permission.id) for permission in role.permissions]
 
 
 class RoleAdmin(LocalizedLabelsMixin, ModelView, model=RoleORM):
