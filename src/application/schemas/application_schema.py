@@ -322,10 +322,15 @@ class ApplicationBankDTO(BaseModel):
 
 
 class SendToBankDTO(BaseModel):
-    """Фонд направляет заявку в банк после успешного скоринга."""
+    """Запасной путь: Фонд направляет утверждённую Советом заявку в банк, если
+    выбранный заявителем банк неактивен или не подходит по типу субъекта."""
 
     bank_id: int = Field(examples=[1])
     comment: str | None = None
+
+
+class FundRejectDTO(BaseModel):
+    reason: ReasonStr = Field(description="Причина отказа Фонда (видна заявителю).")
 
 
 class SendToCouncilDTO(BaseModel):
@@ -339,17 +344,6 @@ class SendToCouncilDTO(BaseModel):
 class CouncilDecisionDTO(BaseModel):
     decision: CouncilDecision
     reason: ReasonStr | None = Field(default=None, description="Обязательна при «Отклоняю».")
-
-
-class ResourceAllocationCreateDTO(BaseModel):
-    amount: Decimal | None = Field(default=None, ge=0)
-    currency: str = Field(default="UZS", min_length=3, max_length=3)
-    reference_number: str | None = Field(default=None, max_length=100)
-    details: str | None = None
-
-
-class CompleteApplicationDTO(BaseModel):
-    comment: str | None = None
 
 
 # ---------- ответы ----------
@@ -379,6 +373,8 @@ class ApplicationDetailDTO(ApplicationListItemDTO):
     photos: list[PhotoDTO] = []
     documents: list[DocumentDTO] = []
     bank_stage: BankStageDTO
+    fund_decided_at: datetime | None = None
+    fund_reject_reason: str | None = None
     council_assignments: list[CouncilAssignmentDTO] = []
     council_decided_at: datetime | None = None
     council_reject_reason: str | None = None
@@ -481,6 +477,9 @@ class ApplicationPatchDTO(BaseModel):
     bank_decision_reason: str | None = None
     bank_decided_by_id: int | None = None
     bank_decided_at: datetime | None = None
+    fund_decided_by_id: int | None = None
+    fund_decided_at: datetime | None = None
+    fund_reject_reason: str | None = None
     sent_to_council_at: datetime | None = None
     sent_to_council_by_id: int | None = None
     council_decided_at: datetime | None = None

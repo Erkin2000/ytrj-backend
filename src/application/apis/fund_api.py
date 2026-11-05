@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends
 
 from src.application.schemas.application_schema import (
     ApplicationFilterDTO,
-    CompleteApplicationDTO,
-    ResourceAllocationCreateDTO,
+    FundRejectDTO,
     ScoringResultRecordDTO,
     SendToBankDTO,
     SendToCouncilDTO,
@@ -25,7 +24,7 @@ FilterDep = Annotated[ApplicationFilterDTO, Depends()]
 ITEM = {
     "id": 12,
     "number": "JG-2026-000012",
-    "status": "BANK_APPROVED",
+    "status": "FUND_REVIEW",
     "subject_type": "YATT",
     "bank": {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"},
     "applicant_full_name": "Алиев Али Алиевич",
@@ -57,12 +56,12 @@ async def get_applications(
         200: success_example(
             {
                 "new": 3,
-                "to_bank": 1,
-                "to_council": 2,
+                "to_review": 2,
                 "in_council": 1,
-                "to_allocate": 1,
-                "in_allocation": 0,
+                "to_bank": 0,
+                "in_bank": 4,
                 "completed": 10,
+                "rejected": 5,
             },
             "Counters retrieved.",
         ),
@@ -143,11 +142,11 @@ async def record_scoring_result(
 
 @router.post(
     "/{application_id}/send-to-bank",
-    summary="Направить заявку в банк (READY_FOR_BANK → SENT_TO_BANK)",
+    summary="Направить утверждённую Советом заявку в банк (COUNCIL_APPROVED → SENT_TO_BANK)",
     description=(
-        "Запасной путь: обычно заявка уходит в банк, выбранный заявителем, автоматически. "
-        "Если после скоринга она осталась в READY_FOR_BANK (банк деактивирован или не подходит "
-        "по типу субъекта), Фонд назначает банк из каталога."
+        "Запасной путь: после утверждения Советом заявка уходит в банк, выбранный заявителем, "
+        "автоматически. Если она осталась в COUNCIL_APPROVED (банк деактивирован или не "
+        "подходит по типу субъекта), Фонд назначает банк из каталога."
     ),
     dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
     responses={
@@ -162,7 +161,7 @@ async def send_to_bank(application_id: int, data: SendToBankDTO, db: DBDep, user
 
 @router.post(
     "/{application_id}/send-to-council",
-    summary="Направить заявку в Совет (BANK_APPROVED → COUNCIL_REVIEW)",
+    summary="Направить заявку в Совет (FUND_REVIEW → COUNCIL_REVIEW)",
     dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
     responses={
         200: success_example({**ITEM, "status": "COUNCIL_REVIEW"}, "Application sent to council."),
@@ -176,36 +175,18 @@ async def send_to_council(
     return ResponseBuilder.success(data=result, message="Application sent to council.")
 
 
-# ---------- финансирование ----------
-
-
 @router.post(
-    "/{application_id}/allocate",
-    summary="Зафиксировать выделение ресурсов (после документа «Требование подтверждено»)",
-    dependencies=[Depends(require_permission(Module.ALLOCATION, Action.CREATE))],
+    "/{application_id}/reject",
+    summary="Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)",
+    description="Причина обязательна и показывается заявителю.",
+    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
     responses={
-        200: success_example({**ITEM, "status": "RESOURCE_ALLOCATION"}, "Resources allocated."),
+        200: success_example({**ITEM, "status": "FUND_REJECTED"}, "Application rejected."),
         **COMMON_ERRORS,
     },
 )
-async def allocate_resources(
-    application_id: int, data: ResourceAllocationCreateDTO, db: DBDep, user: CurrentUserDep
+async def reject_application(
+    application_id: int, data: FundRejectDTO, db: DBDep, user: CurrentUserDep
 ):
-    result = await FundService(db).allocate_resources(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Resources allocated.")
-
-
-@router.post(
-    "/{application_id}/complete",
-    summary="Завершить заявку (RESOURCE_ALLOCATION → COMPLETED)",
-    dependencies=[Depends(require_permission(Module.ALLOCATION, Action.APPROVE))],
-    responses={
-        200: success_example({**ITEM, "status": "COMPLETED"}, "Application completed."),
-        **COMMON_ERRORS,
-    },
-)
-async def complete_application(
-    application_id: int, data: CompleteApplicationDTO, db: DBDep, user: CurrentUserDep
-):
-    result = await FundService(db).complete(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Application completed.")
+    result = await FundService(db).reject(application_id, user, data)
+    return ResponseBuilder.success(data=result, message="Application rejected.")

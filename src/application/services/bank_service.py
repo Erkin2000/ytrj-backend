@@ -144,7 +144,16 @@ class BankService(ApplicationBaseService):
                 ApplicationStatus.BANK_APPROVED,
                 event="bank_approved",
                 actor=user,
-                comment=data.reason or "Банк: заявитель отвечает требованиям Фонда",
+                comment=data.reason or "Банк одобрил заявку",
+            )
+            # Банк — последний этап: одобрение завершает заявку.
+            application.completed_at = now()
+            await self.transition(
+                application,
+                ApplicationStatus.COMPLETED,
+                event="completed",
+                actor=None,
+                comment="Заявка одобрена банком. Процесс завершён",
             )
         else:
             await self.transition(

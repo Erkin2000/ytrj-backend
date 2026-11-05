@@ -129,3 +129,26 @@ class ApplicationBaseService(BaseService):
             comment=comment,
             from_status=from_status,
         )
+
+    # ---------- банк ----------
+
+    async def route_to_chosen_bank(self, application: ApplicationORM) -> bool:
+        """COUNCIL_APPROVED → SENT_TO_BANK: заявка уходит в банк, выбранный заявителем.
+        Если банк неактивен или не подходит по типу субъекта, заявка остаётся в
+        COUNCIL_APPROVED, и банк назначает Фонд (POST /fund/applications/{id}/send-to-bank)."""
+        bank = application.bank
+        if (
+            bank is None
+            or not bank.is_active
+            or application.subject_type not in bank.allowed_subject_types
+        ):
+            return False
+        application.sent_to_bank_at = now()
+        await self.transition(
+            application,
+            ApplicationStatus.SENT_TO_BANK,
+            event="sent_to_bank",
+            actor=None,
+            comment=f"Заявка направлена в банк: {bank.name}",
+        )
+        return True

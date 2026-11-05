@@ -2,14 +2,13 @@
 «Согласен» / «Отклоняю»."""
 
 from src.account.schemas.user_schema import CurrentUserDTO
-from src.application.enums import ApplicationStatus, CouncilDecision, DemandDocumentStatus
+from src.application.enums import ApplicationStatus, CouncilDecision
 from src.application.mappers import ApplicationDataMapper
 from src.application.models.application_model import ApplicationORM
 from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationFilterDTO,
     CouncilDecisionDTO,
-    DemandDocumentAddDTO,
 )
 from src.application.services.base import ApplicationBaseService, now
 from src.common.responses.exceptions import (
@@ -45,10 +44,18 @@ class CouncilService(ApplicationBaseService):
         )
         return {
             "pending": by_status[ApplicationStatus.COUNCIL_REVIEW.value],
-            "approved": by_status[ApplicationStatus.COUNCIL_APPROVED.value]
-            + by_status[ApplicationStatus.DEMAND_DOCUMENT_CREATED.value]
-            + by_status[ApplicationStatus.RESOURCE_ALLOCATION.value]
-            + by_status[ApplicationStatus.COMPLETED.value],
+            # утверждённые Советом — в том числе ушедшие дальше в банк
+            "approved": sum(
+                by_status[s.value]
+                for s in (
+                    ApplicationStatus.COUNCIL_APPROVED,
+                    ApplicationStatus.SENT_TO_BANK,
+                    ApplicationStatus.BANK_REVIEW,
+                    ApplicationStatus.BANK_APPROVED,
+                    ApplicationStatus.BANK_REJECTED,
+                    ApplicationStatus.COMPLETED,
+                )
+            ),
             "rejected": by_status[ApplicationStatus.COUNCIL_REJECTED.value],
         }
 
@@ -99,7 +106,7 @@ class CouncilService(ApplicationBaseService):
     ) -> None:
         """Правило итога (кворум/большинство ещё не согласованы — см. архитектуру):
         «Отклоняю» любого члена завершает заявку как COUNCIL_REJECTED;
-        «Согласен» всех назначенных — COUNCIL_APPROVED + документ-требование."""
+        «Согласен» всех назначенных — COUNCIL_APPROVED и отправка в банк заявителя."""
         if data.decision == CouncilDecision.REJECTED:
             application.council_decided_at = now()
             application.council_reject_reason = data.reason
@@ -125,19 +132,5 @@ class CouncilService(ApplicationBaseService):
             comment="Совет: «Согласен»",
         )
 
-        # После утверждения Советом создаётся документ «Требование подтверждено».
-        number = await self.db.application.next_demand_document_number()
-        await self.db.demand_document.add(
-            DemandDocumentAddDTO(
-                application_id=application.id,
-                number=number,
-                status=DemandDocumentStatus.CREATED,
-            )
-        )
-        await self.transition(
-            application,
-            ApplicationStatus.DEMAND_DOCUMENT_CREATED,
-            event="demand_document_created",
-            actor=None,
-            comment=f"Создан документ «Требование подтверждено» № {number}",
-        )
+        # Утверждённая Советом заявка уходит в банк, выбранный заявителем.
+        await self.route_to_chosen_bank(application)

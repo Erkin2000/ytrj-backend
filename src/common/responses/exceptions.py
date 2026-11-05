@@ -392,10 +392,6 @@ class NoCouncilMembersException(BadRequestException):
     message = "No active council members to assign"
 
 
-class ResourceAllocationNotAllowedException(BadRequestException):
-    message = "Resource allocation is allowed only after council approval"
-
-
 # ---------- политика входа: YIA SSO только для заявителей ----------
 
 

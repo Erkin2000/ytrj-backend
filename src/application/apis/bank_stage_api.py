@@ -80,7 +80,7 @@ async def accept_application(application_id: int, db: DBDep, user: CurrentUserDe
     summary="Результат банка: одобрение или отказ с причиной (изменить нельзя)",
     dependencies=[Depends(require_permission(Module.BANK_REVIEW, Action.APPROVE))],
     responses={
-        200: success_example({**ITEM, "status": "BANK_APPROVED"}, "Bank decision recorded."),
+        200: success_example({**ITEM, "status": "COMPLETED"}, "Bank decision recorded."),
         **COMMON_ERRORS,
     },
 )

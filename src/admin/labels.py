@@ -17,7 +17,9 @@ STATUS_LABELS: dict[str, tuple[str, str]] = {
     "SCORING_IN_PROGRESS": ("Скоринг KATM", "azure"),
     "SCORING_FAILED": ("Скоринг не пройден", "red"),
     "ELIGIBILITY_FAILED": ("Не соответствует требованиям", "red"),
-    "READY_FOR_BANK": ("Готова к отправке в банк", "cyan"),
+    "FUND_REVIEW": ("Рассмотрение Фондом", "cyan"),
+    "FUND_REJECTED": ("Фонд отказал", "red"),
+    "READY_FOR_BANK": ("Готова к отправке в банк (устар.)", "secondary"),
     "SENT_TO_BANK": ("Отправлена в банк", "indigo"),
     "BANK_REVIEW": ("Банк рассматривает", "purple"),
     "BANK_APPROVED": ("Банк одобрил", "teal"),
@@ -25,19 +27,28 @@ STATUS_LABELS: dict[str, tuple[str, str]] = {
     "COUNCIL_REVIEW": ("Рассмотрение Советом", "orange"),
     "COUNCIL_APPROVED": ("Совет утвердил", "lime"),
     "COUNCIL_REJECTED": ("Совет отказал", "red"),
-    "DEMAND_DOCUMENT_CREATED": ("Требование подтверждено", "green"),
-    "RESOURCE_ALLOCATION": ("Выделение ресурсов", "yellow"),
+    "DEMAND_DOCUMENT_CREATED": ("Требование подтверждено (устар.)", "secondary"),
+    "RESOURCE_ALLOCATION": ("Выделение ресурсов (устар.)", "secondary"),
     "COMPLETED": ("Завершена", "success"),
 }
 
 PIPELINE_GROUPS: list[tuple[str, list[str]]] = [
     ("Черновики", ["DRAFT"]),
     ("Скоринг", ["SUBMITTED", "SCORING_IN_PROGRESS"]),
-    ("Банк", ["READY_FOR_BANK", "SENT_TO_BANK", "BANK_REVIEW"]),
-    ("Фонд → Совет", ["BANK_APPROVED", "COUNCIL_REVIEW"]),
-    ("Финансирование", ["COUNCIL_APPROVED", "DEMAND_DOCUMENT_CREATED", "RESOURCE_ALLOCATION"]),
+    ("Фонд", ["FUND_REVIEW"]),
+    ("Совет", ["COUNCIL_REVIEW", "COUNCIL_APPROVED"]),
+    ("Банк", ["SENT_TO_BANK", "BANK_REVIEW", "BANK_APPROVED"]),
     ("Завершены", ["COMPLETED"]),
-    ("Отклонены", ["SCORING_FAILED", "ELIGIBILITY_FAILED", "BANK_REJECTED", "COUNCIL_REJECTED"]),
+    (
+        "Отклонены",
+        [
+            "SCORING_FAILED",
+            "ELIGIBILITY_FAILED",
+            "FUND_REJECTED",
+            "COUNCIL_REJECTED",
+            "BANK_REJECTED",
+        ],
+    ),
 ]
 
 SUBJECT_LABELS: dict[str, str] = {
@@ -91,6 +102,8 @@ EVENT_LABELS: dict[str, str] = {
     "scoring_technical_error": "Техническая ошибка KATM",
     "scoring_retry": "Повтор скоринга",
     "eligibility_failed": "Не соответствует требованиям Фонда",
+    "fund_rejected": "Фонд отказал",
+    "workflow_migrated": "Перенос в новый порядок обработки",
     "sent_to_bank": "Направлена в банк",
     "bank_accepted": "Банк принял заявку",
     "bank_approved": "Банк одобрил",

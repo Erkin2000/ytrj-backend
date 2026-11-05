@@ -128,6 +128,13 @@ class ApplicationORM(TimestampMixin, Base):
     council_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     council_reject_reason: Mapped[str | None] = mapped_column(Text)
 
+    # Решение Фонда до Совета: отказ (FUND_REJECTED) с причиной.
+    fund_decided_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    fund_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fund_reject_reason: Mapped[str | None] = mapped_column(Text)
+
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # --- Связи ---

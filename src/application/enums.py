@@ -24,23 +24,36 @@ class ApplicationStatus(StrEnum):
     SCORING_IN_PROGRESS = "SCORING_IN_PROGRESS"
     SCORING_FAILED = "SCORING_FAILED"
     ELIGIBILITY_FAILED = "ELIGIBILITY_FAILED"
-    READY_FOR_BANK = "READY_FOR_BANK"
+    FUND_REVIEW = "FUND_REVIEW"
+    FUND_REJECTED = "FUND_REJECTED"
+    COUNCIL_REVIEW = "COUNCIL_REVIEW"
+    COUNCIL_APPROVED = "COUNCIL_APPROVED"
+    COUNCIL_REJECTED = "COUNCIL_REJECTED"
     SENT_TO_BANK = "SENT_TO_BANK"
     BANK_REVIEW = "BANK_REVIEW"
     BANK_APPROVED = "BANK_APPROVED"
     BANK_REJECTED = "BANK_REJECTED"
-    COUNCIL_REVIEW = "COUNCIL_REVIEW"
-    COUNCIL_APPROVED = "COUNCIL_APPROVED"
-    COUNCIL_REJECTED = "COUNCIL_REJECTED"
+    COMPLETED = "COMPLETED"
+
+    # Устаревшие (процесс до 2026-11-05: банк → Фонд → Совет → документ → ресурсы).
+    # Новые заявки их не получают; значения остаются, чтобы читалась история.
+    READY_FOR_BANK = "READY_FOR_BANK"
     DEMAND_DOCUMENT_CREATED = "DEMAND_DOCUMENT_CREATED"
     RESOURCE_ALLOCATION = "RESOURCE_ALLOCATION"
-    COMPLETED = "COMPLETED"
+
+
+LEGACY_STATUSES = {
+    ApplicationStatus.READY_FOR_BANK,
+    ApplicationStatus.DEMAND_DOCUMENT_CREATED,
+    ApplicationStatus.RESOURCE_ALLOCATION,
+}
 
 
 # Конечные статусы: заявка только для просмотра.
 FINAL_STATUSES = {
     ApplicationStatus.SCORING_FAILED,
     ApplicationStatus.ELIGIBILITY_FAILED,
+    ApplicationStatus.FUND_REJECTED,
     ApplicationStatus.BANK_REJECTED,
     ApplicationStatus.COUNCIL_REJECTED,
     ApplicationStatus.COMPLETED,
@@ -49,6 +62,7 @@ FINAL_STATUSES = {
 REJECTED_STATUSES = {
     ApplicationStatus.SCORING_FAILED,
     ApplicationStatus.ELIGIBILITY_FAILED,
+    ApplicationStatus.FUND_REJECTED,
     ApplicationStatus.BANK_REJECTED,
     ApplicationStatus.COUNCIL_REJECTED,
 }

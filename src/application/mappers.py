@@ -201,6 +201,8 @@ class ResourceAllocationDataMapper(DataMapper):
 
 
 def _rejection_reason(model: ApplicationORM) -> str | None:
+    if model.status == ApplicationStatus.FUND_REJECTED:
+        return model.fund_reject_reason
     if model.status == ApplicationStatus.BANK_REJECTED:
         return model.bank_decision_reason
     if model.status == ApplicationStatus.COUNCIL_REJECTED:
@@ -270,6 +272,8 @@ class ApplicationDataMapper(DataMapper):
                 CouncilAssignmentDataMapper.map_to_domain_entity(a)
                 for a in model.council_assignments
             ],
+            fund_decided_at=model.fund_decided_at,
+            fund_reject_reason=model.fund_reject_reason,
             council_decided_at=model.council_decided_at,
             council_reject_reason=model.council_reject_reason,
             demand_document=(

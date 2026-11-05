@@ -63,9 +63,7 @@ async def get_counters(db: DBDep, user: CurrentUserDep):
     summary="Решение члена Совета: «Согласен» / «Отклоняю» (причина обязательна)",
     dependencies=[Depends(require_permission(Module.COUNCIL_REVIEW, Action.APPROVE))],
     responses={
-        200: success_example(
-            {**ITEM, "status": "DEMAND_DOCUMENT_CREATED"}, "Council decision recorded."
-        ),
+        200: success_example({**ITEM, "status": "SENT_TO_BANK"}, "Council decision recorded."),
         **COMMON_ERRORS,
     },
 )

@@ -1,5 +1,5 @@
-"""Рабочее окно Фонда: поиск заявок, скоринг, направление в Совет,
-выделение ресурсов и завершение."""
+"""Рабочее окно Фонда: поиск заявок, скоринг, отказ или направление в Совет,
+запасная отправка в банк утверждённой Советом заявки."""
 
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus
@@ -7,10 +7,8 @@ from src.application.mappers import ApplicationDataMapper
 from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationFilterDTO,
-    CompleteApplicationDTO,
     CouncilAssignmentAddDTO,
-    ResourceAllocationAddDTO,
-    ResourceAllocationCreateDTO,
+    FundRejectDTO,
     ScoringAttemptDTO,
     ScoringResultRecordDTO,
     SendToBankDTO,
@@ -22,7 +20,6 @@ from src.common.responses.exceptions import (
     BankNotFoundException,
     BankSubjectTypeMismatchException,
     NoCouncilMembersException,
-    ResourceAllocationNotAllowedException,
     UserNotFoundException,
 )
 from src.rbac.access import effective_permissions
@@ -51,15 +48,25 @@ class FundService(ApplicationBaseService):
     async def get_counters(self, user: CurrentUserDTO) -> dict[str, int]:
         self.assert_global_scope(user)
         by_status = await self.db.application.count_by_status()
+        s = ApplicationStatus
         return {
-            "new": by_status[ApplicationStatus.SUBMITTED.value]
-            + by_status[ApplicationStatus.SCORING_IN_PROGRESS.value],
-            "to_bank": by_status[ApplicationStatus.READY_FOR_BANK.value],
-            "to_council": by_status[ApplicationStatus.BANK_APPROVED.value],
-            "in_council": by_status[ApplicationStatus.COUNCIL_REVIEW.value],
-            "to_allocate": by_status[ApplicationStatus.DEMAND_DOCUMENT_CREATED.value],
-            "in_allocation": by_status[ApplicationStatus.RESOURCE_ALLOCATION.value],
-            "completed": by_status[ApplicationStatus.COMPLETED.value],
+            "new": by_status[s.SUBMITTED.value] + by_status[s.SCORING_IN_PROGRESS.value],
+            "to_review": by_status[s.FUND_REVIEW.value],
+            "in_council": by_status[s.COUNCIL_REVIEW.value],
+            # утверждены Советом, но банк заявителя неактивен/не подходит — нужен send-to-bank
+            "to_bank": by_status[s.COUNCIL_APPROVED.value],
+            "in_bank": by_status[s.SENT_TO_BANK.value] + by_status[s.BANK_REVIEW.value],
+            "completed": by_status[s.COMPLETED.value],
+            "rejected": sum(
+                by_status[x.value]
+                for x in (
+                    s.SCORING_FAILED,
+                    s.ELIGIBILITY_FAILED,
+                    s.FUND_REJECTED,
+                    s.COUNCIL_REJECTED,
+                    s.BANK_REJECTED,
+                )
+            ),
             "by_status": by_status,
         }
 
@@ -102,8 +109,9 @@ class FundService(ApplicationBaseService):
         user: CurrentUserDTO,
         data: SendToBankDTO,
     ) -> ApplicationDetailDTO:
-        """Фонд выбирает банк для заявки, прошедшей скоринг (READY_FOR_BANK → SENT_TO_BANK).
-        Заявитель банк не выбирает."""
+        """Запасной путь (COUNCIL_APPROVED → SENT_TO_BANK): обычно утверждённая Советом
+        заявка уходит в банк заявителя автоматически; если он неактивен или не подходит
+        по типу субъекта, банк назначает Фонд."""
         application = await self.get_for_user(application_id, user)
 
         bank = await self.db.bank.get_one_or_none(id=data.bank_id)
@@ -120,6 +128,31 @@ class FundService(ApplicationBaseService):
             event="sent_to_bank",
             actor=user,
             comment=data.comment or f"Заявка направлена в банк: {bank.name}",
+        )
+
+        await self.db.commit()
+        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
+
+    # ---------- решение Фонда ----------
+
+    async def reject(
+        self,
+        application_id: int,
+        user: CurrentUserDTO,
+        data: FundRejectDTO,
+    ) -> ApplicationDetailDTO:
+        """FUND_REVIEW → FUND_REJECTED: Фонд отклоняет заявку до Совета, причина обязательна."""
+        application = await self.get_for_user(application_id, user)
+
+        application.fund_decided_by_id = user.id
+        application.fund_decided_at = now()
+        application.fund_reject_reason = data.reason
+        await self.transition(
+            application,
+            ApplicationStatus.FUND_REJECTED,
+            event="fund_rejected",
+            actor=user,
+            comment=data.reason,
         )
 
         await self.db.commit()
@@ -158,6 +191,8 @@ class FundService(ApplicationBaseService):
         if not members:
             raise NoCouncilMembersException()
 
+        application.fund_decided_by_id = user.id
+        application.fund_decided_at = now()
         application.sent_to_council_at = now()
         application.sent_to_council_by_id = user.id
         await self.transition(
@@ -176,59 +211,6 @@ class FundService(ApplicationBaseService):
                     assigned_by_id=user.id,
                 )
             )
-
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
-
-    # ---------- выделение ресурсов ----------
-
-    async def allocate_resources(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: ResourceAllocationCreateDTO,
-    ) -> ApplicationDetailDTO:
-        application = await self.get_for_user(application_id, user)
-
-        # Этап выделения ресурсов начинается только после положительного
-        # решения Совета и создания документа «Требование подтверждено».
-        if application.status != ApplicationStatus.DEMAND_DOCUMENT_CREATED:
-            raise ResourceAllocationNotAllowedException()
-
-        await self.db.resource_allocation.add(
-            ResourceAllocationAddDTO(
-                application_id=application.id,
-                allocated_by_id=user.id,
-                **data.model_dump(),
-            )
-        )
-        await self.transition(
-            application,
-            ApplicationStatus.RESOURCE_ALLOCATION,
-            event="resources_allocated",
-            actor=user,
-            comment=data.details or "Зафиксировано выделение ресурсов",
-        )
-
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
-
-    async def complete(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: CompleteApplicationDTO,
-    ) -> ApplicationDetailDTO:
-        application = await self.get_for_user(application_id, user)
-
-        application.completed_at = now()
-        await self.transition(
-            application,
-            ApplicationStatus.COMPLETED,
-            event="completed",
-            actor=user,
-            comment=data.comment or "Процесс завершён",
-        )
 
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))

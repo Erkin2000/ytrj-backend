@@ -73,17 +73,17 @@
         <span><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>{{ _("Техническая ошибка KATM, ждут повтора") }}</span>
         <span class="badge bg-warning">{{ needs_attention.scoring_retry }}</span>
       </a>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=FUND_REVIEW">
+        <span><i class="fa-solid fa-gavel text-cyan me-2"></i>{{ _("Ждут решения Фонда") }}</span>
+        <span class="badge bg-cyan">{{ needs_attention.fund_review }}</span>
+      </a>
       <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=SENT_TO_BANK">
         <span><i class="fa-solid fa-paper-plane text-indigo me-2"></i>{{ _("Новые для банков") }}</span>
         <span class="badge bg-indigo">{{ needs_attention.new_for_bank }}</span>
       </a>
-      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=BANK_APPROVED">
-        <span><i class="fa-solid fa-gavel text-teal me-2"></i>{{ _("Одобрены банком — направить в Совет") }}</span>
-        <span class="badge bg-teal">{{ needs_attention.to_council }}</span>
-      </a>
-      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=DEMAND_DOCUMENT_CREATED">
-        <span><i class="fa-solid fa-coins text-green me-2"></i>{{ _("Ожидают выделения ресурсов") }}</span>
-        <span class="badge bg-green">{{ needs_attention.to_allocate }}</span>
+      <a class="list-group-item d-flex justify-content-between" href="{{ apps_url }}?status=COUNCIL_APPROVED">
+        <span><i class="fa-solid fa-building-columns text-lime me-2"></i>{{ _("Утверждены Советом — назначить банк") }}</span>
+        <span class="badge bg-lime">{{ needs_attention.to_bank }}</span>
       </a>
     </div>
   </div>

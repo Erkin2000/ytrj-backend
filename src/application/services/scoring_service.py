@@ -16,7 +16,7 @@ from src.application.schemas.application_schema import (
     ScoringAttemptDTO,
     ScoringResultRecordDTO,
 )
-from src.application.services.base import ApplicationBaseService, now
+from src.application.services.base import ApplicationBaseService
 from src.common.responses.exceptions import ScoringNotPendingException
 from src.config import settings
 
@@ -207,28 +207,11 @@ class ScoringService(ApplicationBaseService):
             )
             return
 
+        # Прошедшая скоринг заявка поступает в рабочее окно Фонда.
         await self.transition(
             application,
-            ApplicationStatus.READY_FOR_BANK,
+            ApplicationStatus.FUND_REVIEW,
             event="scoring_passed",
             actor=actor,
-            comment="Скоринг KATM и требования Фонда пройдены",
+            comment="Скоринг KATM и требования Фонда пройдены. Заявка передана в Фонд",
         )
-
-        # Заявка автоматически уходит в банк, выбранный заявителем. Если банк
-        # к этому моменту деактивирован или не подходит по типу субъекта, заявка
-        # остаётся в READY_FOR_BANK, и банк назначает Фонд (send-to-bank).
-        bank = application.bank
-        if (
-            bank is not None
-            and bank.is_active
-            and application.subject_type in bank.allowed_subject_types
-        ):
-            application.sent_to_bank_at = now()
-            await self.transition(
-                application,
-                ApplicationStatus.SENT_TO_BANK,
-                event="sent_to_bank",
-                actor=None,
-                comment=f"Заявка направлена в банк: {bank.name}",
-            )

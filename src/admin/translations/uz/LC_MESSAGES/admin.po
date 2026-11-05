@@ -923,3 +923,39 @@ msgstr "Shaxsiy huquqlar"
 
 msgid "Админ направления должен иметь роль направления"
 msgstr "Yoʻnalish administratori yoʻnalish roliga ega boʻlishi kerak"
+
+msgid "Рассмотрение Фондом"
+msgstr "Jamgʻarma koʻrib chiqmoqda"
+
+msgid "Фонд отказал"
+msgstr "Jamgʻarma rad etdi"
+
+msgid "Готова к отправке в банк (устар.)"
+msgstr "Bankka yuborishga tayyor (eskirgan)"
+
+msgid "Требование подтверждено (устар.)"
+msgstr "Talab tasdiqlandi (eskirgan)"
+
+msgid "Выделение ресурсов (устар.)"
+msgstr "Mablagʻ ajratish (eskirgan)"
+
+msgid "Фонд"
+msgstr "Jamgʻarma"
+
+msgid "Совет"
+msgstr "Kengash"
+
+msgid "Перенос в новый порядок обработки"
+msgstr "Yangi koʻrib chiqish tartibiga oʻtkazish"
+
+msgid "Ждут решения Фонда"
+msgstr "Jamgʻarma qarorini kutmoqda"
+
+msgid "Утверждены Советом — назначить банк"
+msgstr "Kengash tasdiqladi — bank tayinlash kerak"
+
+msgid "Решение Фонда (дата)"
+msgstr "Jamgʻarma qarori (sana)"
+
+msgid "Причина Фонда"
+msgstr "Jamgʻarma sababi"

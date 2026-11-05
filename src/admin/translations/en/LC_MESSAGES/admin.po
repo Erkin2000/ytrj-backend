@@ -728,3 +728,39 @@ msgstr "Personal permissions"
 
 msgid "Админ направления должен иметь роль направления"
 msgstr "A direction admin must have a direction role"
+
+msgid "Рассмотрение Фондом"
+msgstr "Fund review"
+
+msgid "Фонд отказал"
+msgstr "Rejected by the Fund"
+
+msgid "Готова к отправке в банк (устар.)"
+msgstr "Ready for bank (legacy)"
+
+msgid "Требование подтверждено (устар.)"
+msgstr "Demand confirmed (legacy)"
+
+msgid "Выделение ресурсов (устар.)"
+msgstr "Resource allocation (legacy)"
+
+msgid "Фонд"
+msgstr "Fund"
+
+msgid "Совет"
+msgstr "Council"
+
+msgid "Перенос в новый порядок обработки"
+msgstr "Moved to the new processing order"
+
+msgid "Ждут решения Фонда"
+msgstr "Awaiting Fund decision"
+
+msgid "Утверждены Советом — назначить банк"
+msgstr "Approved by Council — assign a bank"
+
+msgid "Решение Фонда (дата)"
+msgstr "Fund decision (date)"
+
+msgid "Причина Фонда"
+msgstr "Fund reason"

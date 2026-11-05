@@ -272,16 +272,6 @@ UZ: dict[str, str] = {
         "Subyekt turi MChJdan YaTT yoki oʻzini oʻzi band qilganga oʻzgarganda korxona "
         "rekvizitlari va taʼsischilar roʻyxati tozalanadi."
     ),
-    "Направить заявку в банк (READY_FOR_BANK → SENT_TO_BANK)": (
-        "Arizani bankka yoʻnaltirish (READY_FOR_BANK → SENT_TO_BANK)"
-    ),
-    "Запасной путь: обычно заявка уходит в банк, выбранный заявителем, автоматически. "
-    "Если после скоринга она осталась в READY_FOR_BANK (банк деактивирован или не подходит "
-    "по типу субъекта), Фонд назначает банк из каталога.": (
-        "Zaxira yoʻl: odatda ariza ariza beruvchi tanlagan bankka avtomatik yuboriladi. "
-        "Agar skoringdan soʻng u READY_FOR_BANK holatida qolsa (bank faolsizlantirilgan yoki "
-        "subyekt turiga mos emas), Jamgʻarma katalogdan bank tayinlaydi."
-    ),
     "Выбор банка для заявки": "Ariza uchun bank tanlash",
     "Банк берётся из каталога `GET /banks?subject_type=...`: он должен быть активен и "
     "работать с типом субъекта заявки. После успешного скоринга заявка автоматически "
@@ -292,9 +282,6 @@ UZ: dict[str, str] = {
     ),
     "Выбор банка заявителем (отдельный шаг черновика).": (
         "Ariza beruvchi tomonidan bank tanlash (qoralamaning alohida qadami)."
-    ),
-    "Фонд направляет заявку в банк после успешного скоринга.": (
-        "Jamgʻarma skoring muvaffaqiyatli oʻtgach arizani bankka yoʻnaltiradi."
     ),
     "Добавить учредителя (только для ООО)": "Taʼsischi qoʻshish (faqat MChJ uchun)",
     "Изменить данные учредителя": "Taʼsischi maʼlumotlarini oʻzgartirish",
@@ -407,15 +394,6 @@ UZ: dict[str, str] = {
     "Внести результат скоринга вручную (режим manual)": (
         "Skoring natijasini qoʻlda kiritish (manual rejimi)"
     ),
-    "Направить заявку в Совет (BANK_APPROVED → COUNCIL_REVIEW)": (
-        "Arizani Kengashga yoʻnaltirish (BANK_APPROVED → COUNCIL_REVIEW)"
-    ),
-    "Зафиксировать выделение ресурсов (после документа «Требование подтверждено»)": (
-        "Mablagʻ ajratilganini qayd etish («Talab tasdiqlangan» hujjatidan keyin)"
-    ),
-    "Завершить заявку (RESOURCE_ALLOCATION → COMPLETED)": (
-        "Arizani yakunlash (RESOURCE_ALLOCATION → COMPLETED)"
-    ),
     "Результат проверки требований Фонда. Нужен только при result=PASSED.": (
         "Jamgʻarma talablari tekshiruvi natijasi. Faqat result=PASSED boʻlganda kerak."
     ),
@@ -451,6 +429,13 @@ UZ: dict[str, str] = {
     "Обязательна при «Отклоняю».": "«Rad etaman» da majburiy.",
     "Сайт, с которого начат вход: `yoshlarfondi` — основной (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — админка (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Сайт подписывается в `state`: `POST /auth/sso/callback` меняет `code` тем же клиентом портала, а `/redirect/from-backend` возвращает браузер на фронт этого сайта.": "Kirish boshlangan sayt: `yoshlarfondi` — asosiy sayt (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — admin panel (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Sayt `state` ichida imzolanadi: `POST /auth/sso/callback` `code`ni portalning oʻsha mijozi orqali almashtiradi, `/redirect/from-backend` esa brauzerni shu saytning frontendiga qaytaradi.",
     "Фронт, на который вернуть браузер: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Без параметра сайт берётся из подписанного `state` (тот, что передан в `GET /auth/sso/authorize?site=`). Сам `site` на фронт не пересылается.": "Brauzer qaytariladigan frontend: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Parametr berilmasa, sayt imzolangan `state`dan olinadi (`GET /auth/sso/authorize?site=` da berilgan sayt). `site`ning oʻzi frontendga uzatilmaydi.",
+    "Направить утверждённую Советом заявку в банк (COUNCIL_APPROVED → SENT_TO_BANK)": "Kengash tasdiqlagan arizani bankka yoʻnaltirish (COUNCIL_APPROVED → SENT_TO_BANK)",
+    "Запасной путь: после утверждения Советом заявка уходит в банк, выбранный заявителем, автоматически. Если она осталась в COUNCIL_APPROVED (банк деактивирован или не подходит по типу субъекта), Фонд назначает банк из каталога.": "Zaxira yoʻl: Kengash tasdiqlagandan soʻng ariza ariza beruvchi tanlagan bankka avtomatik yuboriladi. Agar u COUNCIL_APPROVED holatida qolsa (bank faolsizlantirilgan yoki subyekt turiga mos kelmasa), Jamgʻarma katalogdan bank tayinlaydi.",
+    "Направить заявку в Совет (FUND_REVIEW → COUNCIL_REVIEW)": "Arizani Kengashga yoʻnaltirish (FUND_REVIEW → COUNCIL_REVIEW)",
+    "Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)": "Arizani Kengashgacha rad etish (FUND_REVIEW → FUND_REJECTED)",
+    "Причина обязательна и показывается заявителю.": "Sabab majburiy va ariza beruvchiga koʻrsatiladi.",
+    "Причина отказа Фонда (видна заявителю).": "Jamgʻarmaning rad etish sababi (ariza beruvchiga koʻrinadi).",
+    "Запасной путь: Фонд направляет утверждённую Советом заявку в банк, если\nвыбранный заявителем банк неактивен или не подходит по типу субъекта.": "Zaxira yoʻl: ariza beruvchi tanlagan bank faol boʻlmasa yoki subyekt turiga mos kelmasa, Jamgʻarma Kengash tasdiqlagan arizani bankka yoʻnaltiradi.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

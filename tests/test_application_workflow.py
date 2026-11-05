@@ -93,6 +93,12 @@ def status(api, app_id, headers):
     return data(api.client.get(f"/api/v1/applications/{app_id}", headers=headers))["status"]
 
 
+def history_statuses(api, app_id, headers):
+    items = data(api.client.get(f"/api/v1/applications/{app_id}/history", headers=headers))
+    items = items if isinstance(items, list) else items.get("items", [])
+    return [item.get("to_status") or item.get("status") for item in items]
+
+
 def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_application):
     c, app_id = api.client, submitted_application
 
@@ -104,11 +110,34 @@ def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_ap
         permissions=["council_review.read", "applications.read"],
     )
 
-    assert status(api, app_id, applicant) == "SENT_TO_BANK"
-
+    assert status(api, app_id, applicant) == "FUND_REVIEW"
     assert c.get("/api/v1/fund/applications", headers=applicant).status_code == 403
-    bank_items = data(c.get("/api/v1/bank/applications?per_page=100", headers=bank_h))["items"]
-    assert any(item["id"] == app_id for item in bank_items)
+
+    def bank_sees():
+        items = data(c.get("/api/v1/bank/applications?per_page=100", headers=bank_h))["items"]
+        return any(item["id"] == app_id for item in items)
+
+    assert not bank_sees()
+    assert c.get(f"/api/v1/applications/{app_id}", headers=bank_h).status_code in (403, 404)
+
+    send = f"/api/v1/fund/applications/{app_id}/send-to-council"
+    assert (
+        c.post(send, headers=fund, json={"council_member_ids": [mute_me["id"]]}).status_code == 404
+    )
+    r = c.post(send, headers=fund, json={"council_member_ids": [council_me["id"]]})
+    assert r.status_code == 200, r.text
+    assert status(api, app_id, fund) == "COUNCIL_REVIEW"
+    assert c.get(f"/api/v1/applications/{app_id}", headers=mute_h).status_code in (403, 404)
+    assert not bank_sees()
+
+    r = c.post(
+        f"/api/v1/council/applications/{app_id}/decision",
+        headers=council_h,
+        json={"decision": "APPROVED"},
+    )
+    assert r.status_code == 200, r.text
+    assert status(api, app_id, applicant) == "SENT_TO_BANK"
+    assert bank_sees()
 
     assert c.post(f"/api/v1/bank/applications/{app_id}/accept", headers=bank_h).status_code == 200
     r = c.post(
@@ -117,32 +146,33 @@ def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_ap
         json={"decision": "APPROVED"},
     )
     assert r.status_code == 200, r.text
-    assert status(api, app_id, fund) == "BANK_APPROVED"
-
-    send = f"/api/v1/fund/applications/{app_id}/send-to-council"
-    assert (
-        c.post(send, headers=fund, json={"council_member_ids": [mute_me["id"]]}).status_code == 404
-    )
-    r = c.post(send, headers=fund, json={"council_member_ids": [council_me["id"]]})
-    assert r.status_code == 200, r.text
-    assert c.get(f"/api/v1/applications/{app_id}", headers=mute_h).status_code in (403, 404)
-
-    r = c.post(
-        f"/api/v1/council/applications/{app_id}/decision",
-        headers=council_h,
-        json={"decision": "APPROVED"},
-    )
-    assert r.status_code == 200, r.text
-
-    r = c.post(
-        f"/api/v1/fund/applications/{app_id}/allocate",
-        headers=fund,
-        json={"amount": 50_000_000, "reference_number": "TEST-1"},
-    )
-    assert r.status_code == 200, r.text
-    r = c.post(f"/api/v1/fund/applications/{app_id}/complete", headers=fund, json={})
-    assert r.status_code == 200, r.text
     assert status(api, app_id, applicant) == "COMPLETED"
+
+    history = history_statuses(api, app_id, applicant)
+    assert history[history.index("SCORING_IN_PROGRESS") :] == [
+        "SCORING_IN_PROGRESS",
+        "FUND_REVIEW",
+        "COUNCIL_REVIEW",
+        "COUNCIL_REVIEW",
+        "COUNCIL_APPROVED",
+        "SENT_TO_BANK",
+        "BANK_REVIEW",
+        "BANK_APPROVED",
+        "COMPLETED",
+    ], history
+
+    progress = data(c.get(f"/api/v1/applications/{app_id}/progress", headers=applicant))
+    steps = progress if isinstance(progress, list) else progress.get("steps", progress)
+    assert [s["key"] for s in steps] == [
+        "submitted",
+        "scoring",
+        "fund_review",
+        "council_review",
+        "sent_to_bank",
+        "bank_review",
+        "completed",
+    ]
+    assert all(s["state"] == "done" for s in steps)
 
     for path, headers in [
         ("/api/v1/fund/applications/counters", fund),
@@ -151,3 +181,56 @@ def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_ap
         ("/api/v1/applications", applicant),
     ]:
         assert c.get(path, headers=headers).status_code == 200, path
+
+
+def test_fund_rejects_before_council(api, role_ids, applicant, submitted_application):
+    c, app_id = api.client, submitted_application
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+
+    reject = f"/api/v1/fund/applications/{app_id}/reject"
+    assert c.post(reject, headers=fund, json={}).status_code == 422
+
+    r = c.post(reject, headers=fund, json={"reason": "Не подходит под программу"})
+    assert r.status_code == 200, r.text
+    assert status(api, app_id, applicant) == "FUND_REJECTED"
+
+    detail = data(c.get(f"/api/v1/applications/{app_id}", headers=applicant))
+    assert detail["rejection_reason"] == "Не подходит под программу"
+
+    r = c.post(f"/api/v1/fund/applications/{app_id}/send-to-council", headers=fund, json={})
+    assert r.status_code == 400
+
+
+def test_bank_rejects_after_council(api, role_ids, bank, applicant, submitted_application):
+    c, app_id = api.client, submitted_application
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    bank_h, _ = api.staff(role_id=role_ids["BANK_EMPLOYEE"], bank_id=bank["id"])
+    council_h, council_me = api.staff(role_id=role_ids["COUNCIL_MEMBER"])
+
+    c.post(
+        f"/api/v1/fund/applications/{app_id}/send-to-council",
+        headers=fund,
+        json={"council_member_ids": [council_me["id"]]},
+    )
+    c.post(
+        f"/api/v1/council/applications/{app_id}/decision",
+        headers=council_h,
+        json={"decision": "APPROVED"},
+    )
+    c.post(f"/api/v1/bank/applications/{app_id}/accept", headers=bank_h)
+    r = c.post(
+        f"/api/v1/bank/applications/{app_id}/decision",
+        headers=bank_h,
+        json={"decision": "REJECTED", "reason": "Недостаточно залога"},
+    )
+    assert r.status_code == 200, r.text
+    assert status(api, app_id, applicant) == "BANK_REJECTED"
+
+
+def test_removed_allocation_endpoints(api, role_ids, submitted_application):
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    for action in ("allocate", "complete"):
+        r = api.client.post(
+            f"/api/v1/fund/applications/{submitted_application}/{action}", headers=fund, json={}
+        )
+        assert r.status_code in (404, 405), action
