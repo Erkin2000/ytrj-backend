@@ -1,5 +1,5 @@
-"""Рабочее окно Фонда: поиск заявок, скоринг, отказ или направление в Совет,
-запасная отправка в банк утверждённой Советом заявки."""
+"""Рабочее окно Фонда: поиск заявок, скоринг, отказ или направление в Совет.
+В банк заявка уходит автоматически после утверждения Советом."""
 
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus
@@ -10,15 +10,11 @@ from src.application.schemas.application_schema import (
     CouncilAssignmentAddDTO,
     FundRejectDTO,
     ScoringAttemptDTO,
-    ScoringResultRecordDTO,
-    SendToBankDTO,
     SendToCouncilDTO,
 )
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.scoring_service import ScoringService
 from src.common.responses.exceptions import (
-    BankNotFoundException,
-    BankSubjectTypeMismatchException,
     NoCouncilMembersException,
     UserNotFoundException,
 )
@@ -53,8 +49,6 @@ class FundService(ApplicationBaseService):
             "new": by_status[s.SUBMITTED.value] + by_status[s.SCORING_IN_PROGRESS.value],
             "to_review": by_status[s.FUND_REVIEW.value],
             "in_council": by_status[s.COUNCIL_REVIEW.value],
-            # утверждены Советом, но банк заявителя неактивен/не подходит — нужен send-to-bank
-            "to_bank": by_status[s.COUNCIL_APPROVED.value],
             "in_bank": by_status[s.SENT_TO_BANK.value] + by_status[s.BANK_REVIEW.value],
             "completed": by_status[s.COMPLETED.value],
             "rejected": sum(
@@ -87,49 +81,6 @@ class FundService(ApplicationBaseService):
     ) -> ApplicationDetailDTO:
         application = await self.get_for_user(application_id, user)
         await self.scoring_service.retry(application, actor=user)
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
-
-    async def record_scoring_result(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: ScoringResultRecordDTO,
-    ) -> ApplicationDetailDTO:
-        application = await self.get_for_user(application_id, user)
-        await self.scoring_service.record_manual_result(application, data, actor=user)
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
-
-    # ---------- банк ----------
-
-    async def send_to_bank(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: SendToBankDTO,
-    ) -> ApplicationDetailDTO:
-        """Запасной путь (COUNCIL_APPROVED → SENT_TO_BANK): обычно утверждённая Советом
-        заявка уходит в банк заявителя автоматически; если он неактивен или не подходит
-        по типу субъекта, банк назначает Фонд."""
-        application = await self.get_for_user(application_id, user)
-
-        bank = await self.db.bank.get_one_or_none(id=data.bank_id)
-        if bank is None or not bank.is_active:
-            raise BankNotFoundException()
-        if application.subject_type not in bank.allowed_subject_types:
-            raise BankSubjectTypeMismatchException()
-
-        application.bank_id = bank.id
-        application.sent_to_bank_at = now()
-        await self.transition(
-            application,
-            ApplicationStatus.SENT_TO_BANK,
-            event="sent_to_bank",
-            actor=user,
-            comment=data.comment or f"Заявка направлена в банк: {bank.name}",
-        )
-
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
 

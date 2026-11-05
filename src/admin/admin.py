@@ -204,7 +204,6 @@ class JamgarmaAdmin(Admin):
         needs_attention = {
             "scoring_retry": scoring_retry,
             "fund_review": counts["FUND_REVIEW"],
-            "to_bank": counts["COUNCIL_APPROVED"],
             "new_for_bank": counts["SENT_TO_BANK"],
         }
 

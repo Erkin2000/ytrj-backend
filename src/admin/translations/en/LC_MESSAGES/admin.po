@@ -408,8 +408,8 @@ msgstr "Details"
 msgid "Ошибка"
 msgstr "Error"
 
-msgid "Внёс вручную"
-msgstr "Entered manually by"
+msgid "Запустил повтор"
+msgstr "Retried by"
 
 msgid "Член Совета"
 msgstr "Council member"
@@ -755,9 +755,6 @@ msgstr "Moved to the new processing order"
 
 msgid "Ждут решения Фонда"
 msgstr "Awaiting Fund decision"
-
-msgid "Утверждены Советом — назначить банк"
-msgstr "Approved by Council — assign a bank"
 
 msgid "Решение Фонда (дата)"
 msgstr "Fund decision (date)"

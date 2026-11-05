@@ -715,8 +715,8 @@ class ScoringAttemptAdmin(LocalizedLabelsMixin, ModelView, model=ScoringAttemptO
         ScoringAttemptORM.eligibility_passed: "Требования Фонда",
         ScoringAttemptORM.details: "Детали",
         ScoringAttemptORM.error_message: "Ошибка",
-        ScoringAttemptORM.recorded_by: "Внёс вручную",
-        ScoringAttemptORM.recorded_by_id: "Внёс вручную",
+        ScoringAttemptORM.recorded_by: "Запустил повтор",
+        ScoringAttemptORM.recorded_by_id: "Запустил повтор",
         ScoringAttemptORM.created_at: "Когда",
     }
     column_formatters = {

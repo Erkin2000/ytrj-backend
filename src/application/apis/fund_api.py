@@ -1,4 +1,4 @@
-"""Рабочее окно Фонда (и Super Admin): все заявки, скоринг, Совет, финансирование."""
+"""Рабочее окно Фонда (и Super Admin): все заявки, скоринг, отказ или направление в Совет."""
 
 from typing import Annotated
 
@@ -7,8 +7,6 @@ from fastapi import APIRouter, Depends
 from src.application.schemas.application_schema import (
     ApplicationFilterDTO,
     FundRejectDTO,
-    ScoringResultRecordDTO,
-    SendToBankDTO,
     SendToCouncilDTO,
 )
 from src.application.services.fund_service import FundService
@@ -58,7 +56,6 @@ async def get_applications(
                 "new": 3,
                 "to_review": 2,
                 "in_council": 1,
-                "to_bank": 0,
                 "in_bank": 4,
                 "completed": 10,
                 "rejected": 5,
@@ -124,39 +121,7 @@ async def retry_scoring(application_id: int, db: DBDep, user: CurrentUserDep):
     return ResponseBuilder.success(data=data, message="Scoring restarted.")
 
 
-@router.post(
-    "/{application_id}/scoring/result",
-    summary="Внести результат скоринга вручную (режим manual)",
-    dependencies=[Depends(require_permission(Module.SCORING, Action.APPROVE))],
-    responses={200: success_example(ITEM, "Scoring result recorded."), **COMMON_ERRORS},
-)
-async def record_scoring_result(
-    application_id: int, data: ScoringResultRecordDTO, db: DBDep, user: CurrentUserDep
-):
-    result = await FundService(db).record_scoring_result(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Scoring result recorded.")
-
-
-# ---------- Совет ----------
-
-
-@router.post(
-    "/{application_id}/send-to-bank",
-    summary="Направить утверждённую Советом заявку в банк (COUNCIL_APPROVED → SENT_TO_BANK)",
-    description=(
-        "Запасной путь: после утверждения Советом заявка уходит в банк, выбранный заявителем, "
-        "автоматически. Если она осталась в COUNCIL_APPROVED (банк деактивирован или не "
-        "подходит по типу субъекта), Фонд назначает банк из каталога."
-    ),
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
-    responses={
-        200: success_example({**ITEM, "status": "SENT_TO_BANK"}, "Application sent to bank."),
-        **COMMON_ERRORS,
-    },
-)
-async def send_to_bank(application_id: int, data: SendToBankDTO, db: DBDep, user: CurrentUserDep):
-    result = await FundService(db).send_to_bank(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Application sent to bank.")
+# ---------- Решение Фонда: Совет или отказ ----------
 
 
 @router.post(

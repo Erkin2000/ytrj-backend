@@ -600,8 +600,8 @@ msgstr "Tafsilotlar"
 msgid "Ошибка"
 msgstr "Xato"
 
-msgid "Внёс вручную"
-msgstr "Qoʻlda kiritdi"
+msgid "Запустил повтор"
+msgstr "Qayta ishga tushirdi"
 
 msgid "Член Совета"
 msgstr "Kengash aʼzosi"
@@ -950,9 +950,6 @@ msgstr "Yangi koʻrib chiqish tartibiga oʻtkazish"
 
 msgid "Ждут решения Фонда"
 msgstr "Jamgʻarma qarorini kutmoqda"
-
-msgid "Утверждены Советом — назначить банк"
-msgstr "Kengash tasdiqladi — bank tayinlash kerak"
 
 msgid "Решение Фонда (дата)"
 msgstr "Jamgʻarma qarori (sana)"

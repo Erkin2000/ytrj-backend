@@ -23,7 +23,7 @@ FastAPI asosidagi modulli monolit. Joriy modullar:
 - **auth** — YIA Portal (SSO) va parol orqali kirish, rotatsiyali JWT access/refresh, sessiyalar;
 - **rbac** — modullar boʻyicha rollar va ruxsatlar (Create / Read / Update / Delete / Approve), server tomonida tekshiruv;
 - **account** — foydalanuvchilar, holatlar, scope (bank), oxirgi kirish va sessiyalar;
-- **application** — arizalar: qoralama → KATM skoringi → bank → Kengash → talab hujjati → mablagʻ ajratish.
+- **application** — arizalar: qoralama → KATM skoringi → Jamgʻarma → Kengash → bank → yakunlash.
 
 Barcha javoblar yagona formatda: `{"success": bool, "message": str, "data": ...}`.
 Avtorizatsiya: `Authorization: Bearer <access_token>` sarlavhasi.
@@ -57,11 +57,11 @@ UZ: dict[str, str] = {
     "Создание, заполнение, отправка и отслеживание заявки.": (
         "Arizani yaratish, toʻldirish, yuborish va kuzatish."
     ),
-    "Поиск, скоринг, направление в Совет, финансирование.": (
-        "Qidiruv, skoring, Kengashga yoʻnaltirish, moliyalashtirish."
+    "Поиск, скоринг, отказ или направление в Совет.": (
+        "Qidiruv, skoring, rad etish yoki Kengashga yoʻnaltirish."
     ),
-    "Приём и результат по заявкам своего банка.": (
-        "Oʻz banki arizalarini qabul qilish va natija kiritish."
+    "Приём и результат по утверждённым Советом заявкам своего банка.": (
+        "Kengash tasdiqlagan oʻz banki arizalarini qabul qilish va natija kiritish."
     ),
     "Решение по направленным заявкам.": "Yoʻnaltirilgan arizalar boʻyicha qaror.",
     # ---------- общие ----------
@@ -391,16 +391,6 @@ UZ: dict[str, str] = {
     "Повторная обработка после технической ошибки KATM": (
         "KATM texnik xatosidan keyin qayta ishlash"
     ),
-    "Внести результат скоринга вручную (режим manual)": (
-        "Skoring natijasini qoʻlda kiritish (manual rejimi)"
-    ),
-    "Результат проверки требований Фонда. Нужен только при result=PASSED.": (
-        "Jamgʻarma talablari tekshiruvi natijasi. Faqat result=PASSED boʻlganda kerak."
-    ),
-    "Просроченная задолженность > 90 дней": "Muddati oʻtgan qarzdorlik > 90 kun",
-    "Ручное внесение результата KATM (режим manual или после техошибки).": (
-        "KATM natijasini qoʻlda kiritish (manual rejimi yoki texnik xatodan keyin)."
-    ),
     "Кому направить. Пусто — всем активным членам Совета.": (
         "Kimga yoʻnaltirish. Boʻsh — barcha faol Kengash aʼzolariga."
     ),
@@ -429,13 +419,10 @@ UZ: dict[str, str] = {
     "Обязательна при «Отклоняю».": "«Rad etaman» da majburiy.",
     "Сайт, с которого начат вход: `yoshlarfondi` — основной (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — админка (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Сайт подписывается в `state`: `POST /auth/sso/callback` меняет `code` тем же клиентом портала, а `/redirect/from-backend` возвращает браузер на фронт этого сайта.": "Kirish boshlangan sayt: `yoshlarfondi` — asosiy sayt (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — admin panel (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Sayt `state` ichida imzolanadi: `POST /auth/sso/callback` `code`ni portalning oʻsha mijozi orqali almashtiradi, `/redirect/from-backend` esa brauzerni shu saytning frontendiga qaytaradi.",
     "Фронт, на который вернуть браузер: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Без параметра сайт берётся из подписанного `state` (тот, что передан в `GET /auth/sso/authorize?site=`). Сам `site` на фронт не пересылается.": "Brauzer qaytariladigan frontend: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Parametr berilmasa, sayt imzolangan `state`dan olinadi (`GET /auth/sso/authorize?site=` da berilgan sayt). `site`ning oʻzi frontendga uzatilmaydi.",
-    "Направить утверждённую Советом заявку в банк (COUNCIL_APPROVED → SENT_TO_BANK)": "Kengash tasdiqlagan arizani bankka yoʻnaltirish (COUNCIL_APPROVED → SENT_TO_BANK)",
-    "Запасной путь: после утверждения Советом заявка уходит в банк, выбранный заявителем, автоматически. Если она осталась в COUNCIL_APPROVED (банк деактивирован или не подходит по типу субъекта), Фонд назначает банк из каталога.": "Zaxira yoʻl: Kengash tasdiqlagandan soʻng ariza ariza beruvchi tanlagan bankka avtomatik yuboriladi. Agar u COUNCIL_APPROVED holatida qolsa (bank faolsizlantirilgan yoki subyekt turiga mos kelmasa), Jamgʻarma katalogdan bank tayinlaydi.",
     "Направить заявку в Совет (FUND_REVIEW → COUNCIL_REVIEW)": "Arizani Kengashga yoʻnaltirish (FUND_REVIEW → COUNCIL_REVIEW)",
     "Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)": "Arizani Kengashgacha rad etish (FUND_REVIEW → FUND_REJECTED)",
     "Причина обязательна и показывается заявителю.": "Sabab majburiy va ariza beruvchiga koʻrsatiladi.",
     "Причина отказа Фонда (видна заявителю).": "Jamgʻarmaning rad etish sababi (ariza beruvchiga koʻrinadi).",
-    "Запасной путь: Фонд направляет утверждённую Советом заявку в банк, если\nвыбранный заявителем банк неактивен или не подходит по типу субъекта.": "Zaxira yoʻl: ariza beruvchi tanlagan bank faol boʻlmasa yoki subyekt turiga mos kelmasa, Jamgʻarma Kengash tasdiqlagan arizani bankka yoʻnaltiradi.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

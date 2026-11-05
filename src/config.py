@@ -90,9 +90,8 @@ class Settings(BaseSettings):
     # Режим скоринга KATM, пока нет реальной интеграции:
     #   auto_pass       — каждая отправленная заявка проходит скоринг;
     #   auto_fail       — каждая заявка не проходит;
-    #   technical_error — имитация сбоя KATM (заявка ждёт повтора);
-    #   manual          — результат вносит сотрудник Фонда / Super Admin вручную.
-    SCORING_MODE: Literal["auto_pass", "auto_fail", "technical_error", "manual"] = "auto_pass"
+    #   technical_error — имитация сбоя KATM (заявка ждёт повтора).
+    SCORING_MODE: Literal["auto_pass", "auto_fail", "technical_error"] = "auto_pass"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

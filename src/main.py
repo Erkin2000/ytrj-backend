@@ -33,7 +33,7 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 - **auth** — вход через YIA Portal (SSO) и по паролю, JWT access/refresh с ротацией, сессии;
 - **rbac** — роли и права по модулям (Create / Read / Update / Delete / Approve), серверная проверка;
 - **account** — пользователи, статусы, scope (банк), последний вход и сессии;
-- **application** — заявки: черновик → скоринг KATM → банк → Совет → документ-требование → выделение ресурсов.
+- **application** — заявки: черновик → скоринг KATM → Фонд → Совет → банк → завершение.
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
@@ -59,13 +59,13 @@ TAGS_METADATA = [
     },
     {
         "name": "Заявки: рабочее окно Фонда",
-        "description": "Поиск, скоринг, направление в Совет, финансирование.",
-    },
-    {
-        "name": "Заявки: рабочее окно банка",
-        "description": "Приём и результат по заявкам своего банка.",
+        "description": "Поиск, скоринг, отказ или направление в Совет.",
     },
     {"name": "Заявки: рабочее окно Совета", "description": "Решение по направленным заявкам."},
+    {
+        "name": "Заявки: рабочее окно банка",
+        "description": "Приём и результат по утверждённым Советом заявкам своего банка.",
+    },
 ]
 
 app = FastAPI(
@@ -162,8 +162,8 @@ app.include_router(permission_api.router, prefix=API_PREFIX)
 app.include_router(bank_api.router, prefix=API_PREFIX)
 app.include_router(application_api.router, prefix=API_PREFIX)
 app.include_router(fund_api.router, prefix=API_PREFIX)
-app.include_router(bank_stage_api.router, prefix=API_PREFIX)
 app.include_router(council_api.router, prefix=API_PREFIX)
+app.include_router(bank_stage_api.router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)
 app.include_router(sso_web_api.router)

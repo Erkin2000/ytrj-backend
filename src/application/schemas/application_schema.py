@@ -295,21 +295,6 @@ class ApplicationFilterDTO(BaseModel):
     scoring_retry_required: bool | None = None
 
 
-class ScoringResultRecordDTO(BaseModel):
-    """Ручное внесение результата KATM (режим manual или после техошибки)."""
-
-    result: ScoringResult
-    eligibility_passed: bool | None = Field(
-        default=None,
-        description="Результат проверки требований Фонда. Нужен только при result=PASSED.",
-    )
-    details: dict[str, Any] | None = Field(
-        default=None,
-        examples=[{"check": "credit_history", "reason": "Просроченная задолженность > 90 дней"}],
-    )
-    error_message: str | None = None
-
-
 class BankDecisionDTO(BaseModel):
     decision: BankDecision
     reason: ReasonStr | None = Field(default=None, description="Обязательна при отказе.")
@@ -319,14 +304,6 @@ class ApplicationBankDTO(BaseModel):
     """Выбор банка заявителем (отдельный шаг черновика)."""
 
     bank_id: int = Field(examples=[1])
-
-
-class SendToBankDTO(BaseModel):
-    """Запасной путь: Фонд направляет утверждённую Советом заявку в банк, если
-    выбранный заявителем банк неактивен или не подходит по типу субъекта."""
-
-    bank_id: int = Field(examples=[1])
-    comment: str | None = None
 
 
 class FundRejectDTO(BaseModel):

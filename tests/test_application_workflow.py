@@ -229,7 +229,7 @@ def test_bank_rejects_after_council(api, role_ids, bank, applicant, submitted_ap
 
 def test_removed_allocation_endpoints(api, role_ids, submitted_application):
     fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
-    for action in ("allocate", "complete"):
+    for action in ("allocate", "complete", "scoring/result", "send-to-bank"):
         r = api.client.post(
             f"/api/v1/fund/applications/{submitted_application}/{action}", headers=fund, json={}
         )

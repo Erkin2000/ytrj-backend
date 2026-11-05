@@ -2,7 +2,7 @@
 
 Реальный адаптер KATM появится в модуле интеграций и будет выполняться
 фоновой задачей (outbox → Celery). Сейчас результат определяется режимом
-SCORING_MODE или вносится вручную сотрудником Фонда / Super Admin.
+SCORING_MODE. Ручного ввода результата нет.
 """
 
 import logging
@@ -14,7 +14,6 @@ from src.application.models.application_model import ApplicationORM
 from src.application.schemas.application_schema import (
     ScoringAttemptAddDTO,
     ScoringAttemptDTO,
-    ScoringResultRecordDTO,
 )
 from src.application.services.base import ApplicationBaseService
 from src.common.responses.exceptions import ScoringNotPendingException
@@ -43,10 +42,7 @@ class KATMAdapter:
                 },
                 None,
             )
-        if mode == "technical_error":
-            return ScoringResult.TECHNICAL_ERROR, None, "KATM service unavailable (simulated)"
-
-        raise RuntimeError("manual scoring mode: adapter must not be called")
+        return ScoringResult.TECHNICAL_ERROR, None, "KATM service unavailable (simulated)"
 
 
 class EligibilityChecker:
@@ -65,7 +61,7 @@ class ScoringService(ApplicationBaseService):
         return await self.db.scoring.get_for_application(application_id)
 
     async def start(self, application: ApplicationORM, actor: CurrentUserDTO | None) -> None:
-        """SUBMITTED → SCORING_IN_PROGRESS и, если режим не manual, запуск проверки."""
+        """SUBMITTED → SCORING_IN_PROGRESS и запуск проверки."""
         await self.transition(
             application,
             ApplicationStatus.SCORING_IN_PROGRESS,
@@ -73,10 +69,6 @@ class ScoringService(ApplicationBaseService):
             actor=actor,
             comment="Заявка направлена на скоринг KATM",
         )
-
-        if settings.SCORING_MODE == "manual":
-            return
-
         await self._run_adapter(application, actor=None)
 
     async def retry(self, application: ApplicationORM, actor: CurrentUserDTO) -> None:
@@ -93,38 +85,7 @@ class ScoringService(ApplicationBaseService):
             from_status=application.status,
         )
 
-        if settings.SCORING_MODE == "manual":
-            application.scoring_retry_required = False
-            application.scoring_error_message = None
-            await self.db.flush()
-            return
-
         await self._run_adapter(application, actor=actor)
-
-    async def record_manual_result(
-        self,
-        application: ApplicationORM,
-        data: ScoringResultRecordDTO,
-        actor: CurrentUserDTO,
-    ) -> None:
-        if application.status != ApplicationStatus.SCORING_IN_PROGRESS:
-            raise ScoringNotPendingException()
-
-        eligibility_passed = data.eligibility_passed
-        details = data.details
-
-        if data.result == ScoringResult.PASSED and eligibility_passed is None:
-            eligibility_passed, eligibility_details = self.eligibility.check(application)
-            details = {**(details or {}), "eligibility": eligibility_details}
-
-        await self._apply_result(
-            application,
-            result=data.result,
-            eligibility_passed=eligibility_passed,
-            details=details,
-            error_message=data.error_message,
-            actor=actor,
-        )
 
     # ---------- внутреннее ----------
 
