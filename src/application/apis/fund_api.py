@@ -13,6 +13,7 @@ from src.application.services.fund_service import FundService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import COMMON_ERRORS, paginated_example, success_example
+from src.product.apis.examples import PRODUCT_BRIEF_EXAMPLE
 from src.rbac.permissions import Action, Module
 
 router = APIRouter(prefix="/fund/applications", tags=["Заявки: рабочее окно Фонда"])
@@ -23,6 +24,7 @@ ITEM = {
     "id": 12,
     "number": "JG-2026-000012",
     "status": "FUND_REVIEW",
+    "product": PRODUCT_BRIEF_EXAMPLE,
     "subject_type": "YATT",
     "bank": {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"},
     "applicant_full_name": "Алиев Али Алиевич",

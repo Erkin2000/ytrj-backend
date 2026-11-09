@@ -12,7 +12,7 @@ import re
 from markupsafe import Markup, escape
 from sqladmin import BaseView, ModelView, expose
 from sqladmin.filters import BooleanFilter, ForeignKeyFilter, StaticValuesFilter
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
@@ -23,6 +23,7 @@ from src.admin.i18n import _, _l, fmt_dt, fmt_money, fmt_size
 from src.admin.labels import (
     DECISION_LABELS,
     DEMAND_STATUS_LABELS,
+    PRODUCT_STATUS_LABELS,
     SCORING_RESULT_LABELS,
     STATUS_LABELS,
     SUBJECT_LABELS,
@@ -30,11 +31,13 @@ from src.admin.labels import (
     badge,
     gender_label,
     labeled_badge,
+    language_label,
     role_badge,
     status_badge,
     subject_label,
 )
 from src.application.enums import ApplicationStatus, SubjectType
+from src.application.models.answer_model import ApplicationFieldFileORM
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
@@ -45,9 +48,21 @@ from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
-from src.application.services.photo_storage import DocumentStorage, PhotoStorage
+from src.application.services.photo_storage import (
+    DocumentStorage,
+    FieldPhotoStorage,
+    PhotoStorage,
+)
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
+from src.product.enums import ProductStatus
+from src.product.models.product_model import (
+    ProductFieldORM,
+    ProductORM,
+    ProductStageORM,
+    ProductTranslationORM,
+    ru_name,
+)
 from src.rbac.access import DIRECTION_ROLES, uses_personal_permissions
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
@@ -55,6 +70,7 @@ from src.rbac.models.role_model import RoleORM
 CATEGORY_ACCESS = _l("Пользователи и доступ")
 CATEGORY_DICTS = _l("Справочники")
 CATEGORY_APPLICATIONS = _l("Заявки")
+CATEGORY_PRODUCTS = _l("Продукты")
 
 
 # ---------- локализация подписей колонок ----------
@@ -171,6 +187,46 @@ def fmt_subject_types(model, attribute) -> Markup | str:
     if not values:
         return "—"
     return Markup(" ").join(badge(subject_label(v), "blue") for v in values)
+
+
+def fmt_product_name(model, attribute) -> str:
+    return ru_name(getattr(model, "translations", None) or []) or "—"
+
+
+def fmt_product_status(model, attribute) -> Markup | str:
+    return labeled_badge(PRODUCT_STATUS_LABELS, getattr(model, "status", None))
+
+
+def fmt_product_banks(model, attribute) -> Markup | str:
+    banks = getattr(model, "banks", None) or []
+    if not banks:
+        return "—"
+    return Markup(" ").join(badge(b.name, "indigo" if b.is_active else "secondary") for b in banks)
+
+
+def fmt_stages_count(model, attribute) -> str:
+    return str(len(getattr(model, "stages", None) or []))
+
+
+def fmt_application_product(model, attribute) -> Markup | str:
+    product = getattr(model, "product", None)
+    if product is None:
+        return "—"
+    return Markup(
+        f'<a href="/admin/product-orm/details/{product.id}">'
+        f"{escape(ru_name(product.translations))}</a>"
+    )
+
+
+def fmt_translation_product(model, attribute) -> Markup | str:
+    product = getattr(model, "product", None)
+    if product is None:
+        return "—"
+    return Markup(f'<a href="/admin/product-orm/details/{product.id}">#{product.id}</a>')
+
+
+def fmt_language(model, attribute) -> str:
+    return language_label(_attr_value(model, attribute))
 
 
 # ---------- Пользователи и доступ ----------
@@ -472,8 +528,8 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.number,
         ApplicationORM.status,
         ApplicationORM.applicant_full_name,
+        ApplicationORM.product,
         ApplicationORM.subject_type,
-        ApplicationORM.legal_name,
         ApplicationORM.bank,
         ApplicationORM.scoring_retry_required,
         ApplicationORM.submitted_at,
@@ -566,11 +622,14 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.council_assignments: "Члены Совета",
         ApplicationORM.demand_document: "Документ-требование",
         ApplicationORM.resource_allocation: "Выделение ресурсов",
+        ApplicationORM.product: "Продукт",
+        ApplicationORM.product_id: "Продукт",
         ApplicationORM.created_at: "Создана",
         ApplicationORM.updated_at: "Обновлена",
     }
     column_formatters = {
         ApplicationORM.status: fmt_status,
+        ApplicationORM.product: fmt_application_product,
         ApplicationORM.subject_type: fmt_subject,
         ApplicationORM.scoring_retry_required: fmt_bool,
         ApplicationORM.submitted_at: fmt_datetime,
@@ -619,6 +678,16 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         stmt = self.details_query(request).options(
             selectinload(ApplicationORM.status_history).selectinload(StatusHistoryORM.actor),
             selectinload(ApplicationORM.photos),
+            selectinload(ApplicationORM.product).selectinload(ProductORM.translations),
+            selectinload(ApplicationORM.product)
+            .selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.translations),
+            selectinload(ApplicationORM.product)
+            .selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.fields)
+            .selectinload(ProductFieldORM.translations),
+            selectinload(ApplicationORM.field_values),
+            selectinload(ApplicationORM.field_files),
             selectinload(ApplicationORM.scoring_attempts).selectinload(
                 ScoringAttemptORM.recorded_by
             ),
@@ -954,6 +1023,150 @@ class ResourceAllocationAdmin(LocalizedLabelsMixin, ModelView, model=ResourceAll
     can_delete = False
 
 
+# ---------- Продукты ----------
+
+
+class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
+    """Продукты Фонда. Этапы, поля и публикация — через API Фонда (`/fund/products`):
+    там проверяются три языка, блокировка продукта с заявками и готовность к публикации.
+    Здесь — просмотр и правка банков, типов субъекта и сроков приёма."""
+
+    name = _l("Продукт")
+    name_plural = _l("Продукты")
+    icon = "fa-solid fa-box-open"
+    category = CATEGORY_PRODUCTS
+    details_template = "sqladmin/product_details.html"
+
+    column_list = [
+        ProductORM.id,
+        ProductORM.translations,
+        ProductORM.status,
+        ProductORM.allowed_subject_types,
+        ProductORM.accept_from,
+        ProductORM.accept_to,
+        ProductORM.banks,
+        ProductORM.stages,
+        ProductORM.updated_at,
+    ]
+    column_sortable_list = [ProductORM.id, ProductORM.accept_from, ProductORM.updated_at]
+    column_default_sort = [(ProductORM.id, True)]
+    column_filters = [
+        StaticValuesFilter(
+            ProductORM.status,
+            [(s.value, _l(PRODUCT_STATUS_LABELS[s.value][0])) for s in ProductStatus],
+            title=_l("Статус"),
+        ),
+    ]
+    column_labels = {
+        ProductORM.id: "ID",
+        ProductORM.translations: "Название",
+        ProductORM.status: "Статус",
+        ProductORM.allowed_subject_types: "Типы субъектов",
+        ProductORM.accept_from: "Приём с",
+        ProductORM.accept_to: "Приём по",
+        ProductORM.banks: "Банки",
+        ProductORM.stages: "Этапов",
+        ProductORM.created_at: "Создан",
+        ProductORM.updated_at: "Обновлён",
+    }
+    column_formatters = {
+        ProductORM.translations: fmt_product_name,
+        ProductORM.status: fmt_product_status,
+        ProductORM.allowed_subject_types: fmt_subject_types,
+        ProductORM.accept_from: fmt_date,
+        ProductORM.accept_to: fmt_date,
+        ProductORM.banks: fmt_product_banks,
+        ProductORM.stages: fmt_stages_count,
+        ProductORM.updated_at: fmt_datetime,
+    }
+    can_create = False
+    can_delete = False
+    form_columns = [
+        ProductORM.allowed_subject_types,
+        ProductORM.accept_from,
+        ProductORM.accept_to,
+        ProductORM.banks,
+    ]
+    page_size = 25
+
+    async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
+        accept_from = data.get("accept_from", model.accept_from)
+        accept_to = data.get("accept_to", model.accept_to)
+        if accept_from and accept_to and accept_from > accept_to:
+            raise ValueError(_("Начало приёма не может быть позже окончания"))
+        if "allowed_subject_types" in data:
+            values = list(data["allowed_subject_types"] or [])
+            if not values:
+                raise ValueError(_("Укажите хотя бы один тип субъекта"))
+            unknown = [v for v in values if v not in {t.value for t in SubjectType}]
+            if unknown:
+                raise ValueError(_("Неизвестный тип субъекта: %s") % ", ".join(unknown))
+
+    async def get_object_for_details(self, request: Request):
+        stmt = self.details_query(request).options(
+            selectinload(ProductORM.translations),
+            selectinload(ProductORM.banks),
+            selectinload(ProductORM.stages).selectinload(ProductStageORM.translations),
+            selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.fields)
+            .selectinload(ProductFieldORM.translations),
+        )
+        product = await self._get_object_by_pk(stmt)
+        if product is not None:
+            async with async_session_maker() as session:
+                product.applications_count = await session.scalar(
+                    select(func.count()).where(ApplicationORM.product_id == product.id)
+                )
+        return product
+
+
+class ProductTranslationAdmin(LocalizedLabelsMixin, ModelView, model=ProductTranslationORM):
+    """Исправление названий и описаний продукта. Язык и продукт не меняются,
+    строки не создаются и не удаляются: у продукта всегда ровно ru, uz, en."""
+
+    name = _l("Перевод продукта")
+    name_plural = _l("Переводы продуктов")
+    icon = "fa-solid fa-language"
+    category = CATEGORY_PRODUCTS
+
+    column_list = [
+        ProductTranslationORM.id,
+        ProductTranslationORM.product,
+        ProductTranslationORM.language,
+        ProductTranslationORM.name,
+    ]
+    column_searchable_list = [ProductTranslationORM.name]
+    column_default_sort = [(ProductTranslationORM.product_id, True)]
+    column_labels = {
+        ProductTranslationORM.id: "ID",
+        ProductTranslationORM.product: "Продукт",
+        ProductTranslationORM.product_id: "Продукт",
+        ProductTranslationORM.language: "Язык",
+        ProductTranslationORM.name: "Название",
+        ProductTranslationORM.description: "Описание",
+    }
+    column_formatters = {
+        ProductTranslationORM.product: fmt_translation_product,
+        ProductTranslationORM.language: fmt_language,
+    }
+    column_formatters_detail = column_formatters
+    can_create = False
+    can_delete = False
+    form_columns = [ProductTranslationORM.name, ProductTranslationORM.description]
+
+    async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
+        name = (data.get("name") or "").strip()
+        if len(name) < 2:
+            raise ValueError(_("Название — не короче 2 символов"))
+        data["name"] = name
+        description = (data.get("description") or "").strip() or None
+        if (description is None) != (model.description is None):
+            raise ValueError(
+                _("Описание задаётся на всех трёх языках или ни на одном — меняйте его через API")
+            )
+        data["description"] = description
+
+
 # ---------- Файлы фотографий (только для авторизованных в админке) ----------
 
 
@@ -1024,12 +1237,48 @@ class ApplicationDocumentFileView(BaseView):
         )
 
 
+class ApplicationFieldFileView(BaseView):
+    """Отдаёт файл поля анкеты продукта (PHOTO / FILE) под cookie-сессией админки."""
+
+    name = _l("Файл анкеты")
+
+    def is_visible(self, request: Request) -> bool:
+        return False
+
+    @expose("/application-field-file/{pk}", methods=["GET"], include_in_schema=False)
+    async def field_file(self, request: Request):
+        try:
+            pk = int(request.path_params["pk"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=404) from None
+
+        async with async_session_maker() as session:
+            file = await session.get(ApplicationFieldFileORM, pk)
+
+        if file is None:
+            raise HTTPException(status_code=404)
+
+        path = FieldPhotoStorage().absolute_path(file.storage_path)
+        if not path.is_file():
+            raise HTTPException(status_code=404)
+
+        inline = file.content_type.startswith("image/")
+        return FileResponse(
+            path,
+            media_type=file.content_type,
+            filename=file.file_name,
+            content_disposition_type="inline" if inline else "attachment",
+        )
+
+
 ALL_VIEWS = [
     UserAdmin,
     RoleAdmin,
     PermissionAdmin,
     RefreshTokenAdmin,
     BankAdmin,
+    ProductAdmin,
+    ProductTranslationAdmin,
     ApplicationAdmin,
     StatusHistoryAdmin,
     ScoringAttemptAdmin,
@@ -1041,4 +1290,5 @@ ALL_VIEWS = [
     ResourceAllocationAdmin,
     ApplicationPhotoFileView,
     ApplicationDocumentFileView,
+    ApplicationFieldFileView,
 ]

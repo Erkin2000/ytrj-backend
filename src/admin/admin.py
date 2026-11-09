@@ -32,17 +32,22 @@ from src.admin.labels import (
     DECISION_LABELS,
     DEMAND_STATUS_LABELS,
     PIPELINE_GROUPS,
+    PRODUCT_STATUS_LABELS,
     SCORING_RESULT_LABELS,
     STATUS_LABELS,
     event_label,
+    field_type_label,
     labeled_badge,
+    language_label,
     role_badge,
     status_badge,
     status_label,
     subject_label,
+    tr_name,
 )
 from src.admin.views import ALL_VIEWS
 from src.application.enums import REJECTED_STATUSES, ApplicationStatus
+from src.application.mappers import build_form
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.workflow import build_progress
@@ -264,6 +269,11 @@ def setup_admin(app: FastAPI) -> Admin:
             "decision_badge": lambda v: labeled_badge(DECISION_LABELS, v),
             "scoring_badge": lambda v: labeled_badge(SCORING_RESULT_LABELS, v),
             "demand_badge": lambda v: labeled_badge(DEMAND_STATUS_LABELS, v),
+            "product_status_badge": lambda v: labeled_badge(PRODUCT_STATUS_LABELS, v),
+            "field_type_label": field_type_label,
+            "language_label": language_label,
+            "tr_name": tr_name,
+            "application_form": build_form,
             "fmt_dt": fmt_dt,
             "fmt_money": fmt_money,
             "fmt_size": fmt_size,

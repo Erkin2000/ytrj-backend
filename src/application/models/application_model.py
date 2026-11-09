@@ -21,6 +21,10 @@ from src.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from src.account.models.user_model import UserORM
+    from src.application.models.answer_model import (
+        ApplicationFieldFileORM,
+        ApplicationFieldValueORM,
+    )
     from src.application.models.bank_model import BankORM
     from src.application.models.council_assignment_model import CouncilAssignmentORM
     from src.application.models.demand_document_model import DemandDocumentORM
@@ -30,6 +34,7 @@ if TYPE_CHECKING:
     from src.application.models.resource_allocation_model import ResourceAllocationORM
     from src.application.models.scoring_model import ScoringAttemptORM
     from src.application.models.status_history_model import StatusHistoryORM
+    from src.product.models.product_model import ProductORM
 
 
 class ApplicationORM(TimestampMixin, Base):
@@ -64,12 +69,20 @@ class ApplicationORM(TimestampMixin, Base):
     )
     applicant_date_of_birth: Mapped[date | None] = mapped_column(Date)
 
+    # --- Продукт Фонда: анкета заявки строится из его этапов и полей ---
+    product_id: Mapped[int | None] = mapped_column(
+        ForeignKey("products.id", ondelete="RESTRICT"),
+        index=True,
+    )
+
     # --- Форма заявки ---
     subject_type: Mapped[SubjectType | None] = mapped_column(
         Enum(SubjectType, name="subject_type"),
     )
     legal_name: Mapped[str | None] = mapped_column(String(255))
 
+    # --- Устаревшая фиксированная анкета (до продуктов): поля ниже больше не заполняются,
+    # данные старых заявок остаются для истории и админки. ---
     # --- Предприятие и его руководитель (ИП / ООО). Руководитель может не совпадать
     # с заявителем, поэтому данные вводятся отдельно от снимка профиля. ---
     company_inn: Mapped[str | None] = mapped_column(String(20))
@@ -140,6 +153,17 @@ class ApplicationORM(TimestampMixin, Base):
     # --- Связи ---
     applicant: Mapped["UserORM"] = relationship(foreign_keys=[applicant_id], lazy="selectin")
     bank: Mapped["BankORM | None"] = relationship(lazy="selectin")
+    product: Mapped["ProductORM | None"] = relationship(lazy="selectin")
+    field_values: Mapped[list["ApplicationFieldValueORM"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationFieldValueORM.id",
+    )
+    field_files: Mapped[list["ApplicationFieldFileORM"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationFieldFileORM.id",
+    )
     bank_accepted_by: Mapped["UserORM | None"] = relationship(foreign_keys=[bank_accepted_by_id])
     bank_decided_by: Mapped["UserORM | None"] = relationship(foreign_keys=[bank_decided_by_id])
     sent_to_council_by: Mapped["UserORM | None"] = relationship(

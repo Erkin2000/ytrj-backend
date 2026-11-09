@@ -15,6 +15,7 @@ class Module(StrEnum):
     USERS = "users"
     ROLES = "roles"
     BANKS = "banks"
+    PRODUCTS = "products"
     APPLICATIONS = "applications"
     SCORING = "scoring"
     BANK_REVIEW = "bank_review"
@@ -34,6 +35,7 @@ MODULE_NAMES: dict[Module, str] = {
     Module.USERS: "Пользователи",
     Module.ROLES: "Роли и права",
     Module.BANKS: "Каталог банков",
+    Module.PRODUCTS: "Продукты",
     Module.APPLICATIONS: "Заявки",
     Module.SCORING: "Скоринг KATM",
     Module.BANK_REVIEW: "Этап банка",
@@ -68,6 +70,11 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "banks.read": ("Просмотр банков", "Каталог банков-партнёров"),
     "banks.update": ("Изменение банков", "Правила выбора банка по типу субъекта"),
     "banks.delete": ("Удаление банков", "Деактивация банков"),
+    "products.create": ("Создание продуктов", "Новый продукт и копия существующего"),
+    "products.read": ("Просмотр продуктов", "Каталог продуктов; заявитель видит опубликованные"),
+    "products.update": ("Изменение продуктов", "Названия, банки, сроки, этапы и поля анкеты"),
+    "products.delete": ("Удаление продуктов", "Удаление продукта без заявок"),
+    "products.approve": ("Публикация продуктов", "Публикация и снятие с публикации"),
     "applications.create": ("Создание заявки", "Подача заявки заявителем"),
     "applications.read": ("Просмотр заявок", "Просмотр заявок в рамках scope"),
     "applications.update": ("Изменение заявки", "Редактирование черновика, запрос дополнений"),
@@ -110,6 +117,11 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "users.read",
             "roles.read",
             "banks.read",
+            "products.create",
+            "products.read",
+            "products.update",
+            "products.delete",
+            "products.approve",
             "applications.read",
             "applications.update",
             "applications.approve",
@@ -150,6 +162,7 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
         False,
         [
             "banks.read",
+            "products.read",
             "applications.create",
             "applications.read",
             "applications.update",

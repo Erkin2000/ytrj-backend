@@ -13,8 +13,6 @@ import copy
 import re
 from typing import Any
 
-from src.config import settings
-
 DESCRIPTION_UZ = """
 **Jamgʻarma** moliyalashtirish platformasining backend qismi (YTRJ-EP).
 
@@ -53,9 +51,6 @@ UZ: dict[str, str] = {
     "Каталог прав платформы.": "Platforma ruxsatlari katalogi.",
     "Банки-партнёры и правила выбора по типу субъекта.": (
         "Hamkor banklar va subyekt turi boʻyicha tanlash qoidalari."
-    ),
-    "Создание, заполнение, отправка и отслеживание заявки.": (
-        "Arizani yaratish, toʻldirish, yuborish va kuzatish."
     ),
     "Поиск, скоринг, отказ или направление в Совет.": (
         "Qidiruv, skoring, rad etish yoki Kengashga yoʻnaltirish."
@@ -97,12 +92,6 @@ UZ: dict[str, str] = {
         "mumkin; `null` maydonni tozalaydi. Profil toʻliq toʻldirilmaguncha ariza yaratib "
         "boʻlmaydi."
     ),
-    "Все данные заявителя заполнены — можно создавать заявку.": (
-        "Ariza beruvchining barcha maʼlumotlari toʻldirilgan — ariza yaratish mumkin."
-    ),
-    "Поля профиля, которые нужно дополнить перед подачей заявки.": (
-        "Ariza berishdan oldin toʻldirilishi kerak boʻlgan profil maydonlari."
-    ),
     "Серия и номер паспорта или ID-карты без пробелов.": (
         "Pasport yoki ID-karta seriyasi va raqami, probelsiz."
     ),
@@ -112,7 +101,6 @@ UZ: dict[str, str] = {
         "va bu yerda qabul qilinmaydi (ortiqcha maydonlar 422 bilan rad etiladi)."
     ),
     "Заявитель": "Ariza beruvchi",
-    "Администратор": "Administrator",
     "Смена собственного пароля (закрывает прежние сессии)": (
         "Oʻz parolini oʻzgartirish (avvalgi sessiyalar yopiladi)"
     ),
@@ -125,11 +113,6 @@ UZ: dict[str, str] = {
         "Portal foydalanuvchini `SSO_REDIRECT_URI`ga `code` va `state` bilan qaytaradi."
     ),
     "YIA SSO (все роли): обмен code на токены": "YIA SSO (barcha rollar): code ni tokenlarga almashtirish",
-    "Фронтенд передаёт сюда `code`, `state` и `error` из query-параметров redirect_uri. "
-    "`code` одноразовый и живёт 60 секунд — вызывать сразу после редиректа.": (
-        "Frontend bu yerga redirect_uri query-parametrlaridagi `code`, `state` va `error`ni "
-        "uzatadi. `code` bir martalik va 60 soniya amal qiladi — redirektdan soʻng darhol chaqiring."
-    ),
     "YIA SSO (тест): вход с ручными данными — при SSO_MOCK=True": (
         "YIA SSO (test): qoʻlda kiritilgan maʼlumotlar bilan kirish — SSO_MOCK=True boʻlganda"
     ),
@@ -172,9 +155,6 @@ UZ: dict[str, str] = {
     ),
     "Каримова Нигора": "Karimova Nigora",
     "Оператор Фонда": "Jamgʻarma operatori",
-    "Создание внутреннего пользователя (логин + пароль + роль)": (
-        "Ichki foydalanuvchi yaratish (login + parol + rol)"
-    ),
     "Профиль пользователя": "Foydalanuvchi profili",
     "Изменение пользователя": "Foydalanuvchini oʻzgartirish",
     "Удаление пользователя": "Foydalanuvchini oʻchirish",
@@ -223,143 +203,14 @@ UZ: dict[str, str] = {
         "Bankni faolsizlantirish (arizalar tarixi saqlanadi)"
     ),
     # ---------- applications: applicant ----------
-    "Мои заявки: номер, дата, банк, статус": "Mening arizalarim: raqam, sana, bank, holat",
-    "ИП Алиев": "YaTT Aliyev",
     "Алиев Али Алиевич": "Aliyev Ali Aliyevich",
-    "Подать заявку: создаётся номер и черновик (DRAFT)": (
-        "Ariza berish: raqam va qoralama (DRAFT) yaratiladi"
-    ),
-    "Карточка заявки: заявитель, предприятие, учредители, проект, место, файлы, этапы": (
-        "Ariza kartochkasi: ariza beruvchi, korxona, taʼsischilar, loyiha, joy, fayllar, bosqichlar"
-    ),
-    "Удаление черновика (вместе с фото и документами)": (
-        "Qoralamani oʻchirish (suratlar va hujjatlar bilan birga)"
-    ),
-    "Прикрепить фотографию (максимум 4; JPG/PNG/WEBP до 5 МБ)": (
-        "Surat biriktirish (koʻpi bilan 4 ta; JPG/PNG/WEBP, 5 MB gacha)"
-    ),
-    "Недостающие поля — те же ключи, что в `submission-check` (`bank_id`, `location.confirmed`, "
-    "`company.inn`, `project.requested_amount`, `founders`, `applicant.phone` …). "
-    "После отправки запускается скоринг; при успехе заявка автоматически уходит в выбранный "
-    "банк (`SENT_TO_BANK`), при техошибке KATM остаётся в `SCORING_IN_PROGRESS` до повтора.": (
-        "Yetishmayotgan maydonlar — `submission-check`dagi kalitlar bilan bir xil (`bank_id`, "
-        "`location.confirmed`, `company.inn`, `project.requested_amount`, `founders`, "
-        "`applicant.phone` …). Yuborilgach skoring ishga tushadi; muvaffaqiyatli boʻlsa ariza "
-        "tanlangan bankka avtomatik yuboriladi (`SENT_TO_BANK`), KATM texnik xatosida qayta "
-        "urinishgacha `SCORING_IN_PROGRESS`da qoladi."
-    ),
-    "ООО Tikuv Servis": "«Tikuv Servis» MChJ",
     "Заявка принята и зарегистрирована.": "Ariza qabul qilindi va roʻyxatga olindi.",
     "Банк рассматривает": "Bank koʻrib chiqmoqda",
     "Ответственный сотрудник банка проводит рассмотрение.": (
         "Bankning masʼul xodimi koʻrib chiqmoqda."
     ),
-    "Данные заявителя берутся из профиля (`/auth/me`). Банк выбирается отдельным шагом "
-    "(`PUT /applications/{id}/bank`). Для ООО в `company` передаются СТИР предприятия и данные "
-    "руководителя (он может не совпадать с заявителем) и список учредителей `founders`. "
-    "Для ИП и самозанятого `company` и `founders` не используются.": (
-        "Ariza beruvchi maʼlumotlari profildan (`/auth/me`) olinadi. Bank alohida qadamda "
-        "tanlanadi (`PUT /applications/{id}/bank`). MChJ uchun `company`da korxona "
-        "STIRi va rahbar maʼlumotlari (u ariza beruvchi bilan bir xil boʻlmasligi mumkin) hamda "
-        "`founders` taʼsischilar roʻyxati uzatiladi. YaTT va oʻzini oʻzi band qilganlar uchun "
-        "`company` va `founders` ishlatilmaydi."
-    ),
-    "Редактирование черновика: тип субъекта, юр. наименование, предприятие": (
-        "Qoralamani tahrirlash: subyekt turi, yuridik nomi, korxona"
-    ),
-    "При смене типа субъекта с ООО на ИП или самозанятого очищаются реквизиты "
-    "предприятия и список учредителей.": (
-        "Subyekt turi MChJdan YaTT yoki oʻzini oʻzi band qilganga oʻzgarganda korxona "
-        "rekvizitlari va taʼsischilar roʻyxati tozalanadi."
-    ),
-    "Выбор банка для заявки": "Ariza uchun bank tanlash",
-    "Банк берётся из каталога `GET /banks?subject_type=...`: он должен быть активен и "
-    "работать с типом субъекта заявки. После успешного скоринга заявка автоматически "
-    "направляется в выбранный банк. При смене типа субъекта неподходящий банк сбрасывается.": (
-        "Bank `GET /banks?subject_type=...` katalogidan olinadi: u faol boʻlishi va ariza "
-        "subyekt turi bilan ishlashi kerak. Skoring muvaffaqiyatli oʻtgach ariza tanlangan bankka "
-        "avtomatik yuboriladi. Subyekt turi oʻzgarganda mos kelmaydigan bank bekor qilinadi."
-    ),
     "Выбор банка заявителем (отдельный шаг черновика).": (
         "Ariza beruvchi tomonidan bank tanlash (qoralamaning alohida qadami)."
-    ),
-    "Добавить учредителя (только для ООО)": "Taʼsischi qoʻshish (faqat MChJ uchun)",
-    "Изменить данные учредителя": "Taʼsischi maʼlumotlarini oʻzgartirish",
-    "Удалить учредителя из черновика": "Taʼsischini qoralamadan oʻchirish",
-    "Усманов Жасур Абдуллаевич": "Usmanov Jasur Abdullayevich",
-    "Каримов Бахтиёр Рустамович": "Karimov Baxtiyor Rustamovich",
-    "СТИР (ИНН) предприятия.": "Korxona STIRi.",
-    "Реквизиты предприятия и руководителя (только для ООО).": (
-        "Korxona va rahbar rekvizitlari (faqat MChJ uchun)."
-    ),
-    "Учредители (только для ООО, хотя бы один).": (
-        "Taʼsischilar (faqat MChJ uchun, kamida bittasi)."
-    ),
-    "Передаются только изменяемые поля; `null` очищает поле.": (
-        "Faqat oʻzgartiriladigan maydonlar uzatiladi; `null` maydonni tozalaydi."
-    ),
-    "Реквизиты ООО и его руководителя. Руководитель может не совпадать с заявителем.": (
-        "MChJ va uning rahbari rekvizitlari. Rahbar ariza beruvchi bilan bir xil boʻlmasligi "
-        "mumkin."
-    ),
-    "Удаление черновика": "Qoralamani oʻchirish",
-    "Информация о проекте: сумма, срок кредита, стоимость, рабочие места, описание": (
-        "Loyiha haqida maʼlumot: summa, kredit muddati, qiymat, ish oʻrinlari, tavsif"
-    ),
-    "Заполняется целиком. Срок кредита — в месяцах, в пределах LOAN_TERM_MIN_MONTHS…"
-    "LOAN_TERM_MAX_MONTHS (по умолчанию 12–36). Запрашиваемая сумма не больше общей стоимости "
-    "проекта. Без этого блока заявку отправить нельзя.": (
-        "Toʻliq toʻldiriladi. Kredit muddati — oylarda, LOAN_TERM_MIN_MONTHS…LOAN_TERM_MAX_MONTHS "
-        "oraligʻida (odatiy 12–36). Soʻralayotgan summa loyihaning umumiy qiymatidan oshmasligi "
-        "kerak. Bu blok boʻlmasa arizani yuborib boʻlmaydi."
-    ),
-    "Проект, на который запрашивается финансирование.": ("Moliyalashtirish soʻralayotgan loyiha."),
-    "Запрашиваемая сумма, UZS.": "Soʻralayotgan summa, UZS.",
-    f"Срок кредита в месяцах: от {settings.LOAN_TERM_MIN_MONTHS} "
-    f"до {settings.LOAN_TERM_MAX_MONTHS}.": (
-        f"Kredit muddati oylarda: {settings.LOAN_TERM_MIN_MONTHS} dan "
-        f"{settings.LOAN_TERM_MAX_MONTHS} gacha."
-    ),
-    "Общая стоимость проекта, UZS (не меньше запрашиваемой суммы).": (
-        "Loyihaning umumiy qiymati, UZS (soʻralayotgan summadan kam boʻlmasligi kerak)."
-    ),
-    "Сколько рабочих мест будет создано.": "Qancha ish oʻrni yaratiladi.",
-    "Описание проекта: на что пойдут средства.": "Loyiha tavsifi: mablagʻ nimaga sarflanadi.",
-    "Открытие швейного цеха: закупка 10 машин и аренда помещения на 12 месяцев.": (
-        "Tikuv sexini ochish: 10 ta mashina xarid qilish va binoni 12 oyga ijaraga olish."
-    ),
-    "Открытие швейного цеха: закупка 10 машин и аренда помещения.": (
-        "Tikuv sexini ochish: 10 ta mashina xarid qilish va binoni ijaraga olish."
-    ),
-    "Место осуществления деятельности (не текущее местоположение!)": (
-        "Faoliyat amalga oshiriladigan joy (joriy joylashuv emas!)"
-    ),
-    "Координаты плюс область, район и махалля; адрес — уточнение. "
-    "Отправка заявки невозможна без confirmed=true.": (
-        "Koordinatalar hamda viloyat, tuman va mahalla; manzil — aniqlashtirish. "
-        "confirmed=true boʻlmasa arizani yuborib boʻlmaydi."
-    ),
-    "Область.": "Viloyat.",
-    "Район.": "Tuman.",
-    "Махалля.": "Mahalla.",
-    "Улица, дом (уточнение).": "Koʻcha, uy (aniqlashtirish).",
-    "Яккасарайский район": "Yakkasaroy tumani",
-    "Махалля Кушбеги": "Qushbegi mahallasi",
-    "ул. Бабура, 12": "Bobur koʻchasi, 12",
-    "Ташкент": "Toshkent",
-    "Прикрепить фотографию (максимум 4; JPG/PNG/WEBP)": (
-        "Surat biriktirish (koʻpi bilan 4 ta; JPG/PNG/WEBP)"
-    ),
-    "Удалить фотографию черновика": "Qoralama suratini oʻchirish",
-    "Прикрепить документ (максимум 4; PDF/DOCX до 10 МБ)": (
-        "Hujjat biriktirish (koʻpi bilan 4 ta; PDF/DOCX, 10 MB gacha)"
-    ),
-    "Удалить документ черновика": "Qoralama hujjatini oʻchirish",
-    "Файл документа (только для тех, кто имеет доступ к заявке)": (
-        "Hujjat fayli (faqat arizaga kirish huquqi borlar uchun)"
-    ),
-    "Файл фотографии (только для тех, кто имеет доступ к заявке)": (
-        "Surat fayli (faqat arizaga kirish huquqi borlar uchun)"
     ),
     "Сводка перед отправкой: выбранные параметры и недостающие поля": (
         "Yuborishdan oldingi xulosa: tanlangan parametrlar va yetishmayotgan maydonlar"
@@ -373,9 +224,6 @@ UZ: dict[str, str] = {
     "Заявка подана": "Ariza topshirildi",
     "Хронологическая история заявки": "Arizaning xronologik tarixi",
     "Заявка создана": "Ariza yaratildi",
-    "Пользователь подтвердил, что это место деятельности, а не текущее местоположение.": (
-        "Foydalanuvchi bu faoliyat joyi ekanini, joriy joylashuv emasligini tasdiqladi."
-    ),
     "Тип предпринимательского субъекта.": "Tadbirkorlik subyekti turi.",
     # ---------- applications: fund ----------
     "Поиск заявок по статусу, банку, дате, типу субъекта, номеру/ФИО": (
@@ -399,7 +247,6 @@ UZ: dict[str, str] = {
         "Bank arizalari: yangi / koʻrib chiqilmoqda / yakunlangan"
     ),
     "Раздел рабочего окна": "Ish oynasi boʻlimi",
-    "ООО «Навруз»": "«Navroʻz» MChJ",
     "Счётчики рабочего окна банка": "Bank ish oynasi hisoblagichlari",
     "Принять заявку в рассмотрение (SENT_TO_BANK → BANK_REVIEW)": (
         "Arizani koʻrib chiqishga qabul qilish (SENT_TO_BANK → BANK_REVIEW)"
@@ -423,6 +270,76 @@ UZ: dict[str, str] = {
     "Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)": "Arizani Kengashgacha rad etish (FUND_REVIEW → FUND_REJECTED)",
     "Причина обязательна и показывается заявителю.": "Sabab majburiy va ariza beruvchiga koʻrsatiladi.",
     "Причина отказа Фонда (видна заявителю).": "Jamgʻarmaning rad etish sababi (ariza beruvchiga koʻrinadi).",
+    # ---------- продукты ----------
+    "Продукты: управление (Фонд)": "Mahsulotlar: boshqaruv (Jamgʻarma)",
+    "Продукты: каталог заявителя": "Mahsulotlar: ariza beruvchi katalogi",
+    "Продукты, их банки, сроки приёма, этапы и поля анкеты; публикация.": "Mahsulotlar, ularning banklari, qabul muddatlari, anketa bosqichlari va maydonlari; eʼlon qilish.",
+    "Опубликованные продукты, по которым сейчас принимаются заявки.": "Hozir arizalar qabul qilinayotgan eʼlon qilingan mahsulotlar.",
+    "Заявка по продукту: ответы на поля этапов, файлы, отправка, отслеживание.": "Mahsulot boʻyicha ariza: bosqich maydonlariga javoblar, fayllar, yuborish, kuzatish.",
+    "Все продукты (фильтр по статусу, поиск по названию)": "Barcha mahsulotlar (holat boʻyicha filtr, nom boʻyicha qidiruv)",
+    "Молодёжный бизнес": "Yoshlar biznesi",
+    "Льготный кредит для молодых предпринимателей.": "Yosh tadbirkorlar uchun imtiyozli kredit.",
+    "Создать продукт (черновик): названия, описания, типы субъекта, сроки, банки": "Mahsulot yaratish (qoralama): nomlar, tavsiflar, subyekt turlari, muddatlar, banklar",
+    "Продукт с банками, этапами и полями": "Banklar, bosqichlar va maydonlar bilan mahsulot",
+    "Сведения о проекте": "Loyiha haqida maʼlumot",
+    "Запрашиваемая сумма": "Soʻralayotgan summa",
+    "Фото места деятельности": "Faoliyat joyi surati",
+    "Изменить названия, описания, типы субъекта, сроки приёма или банки": "Nomlar, tavsiflar, subyekt turlari, qabul muddatlari yoki banklarni oʻzgartirish",
+    "Передаются только изменяемые поля. `bank_ids` заменяет список банков целиком. Разрешено и при наличии заявок.": "Faqat oʻzgaradigan maydonlar yuboriladi. `bank_ids` banklar roʻyxatini toʻliq almashtiradi. Arizalar mavjud boʻlsa ham ruxsat etiladi.",
+    "Удалить продукт без заявок": "Arizasiz mahsulotni oʻchirish",
+    "Продукт с заявками удалить нельзя — снимите его с публикации (`archive`).": "Arizalari bor mahsulotni oʻchirib boʻlmaydi — uni eʼlondan oling (`archive`).",
+    "Опубликовать продукт (DRAFT / ARCHIVED → PUBLISHED)": "Mahsulotni eʼlon qilish (DRAFT / ARCHIVED → PUBLISHED)",
+    "Нужны хотя бы один активный банк, хотя бы один этап и хотя бы одно поле в каждом этапе. Заявители видят продукт в сроках приёма.": "Kamida bitta faol bank, kamida bitta bosqich va har bir bosqichda kamida bitta maydon kerak. Ariza beruvchilar mahsulotni qabul muddatlarida koʻradi.",
+    "Снять продукт с публикации (PUBLISHED → ARCHIVED)": "Mahsulotni eʼlondan olish (PUBLISHED → ARCHIVED)",
+    "Новые заявки не принимаются, черновики по продукту отправить нельзя.": "Yangi arizalar qabul qilinmaydi, mahsulot boʻyicha qoralamalarni yuborib boʻlmaydi.",
+    "Скопировать продукт в новый черновик (с банками, этапами и полями)": "Mahsulotdan yangi qoralamaga nusxa olish (banklar, bosqichlar va maydonlar bilan)",
+    "Добавить этап: номер и название на трёх языках": "Bosqich qoʻshish: raqam va uch tildagi nom",
+    "Возвращает продукт целиком. Если по продукту уже есть заявки, этапы и поля менять нельзя (`product_locked`): скопируйте продукт (`POST /fund/products/{id}/copy`).": "Mahsulotni toʻliq qaytaradi. Agar mahsulot boʻyicha arizalar boʻlsa, bosqich va maydonlarni oʻzgartirib boʻlmaydi (`product_locked`): mahsulotdan nusxa oling (`POST /fund/products/{id}/copy`).",
+    "Изменить номер или название этапа": "Bosqich raqami yoki nomini oʻzgartirish",
+    "Удалить этап вместе с его полями": "Bosqichni maydonlari bilan birga oʻchirish",
+    "Добавить поле в этап: тип, название на трёх языках, обязательность": "Bosqichga maydon qoʻshish: tur, uch tildagi nom, majburiylik",
+    "Типы: STRING (текст), NUMBER (число), DATE (дата), PHONE (+998XXXXXXXXX), EMAIL, PHOTO (JPG/PNG/WEBP), FILE (PDF/DOCX). `max_files` — только для PHOTO и FILE. Возвращает продукт целиком. Если по продукту уже есть заявки, этапы и поля менять нельзя (`product_locked`): скопируйте продукт (`POST /fund/products/{id}/copy`).": "Turlar: STRING (matn), NUMBER (son), DATE (sana), PHONE (+998XXXXXXXXX), EMAIL, PHOTO (JPG/PNG/WEBP), FILE (PDF/DOCX). `max_files` — faqat PHOTO va FILE uchun. Mahsulotni toʻliq qaytaradi. Agar mahsulot boʻyicha arizalar boʻlsa, bosqich va maydonlarni oʻzgartirib boʻlmaydi (`product_locked`): mahsulotdan nusxa oling (`POST /fund/products/{id}/copy`).",
+    "Изменить поле: тип, название, обязательность, лимит файлов, порядок": "Maydonni oʻzgartirish: tur, nom, majburiylik, fayllar limiti, tartib",
+    "Удалить поле": "Maydonni oʻchirish",
+    "Продукты, по которым сейчас принимаются заявки": "Hozir arizalar qabul qilinayotgan mahsulotlar",
+    "Опубликованные продукты в сроках приёма. С `subject_type` — только продукты для этого типа субъекта. В `banks` — только активные банки продукта.": "Qabul muddatidagi eʼlon qilingan mahsulotlar. `subject_type` bilan — faqat shu subyekt turi uchun mahsulotlar. `banks` da — mahsulotning faqat faol banklari.",
+    "Продукт с этапами и полями анкеты": "Anketa bosqichlari va maydonlari bilan mahsulot",
+    "Мои заявки: номер, продукт, банк, статус": "Mening arizalarim: raqam, mahsulot, bank, holat",
+    "Подать заявку по продукту: создаётся номер и черновик (DRAFT)": "Mahsulot boʻyicha ariza berish: raqam va qoralama (DRAFT) yaratiladi",
+    "Продукт берётся из `GET /products`: опубликован, в сроках приёма и рассчитан на `subject_type`. Данные заявителя — из профиля (`/auth/me`). Банк — из `banks` продукта, сразу (`bank_id`) или позже (`PUT /applications/{id}/bank`). Дальше заявитель заполняет этапы продукта (`PUT /applications/{id}/stages/{stage_id}`).": "Mahsulot `GET /products` dan olinadi: eʼlon qilingan, qabul muddatida va `subject_type` uchun moʻljallangan. Ariza beruvchi maʼlumotlari — profildan (`/auth/me`). Bank — mahsulotning `banks` roʻyxatidan, darhol (`bank_id`) yoki keyinroq (`PUT /applications/{id}/bank`). Soʻng ariza beruvchi mahsulot bosqichlarini toʻldiradi (`PUT /applications/{id}/stages/{stage_id}`).",
+    "Карточка заявки: заявитель, продукт, ответы анкеты, этапы рассмотрения": "Ariza kartochkasi: ariza beruvchi, mahsulot, anketa javoblari, koʻrib chiqish bosqichlari",
+    "Редактирование черновика: продукт или тип субъекта": "Qoralamani tahrirlash: mahsulot yoki subyekt turi",
+    "Смена продукта очищает ответы анкеты, файлы и выбранный банк. Если выбранный банк не работает с новым типом субъекта, он сбрасывается.": "Mahsulot almashtirilsa, anketa javoblari, fayllar va tanlangan bank tozalanadi. Agar tanlangan bank yangi subyekt turi bilan ishlamasa, u bekor qilinadi.",
+    "Удаление черновика (вместе с файлами анкеты)": "Qoralamani oʻchirish (anketa fayllari bilan birga)",
+    "Выбор банка из банков продукта": "Mahsulot banklaridan bank tanlash",
+    "Банк берётся из `banks` продукта (`GET /products/{id}`): он должен быть активен и работать с типом субъекта заявки. После утверждения Советом заявка автоматически уходит в этот банк.": "Bank mahsulotning `banks` roʻyxatidan olinadi (`GET /products/{id}`): u faol boʻlishi va ariza subyekti turi bilan ishlashi kerak. Kengash tasdiqlagandan soʻng ariza avtomatik ravishda shu bankka yuboriladi.",
+    "Сохранить ответы этапа продукта": "Mahsulot bosqichi javoblarini saqlash",
+    "`values` — словарь «id поля → значение». Меняются только переданные поля; `null` или пустая строка очищает поле. Проверка по типу: NUMBER — число, DATE — ГГГГ-ММ-ДД, PHONE — +998XXXXXXXXX, EMAIL — адрес почты. Обязательность проверяется при отправке заявки. Файлы полей PHOTO / FILE загружаются через `POST .../fields/{field_id}/files`.": "`values` — «maydon id → qiymat» lugʻati. Faqat yuborilgan maydonlar oʻzgaradi; `null` yoki boʻsh satr maydonni tozalaydi. Tur boʻyicha tekshiruv: NUMBER — son, DATE — YYYY-OO-KK, PHONE — +998XXXXXXXXX, EMAIL — pochta manzili. Majburiylik ariza yuborilganda tekshiriladi. PHOTO / FILE maydonlari fayllari `POST .../fields/{field_id}/files` orqali yuklanadi.",
+    "Загрузить файл в поле PHOTO или FILE": "PHOTO yoki FILE maydoniga fayl yuklash",
+    "PHOTO — JPG/PNG/WEBP до 5 МБ, FILE — PDF/DOCX до 10 МБ. Не больше `max_files` файлов на поле.": "PHOTO — JPG/PNG/WEBP 5 MB gacha, FILE — PDF/DOCX 10 MB gacha. Har bir maydonga `max_files` tadan koʻp boʻlmagan fayl.",
+    "Удалить файл поля из черновика": "Qoralamadan maydon faylini oʻchirish",
+    "Скачать файл поля (только для тех, кто имеет доступ к заявке)": "Maydon faylini yuklab olish (faqat arizaga ruxsati borlar uchun)",
+    "Недостающие поля — те же ключи, что в `submission-check`: `product_id`, `subject_type`, `bank_id`, `fields.<id поля>` (обязательные поля этапов), `applicant.phone` … После отправки запускается скоринг; при успехе заявка поступает в Фонд (`FUND_REVIEW`), при техошибке KATM остаётся в `SCORING_IN_PROGRESS` до повтора.": "Yetishmayotgan maydonlar — `submission-check` dagi kalitlar: `product_id`, `subject_type`, `bank_id`, `fields.<maydon id>` (bosqichlarning majburiy maydonlari), `applicant.phone` … Yuborilgandan soʻng skoring boshlanadi; muvaffaqiyatli boʻlsa ariza Jamgʻarmaga tushadi (`FUND_REVIEW`), KATM texnik xatosida takrorlashgacha `SCORING_IN_PROGRESS` holatida qoladi.",
+    "Продукт из `GET /products`.": "`GET /products` dagi mahsulot.",
+    "Банк из `banks` продукта; можно выбрать позже (`PUT /applications/{id}/bank`).": "Mahsulotning `banks` roʻyxatidagi bank; keyinroq tanlash mumkin (`PUT /applications/{id}/bank`).",
+    "Смена продукта очищает ответы анкеты и выбранный банк.": "Mahsulot almashtirilsa, anketa javoblari va tanlangan bank tozalanadi.",
+    "Только для PHOTO и FILE: сколько файлов можно загрузить.": "Faqat PHOTO va FILE uchun: nechta fayl yuklash mumkin.",
+    "Порядок поля внутри этапа.": "Bosqich ichidagi maydon tartibi.",
+    "Для каких типов субъекта доступен продукт.": "Mahsulot qaysi subyekt turlari uchun mavjud.",
+    "Начало приёма заявок (включительно).": "Arizalarni qabul qilish boshlanishi (shu kun ham).",
+    "Конец приёма заявок (включительно).": "Arizalarni qabul qilish tugashi (shu kun ham).",
+    "Банки, через которые работает продукт (из каталога банков).": "Mahsulot ishlaydigan banklar (banklar katalogidan).",
+    "Полный список банков продукта (заменяет текущий).": "Mahsulot banklarining toʻliq roʻyxati (joriysini almashtiradi).",
+    "Номер этапа (порядок).": "Bosqich raqami (tartib).",
+    'Значения полей этапа: ключ — id поля, значение — строка; `null` или "" очищает поле.\nМеняются только переданные поля. Файлы (PHOTO / FILE) загружаются отдельно.': 'Bosqich maydonlari qiymatlari: kalit — maydon id, qiymat — satr; `null` yoki "" maydonni tozalaydi. Faqat yuborilgan maydonlar oʻzgaradi. Fayllar (PHOTO / FILE) alohida yuklanadi.',
+    "Сайт, с которого начат вход через YIA Portal: у каждого свой клиент портала\nи свой redirect_uri.": "YIA Portal orqali kirish boshlangan sayt: har birining oʻz portal mijozi va oʻz redirect_uri si bor.",
+    "Сотрудник входит через YIA Portal (по ПИНФЛ) и/или по логину и паролю:\nнужен хотя бы один из способов.": "Xodim YIA Portal orqali (JShShIR boʻyicha) va/yoki login va parol bilan kiradi: kamida bitta usul kerak.",
+    "Ровно три перевода — `ru`, `uz`, `en`, каждый язык один раз. При изменении передаются все три.": "Aynan uchta tarjima — `ru`, `uz`, `en`, har bir til bir marta. Oʻzgartirishda uchalasi ham yuboriladi.",
+    "Ровно три перевода — `ru`, `uz`, `en`, каждый язык один раз. При изменении передаются все три. Описание — на всех трёх языках или ни на одном.": "Aynan uchta tarjima — `ru`, `uz`, `en`, har bir til bir marta. Oʻzgartirishda uchalasi ham yuboriladi. Tavsif — uchala tilda yoki birortasida ham emas.",
+    "Справочник для конструктора продукта (Фонд) и формы заявки (заявитель): какие типы полей можно добавить в этап, как их заполнять и какие ограничения у файлов. Значения `type` передаются в `field_type` при создании поля.": "Mahsulot konstruktori (Jamgʻarma) va ariza shakli (ariza beruvchi) uchun maʼlumotnoma: bosqichga qanday turdagi maydonlarni qoʻshish mumkin, ularni qanday toʻldirish kerak va fayllarga qanday cheklovlar bor. `type` qiymatlari maydon yaratishda `field_type` ga beriladi.",
+    "Типы полей анкеты: названия на ru/uz/en и правила заполнения": "Anketa maydonlari turlari: ru/uz/en dagi nomlar va toʻldirish qoidalari",
+    "Телефон": "Telefon",
+    "Фото": "Surat",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

@@ -43,16 +43,10 @@ class Settings(BaseSettings):
     ADMIN_SESSION_SECRET: str
 
     MEDIA_PATH: str = "media"
-    MAX_APPLICATION_PHOTOS: int = 4
-    MAX_APPLICATION_FOUNDERS: int = 20
-
-    # Срок кредита в заявке, месяцев (границы уточнить с заказчиком).
-    LOAN_TERM_MIN_MONTHS: int = 12
-    LOAN_TERM_MAX_MONTHS: int = 36
+    # Файлы полей анкеты продукта: PHOTO и FILE.
     PHOTO_MAX_SIZE_MB: int = 5
     PHOTO_ALLOWED_TYPES: list[str] = ["image/jpeg", "image/png", "image/webp"]
 
-    MAX_APPLICATION_DOCUMENTS: int = 4
     DOCUMENT_MAX_SIZE_MB: int = 10
     DOCUMENT_ALLOWED_TYPES: list[str] = [
         "application/pdf",

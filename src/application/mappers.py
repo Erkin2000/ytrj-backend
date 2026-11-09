@@ -1,12 +1,10 @@
 from src.account.models.user_model import UserORM
 from src.application.enums import ApplicationStatus
+from src.application.models.answer_model import ApplicationFieldFileORM
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
 from src.application.models.demand_document_model import DemandDocumentORM
-from src.application.models.document_model import ApplicationDocumentORM
-from src.application.models.founder_model import ApplicationFounderORM
-from src.application.models.photo_model import ApplicationPhotoORM
 from src.application.models.resource_allocation_model import ResourceAllocationORM
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
@@ -16,20 +14,18 @@ from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationListItemDTO,
     BankStageDTO,
-    CompanyDTO,
     CouncilAssignmentDTO,
     DemandDocumentDTO,
-    DocumentDTO,
-    FounderDTO,
-    LocationResponseDTO,
-    PhotoDTO,
-    ProjectResponseDTO,
+    FieldFileDTO,
+    FormFieldDTO,
+    FormStageDTO,
     ResourceAllocationDTO,
     ScoringAttemptDTO,
     StatusHistoryDTO,
 )
 from src.application.schemas.bank_schema import BankDTO
 from src.config import settings
+from src.product.mappers import field_dto, names, product_brief
 from src.utils.base_rep.mappers.base import DataMapper
 
 
@@ -42,88 +38,6 @@ def actor(model: UserORM | None) -> ActorDTO | None:
 class BankDataMapper(DataMapper):
     db_model = BankORM
     schema = BankDTO
-
-
-class FounderDataMapper(DataMapper):
-    db_model = ApplicationFounderORM
-    schema = FounderDTO
-
-    @staticmethod
-    def map_to_domain_entity(model: ApplicationFounderORM) -> FounderDTO:
-        return FounderDTO(
-            id=model.id,
-            full_name=model.full_name,
-            passport_number=model.passport_number,
-            date_of_birth=model.date_of_birth,
-            created_at=model.created_at,
-        )
-
-
-def location_dto(model: ApplicationORM) -> LocationResponseDTO:
-    return LocationResponseDTO(
-        lat=model.location_lat,
-        lng=model.location_lng,
-        region=model.location_region,
-        district=model.location_district,
-        makhalla=model.location_makhalla,
-        address=model.location_address,
-        confirmed=model.location_confirmed,
-    )
-
-
-def project_dto(model: ApplicationORM) -> ProjectResponseDTO:
-    return ProjectResponseDTO(
-        requested_amount=model.project_requested_amount,
-        loan_term_months=model.project_loan_term_months,
-        total_cost=model.project_total_cost,
-        jobs_count=model.project_jobs_count,
-        description=model.project_description,
-    )
-
-
-def company_dto(model: ApplicationORM) -> CompanyDTO:
-    return CompanyDTO.model_construct(
-        inn=model.company_inn,
-        director_full_name=model.director_full_name,
-        director_passport=model.director_passport,
-        director_phone=model.director_phone,
-        director_date_of_birth=model.director_date_of_birth,
-    )
-
-
-class DocumentDataMapper(DataMapper):
-    db_model = ApplicationDocumentORM
-    schema = DocumentDTO
-
-    @staticmethod
-    def map_to_domain_entity(model: ApplicationDocumentORM) -> DocumentDTO:
-        return DocumentDTO(
-            id=model.id,
-            file_name=model.file_name,
-            content_type=model.content_type,
-            size=model.size,
-            url=(
-                f"{settings.API_PREFIX}/applications/{model.application_id}"
-                f"/documents/{model.id}/file"
-            ),
-            created_at=model.created_at,
-        )
-
-
-class PhotoDataMapper(DataMapper):
-    db_model = ApplicationPhotoORM
-    schema = PhotoDTO
-
-    @staticmethod
-    def map_to_domain_entity(model: ApplicationPhotoORM) -> PhotoDTO:
-        return PhotoDTO(
-            id=model.id,
-            file_name=model.file_name,
-            content_type=model.content_type,
-            size=model.size,
-            url=f"{settings.API_PREFIX}/applications/{model.application_id}/photos/{model.id}/file",
-            created_at=model.created_at,
-        )
 
 
 class StatusHistoryDataMapper(DataMapper):
@@ -200,6 +114,51 @@ class ResourceAllocationDataMapper(DataMapper):
         )
 
 
+def field_file_dto(model: ApplicationFieldFileORM) -> FieldFileDTO:
+    return FieldFileDTO(
+        id=model.id,
+        file_name=model.file_name,
+        content_type=model.content_type,
+        size=model.size,
+        url=(
+            f"{settings.API_PREFIX}/applications/{model.application_id}"
+            f"/fields/{model.field_id}/files/{model.id}"
+        ),
+        created_at=model.created_at,
+    )
+
+
+def build_form(model: ApplicationORM) -> list[FormStageDTO]:
+    """Этапы продукта заявки с ответами: значения и файлы по каждому полю."""
+    if model.product is None:
+        return []
+    values = {v.field_id: v.value for v in model.field_values}
+    files: dict[int, list[FieldFileDTO]] = {}
+    for f in model.field_files:
+        files.setdefault(f.field_id, []).append(field_file_dto(f))
+
+    stages = []
+    for stage in model.product.stages:
+        fields = [
+            FormFieldDTO(
+                **field_dto(field).model_dump(),
+                value=values.get(field.id),
+                files=files.get(field.id, []),
+            )
+            for field in stage.fields
+        ]
+        stages.append(
+            FormStageDTO(
+                id=stage.id,
+                number=stage.number,
+                translations=names(stage.translations),
+                is_complete=all(not f.is_required or f.value or f.files for f in fields),
+                fields=fields,
+            )
+        )
+    return stages
+
+
 def _rejection_reason(model: ApplicationORM) -> str | None:
     if model.status == ApplicationStatus.FUND_REJECTED:
         return model.fund_reject_reason
@@ -224,8 +183,8 @@ class ApplicationDataMapper(DataMapper):
             "id": model.id,
             "number": model.number,
             "status": model.status,
+            "product": product_brief(model.product) if model.product else None,
             "subject_type": model.subject_type,
-            "legal_name": model.legal_name,
             "bank": BankDataMapper.map_to_domain_entity(model.bank) if model.bank else None,
             "applicant_full_name": model.applicant_full_name,
             "scoring_retry_required": model.scoring_retry_required,
@@ -253,12 +212,7 @@ class ApplicationDataMapper(DataMapper):
                 gender=model.applicant_gender,
                 date_of_birth=model.applicant_date_of_birth,
             ),
-            company=company_dto(model),
-            founders=[FounderDataMapper.map_to_domain_entity(f) for f in model.founders],
-            project=project_dto(model),
-            location=location_dto(model),
-            photos=[PhotoDataMapper.map_to_domain_entity(p) for p in model.photos],
-            documents=[DocumentDataMapper.map_to_domain_entity(d) for d in model.documents],
+            form=build_form(model),
             bank_stage=BankStageDTO(
                 sent_to_bank_at=model.sent_to_bank_at,
                 accepted_by=actor(model.bank_accepted_by),

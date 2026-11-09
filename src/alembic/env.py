@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 # Модели должны быть импортированы, чтобы попасть в Base.metadata (autogenerate).
 from src.account.models.user_model import UserORM  # noqa: E402, F401
 from src.account.models.user_permission_model import UserPermissionORM  # noqa: E402, F401
+from src.application.models.answer_model import ApplicationFieldValueORM  # noqa: E402, F401
 from src.application.models.application_model import ApplicationORM  # noqa: E402, F401
 from src.application.models.bank_model import BankORM  # noqa: E402, F401
 from src.application.models.council_assignment_model import CouncilAssignmentORM  # noqa: E402, F401
@@ -27,6 +28,7 @@ from src.application.models.status_history_model import StatusHistoryORM  # noqa
 from src.auth.models.refresh_token_model import RefreshTokenORM  # noqa: E402, F401
 from src.config import settings  # noqa: E402
 from src.database import Base  # noqa: E402
+from src.product.models.product_model import ProductORM  # noqa: E402, F401
 from src.rbac.models.permission_model import PermissionORM  # noqa: E402, F401
 from src.rbac.models.role_model import RoleORM  # noqa: E402, F401
 from src.rbac.models.role_permission_model import RolePermissionORM  # noqa: E402, F401

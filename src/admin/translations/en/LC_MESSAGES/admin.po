@@ -761,3 +761,119 @@ msgstr "Fund decision (date)"
 
 msgid "Причина Фонда"
 msgstr "Fund reason"
+
+# ---------- продукты ----------
+
+msgid "Продукты"
+msgstr "Products"
+
+msgid "Продукт"
+msgstr "Product"
+
+msgid "Перевод продукта"
+msgstr "Product translation"
+
+msgid "Переводы продуктов"
+msgstr "Product translations"
+
+msgid "Опубликован"
+msgstr "Published"
+
+msgid "Снят с публикации"
+msgstr "Archived"
+
+msgid "Текст"
+msgstr "Text"
+
+msgid "Число"
+msgstr "Number"
+
+msgid "Фото"
+msgstr "Photo"
+
+msgid "Русский"
+msgstr "Russian"
+
+msgid "Узбекский"
+msgstr "Uzbek"
+
+msgid "Английский"
+msgstr "English"
+
+msgid "Язык"
+msgstr "Language"
+
+msgid "Приём с"
+msgstr "Accepting from"
+
+msgid "Приём по"
+msgstr "Accepting until"
+
+msgid "Этапов"
+msgstr "Stages"
+
+msgid "Файл анкеты"
+msgstr "Form file"
+
+msgid "Начало приёма не может быть позже окончания"
+msgstr "Acceptance start cannot be later than its end"
+
+msgid "Укажите хотя бы один тип субъекта"
+msgstr "Specify at least one subject type"
+
+msgid "Неизвестный тип субъекта: %s"
+msgstr "Unknown subject type: %s"
+
+msgid "Название — не короче 2 символов"
+msgstr "Name must be at least 2 characters long"
+
+msgid "Описание задаётся на всех трёх языках или ни на одном — меняйте его через API"
+msgstr "Description is set in all three languages or in none — change it via the API"
+
+msgid "Анкета продукта"
+msgstr "Product form"
+
+msgid "Заполнен"
+msgstr "Complete"
+
+msgid "Не заполнен"
+msgstr "Incomplete"
+
+msgid "Есть заявки — этапы и поля не меняются"
+msgstr "Has applications — stages and fields are locked"
+
+msgid "Заявок"
+msgstr "Applications"
+
+msgid "Приём"
+msgstr "Acceptance"
+
+msgid "Копия продукта"
+msgstr "Copy of product"
+
+msgid "Этапы, поля и публикация настраиваются через API Фонда: /api/v1/fund/products."
+msgstr "Stages, fields and publishing are managed via the Fund API: /api/v1/fund/products."
+
+msgid "Названия и описания"
+msgstr "Names and descriptions"
+
+msgid "Условия"
+msgstr "Conditions"
+
+msgid "Этапы и поля анкеты"
+msgstr "Form stages and fields"
+
+msgid "Поле"
+msgstr "Field"
+
+msgid "Обязательное"
+msgstr "Required"
+
+msgid "Файлов"
+msgstr "Files"
+
+msgid "В этапе нет полей."
+msgstr "The stage has no fields."
+
+msgid "Этапов пока нет."
+msgstr "No stages yet."

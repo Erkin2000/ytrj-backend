@@ -1,0 +1,92 @@
+{% extends "sqladmin/details.html" %}
+
+{% block content %}
+{% set pr = model %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body">
+      <div class="row align-items-center g-3">
+        <div class="col">
+          <div class="page-pretitle">{{ _("Продукт") }} #{{ pr.id }}</div>
+          <h2 class="page-title mb-1">{{ tr_name(pr.translations) }} &nbsp;{{ product_status_badge(pr.status) }}
+            {% if pr.applications_count %}<span class="badge bg-orange-lt ms-1"><i class="fa-solid fa-lock me-1"></i>{{ _("Есть заявки — этапы и поля не меняются") }}</span>{% endif %}
+          </h2>
+          <div class="text-muted small">
+            {{ _("Заявок") }}: <a href="{{ url_for('admin:list', identity='application-orm') }}">{{ pr.applications_count or 0 }}</a>
+            · {{ _("Приём") }}: {{ pr.accept_from.strftime("%d.%m.%Y") if pr.accept_from else "…" }} — {{ pr.accept_to.strftime("%d.%m.%Y") if pr.accept_to else "…" }}
+            {% if pr.copied_from_id %} · {{ _("Копия продукта") }} <a href="{{ url_for('admin:details', identity='product-orm', pk=pr.copied_from_id) }}">#{{ pr.copied_from_id }}</a>{% endif %}
+            · {{ _("Обновлён") }} {{ fmt_dt(pr.updated_at) }}
+          </div>
+        </div>
+        <div class="col-auto">
+          <a href="{{ url_for('admin:list', identity='product-orm') }}" class="btn">{{ _("Go Back") }}</a>
+          {% if model_view.check_can_edit(request, model) %}
+          <a href="{{ model_view._build_url_for('admin:edit', request, model) }}" class="btn btn-primary">{{ _("Edit") }}</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="text-muted small mt-3"><i class="fa-solid fa-circle-info me-1"></i>{{ _("Этапы, поля и публикация настраиваются через API Фонда: /api/v1/fund/products.") }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="col-lg-5">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("Названия и описания") }}</h3></div>
+    <div class="list-group list-group-flush">
+      {% for t in pr.translations %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('admin:details', identity='product-translation-orm', pk=t.id) }}">
+        <div class="d-flex justify-content-between"><span class="fw-semibold">{{ t.name }}</span><span class="badge bg-secondary-lt">{{ language_label(t.language) }}</span></div>
+        {% if t.description %}<div class="text-muted small mt-1" style="white-space: pre-line">{{ t.description }}</div>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Условия") }}</h3></div>
+    <div class="card-body">
+      <dl class="jg-kv">
+        <dt>{{ _("Типы субъектов") }}</dt>
+        <dd>{% for s in pr.allowed_subject_types %}<span class="badge bg-blue-lt me-1">{{ subject_label(s) }}</span>{% else %}—{% endfor %}</dd>
+        <dt>{{ _("Банки") }}</dt>
+        <dd>{% for b in pr.banks %}<a class="badge {{ 'bg-indigo-lt' if b.is_active else 'bg-secondary-lt' }} me-1" href="{{ url_for('admin:details', identity='bank-orm', pk=b.id) }}">{{ b.name }}</a>{% else %}—{% endfor %}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<div class="col-lg-7">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("Этапы и поля анкеты") }} <span class="badge bg-secondary-lt ms-2">{{ pr.stages | length }}</span></h3></div>
+    {% for stage in pr.stages %}
+    <div class="card-header bg-transparent">
+      <h4 class="card-title">{{ stage.number }}. {{ tr_name(stage.translations) }}</h4>
+      <div class="card-actions text-muted small">{% for t in stage.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+    </div>
+    {% if stage.fields %}
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter table-sm">
+        <thead><tr><th>{{ _("Поле") }}</th><th>{{ _("Тип") }}</th><th>{{ _("Обязательное") }}</th><th>{{ _("Файлов") }}</th></tr></thead>
+        <tbody>
+          {% for f in stage.fields %}
+          <tr>
+            <td>{{ tr_name(f.translations) }}
+              <div class="text-muted small">{% for t in f.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div></td>
+            <td>{{ field_type_label(f.field_type) }}</td>
+            <td>{% if f.is_required %}<i class="fa fa-check text-success"></i>{% else %}<i class="fa fa-minus text-muted"></i>{% endif %}</td>
+            <td>{{ f.max_files if f.field_type.value in ["PHOTO", "FILE"] else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("В этапе нет полей.") }}</div>
+    {% endif %}
+    {% else %}
+    <div class="card-body text-muted">{{ _("Этапов пока нет.") }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

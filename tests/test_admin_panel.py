@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import select
 
 from src.account.models.user_model import UserORM
+from src.product.models.product_model import ProductTranslationORM
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 from src.rbac.models.role_permission_model import RolePermissionORM
@@ -154,3 +155,138 @@ def test_admin_keeps_manually_selected_permissions(api, admin_client, role_pk):
     assert r.status_code in (302, 303), r.text[:300]
     login, _ = api.sso_login(pinfl)
     assert _personal_codes(api, login["headers"]) == ["applications.read"]
+
+
+@pytest.fixture
+def product_application(api, role_ids, banks, applicant, photo_upload):
+    bank = next(
+        (
+            b
+            for b in banks
+            if b.get("is_active", True)
+            and "SELF_EMPLOYED" in (b.get("allowed_subject_types") or [])
+        ),
+        None,
+    )
+    if bank is None:
+        pytest.skip("Нет активного банка для SELF_EMPLOYED")
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    product = api.product(fund, [bank["id"]])
+    r = api.client.post(
+        "/api/v1/applications",
+        headers=applicant,
+        json={"product_id": product["id"], "subject_type": "SELF_EMPLOYED"},
+    )
+    assert r.status_code == 201, r.text
+    app_id = data(r)["id"]
+    api.application_ids.append(app_id)
+    stage = product["stages"][0]
+    number, photo, _ = stage["fields"]
+    api.client.put(
+        f"/api/v1/applications/{app_id}/stages/{stage['id']}",
+        headers=applicant,
+        json={"values": {str(number["id"]): "777"}},
+    )
+    r = api.client.post(
+        f"/api/v1/applications/{app_id}/fields/{photo['id']}/files",
+        headers=applicant,
+        files=photo_upload(),
+    )
+    assert r.status_code == 201, r.text
+    return product, app_id, data(r)["id"]
+
+
+def test_admin_product_pages(admin_client, product_application):
+    product, app_id, file_id = product_application
+    for path in (
+        "/admin/product-orm/list",
+        "/admin/product-translation-orm/list",
+        f"/admin/product-orm/edit/{product['id']}",
+    ):
+        assert admin_client.get(path).status_code == 200, path
+
+    page = admin_client.get(f"/admin/product-orm/details/{product['id']}").text
+    assert "TEST Mahsulot" in page and "TEST Product" in page
+    assert "Комментарий" in page
+
+    page = admin_client.get(f"/admin/application-orm/details/{app_id}").text
+    assert f"/application-field-file/{file_id}" in page
+    assert "777" in page
+
+    r = admin_client.get(f"/admin/application-field-file/{file_id}")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert admin_client.get("/admin/application-field-file/999999999").status_code == 404
+
+
+def test_admin_product_edit_validation(api, admin_client, product_application):
+    product, _, _ = product_application
+    url = f"/admin/product-orm/edit/{product['id']}"
+    bank_ids = [str(b["id"]) for b in product["banks"]]
+
+    r = admin_client.post(
+        url,
+        data={
+            "allowed_subject_types": ["SELF_EMPLOYED"],
+            "accept_from": "2026-12-31",
+            "accept_to": "2026-01-01",
+            "banks": bank_ids,
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+
+    r = admin_client.post(
+        url,
+        data={
+            "allowed_subject_types": ["SELF_EMPLOYED", "FOO"],
+            "accept_from": "",
+            "accept_to": "",
+            "banks": bank_ids,
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+
+    r = admin_client.post(
+        url,
+        data={
+            "allowed_subject_types": ["SELF_EMPLOYED", "MCHJ"],
+            "accept_from": "2026-01-01",
+            "accept_to": "",
+            "banks": bank_ids,
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code in (302, 303)
+    detail = data(api.client.get(f"/api/v1/fund/products/{product['id']}", headers=api.superadmin))
+    assert detail["accept_from"] == "2026-01-01" and detail["accept_to"] is None
+    assert detail["allowed_subject_types"] == ["SELF_EMPLOYED", "MCHJ"]
+
+
+def test_admin_product_translation_edit(api, admin_client, product_application):
+    product, _, _ = product_application
+    rows = db_all(
+        select(ProductTranslationORM.id, ProductTranslationORM.language).where(
+            ProductTranslationORM.product_id == product["id"]
+        )
+    )
+    en_id = next(row_id for row_id, language in rows if language == "en")
+    url = f"/admin/product-translation-orm/edit/{en_id}"
+
+    r = admin_client.post(url, data={"name": "x", "description": ""}, follow_redirects=False)
+    assert r.status_code == 400
+    r = admin_client.post(
+        url, data={"name": "TEST Edited", "description": "only en"}, follow_redirects=False
+    )
+    assert r.status_code == 400
+    r = admin_client.post(
+        url, data={"name": "TEST Edited", "description": ""}, follow_redirects=False
+    )
+    assert r.status_code in (302, 303)
+
+    detail = data(api.client.get(f"/api/v1/fund/products/{product['id']}", headers=api.superadmin))
+    assert detail["translations"][2] == {
+        "language": "en",
+        "name": "TEST Edited",
+        "description": None,
+    }

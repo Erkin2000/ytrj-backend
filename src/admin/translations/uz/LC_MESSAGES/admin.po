@@ -956,3 +956,119 @@ msgstr "Jamgʻarma qarori (sana)"
 
 msgid "Причина Фонда"
 msgstr "Jamgʻarma sababi"
+
+# ---------- продукты ----------
+
+msgid "Продукты"
+msgstr "Mahsulotlar"
+
+msgid "Продукт"
+msgstr "Mahsulot"
+
+msgid "Перевод продукта"
+msgstr "Mahsulot tarjimasi"
+
+msgid "Переводы продуктов"
+msgstr "Mahsulot tarjimalari"
+
+msgid "Опубликован"
+msgstr "Eʼlon qilingan"
+
+msgid "Снят с публикации"
+msgstr "Eʼlondan olingan"
+
+msgid "Текст"
+msgstr "Matn"
+
+msgid "Число"
+msgstr "Son"
+
+msgid "Фото"
+msgstr "Surat"
+
+msgid "Русский"
+msgstr "Ruscha"
+
+msgid "Узбекский"
+msgstr "Oʻzbekcha"
+
+msgid "Английский"
+msgstr "Inglizcha"
+
+msgid "Язык"
+msgstr "Til"
+
+msgid "Приём с"
+msgstr "Qabul boshlanishi"
+
+msgid "Приём по"
+msgstr "Qabul tugashi"
+
+msgid "Этапов"
+msgstr "Bosqichlar"
+
+msgid "Файл анкеты"
+msgstr "Anketa fayli"
+
+msgid "Начало приёма не может быть позже окончания"
+msgstr "Qabul boshlanishi tugashidan keyin boʻlishi mumkin emas"
+
+msgid "Укажите хотя бы один тип субъекта"
+msgstr "Kamida bitta subyekt turini koʻrsating"
+
+msgid "Неизвестный тип субъекта: %s"
+msgstr "Nomaʼlum subyekt turi: %s"
+
+msgid "Название — не короче 2 символов"
+msgstr "Nom kamida 2 ta belgidan iborat boʻlishi kerak"
+
+msgid "Описание задаётся на всех трёх языках или ни на одном — меняйте его через API"
+msgstr "Tavsif uchala tilda yoki birortasida ham berilmaydi — uni API orqali oʻzgartiring"
+
+msgid "Анкета продукта"
+msgstr "Mahsulot anketasi"
+
+msgid "Заполнен"
+msgstr "Toʻldirilgan"
+
+msgid "Не заполнен"
+msgstr "Toʻldirilmagan"
+
+msgid "Есть заявки — этапы и поля не меняются"
+msgstr "Arizalar bor — bosqich va maydonlar oʻzgarmaydi"
+
+msgid "Заявок"
+msgstr "Arizalar"
+
+msgid "Приём"
+msgstr "Qabul"
+
+msgid "Копия продукта"
+msgstr "Mahsulot nusxasi"
+
+msgid "Этапы, поля и публикация настраиваются через API Фонда: /api/v1/fund/products."
+msgstr "Bosqichlar, maydonlar va eʼlon qilish Jamgʻarma API orqali sozlanadi: /api/v1/fund/products."
+
+msgid "Названия и описания"
+msgstr "Nomlar va tavsiflar"
+
+msgid "Условия"
+msgstr "Shartlar"
+
+msgid "Этапы и поля анкеты"
+msgstr "Anketa bosqichlari va maydonlari"
+
+msgid "Поле"
+msgstr "Maydon"
+
+msgid "Обязательное"
+msgstr "Majburiy"
+
+msgid "Файлов"
+msgstr "Fayllar"
+
+msgid "В этапе нет полей."
+msgstr "Bosqichda maydonlar yoʻq."
+
+msgid "Этапов пока нет."
+msgstr "Hozircha bosqichlar yoʻq."

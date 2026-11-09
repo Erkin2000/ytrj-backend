@@ -150,3 +150,18 @@ class DocumentStorage(FileStorage):
     @property
     def max_size_mb(self) -> int:
         return settings.DOCUMENT_MAX_SIZE_MB
+
+
+class FieldPhotoStorage(PhotoStorage):
+    """Файлы полей PHOTO анкеты продукта: applications/<id>/fields/."""
+
+    subdir = "fields"
+
+    def _application_dir(self, application_id: int) -> Path:
+        return FileStorage._application_dir(self, application_id)
+
+
+class FieldDocumentStorage(DocumentStorage):
+    """Файлы полей FILE анкеты продукта (PDF / DOCX): applications/<id>/fields/."""
+
+    subdir = "fields"

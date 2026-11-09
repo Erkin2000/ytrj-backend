@@ -2,10 +2,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, StringConstraints, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, StringConstraints
 
 from src.account.models.user_model import Gender
-from src.account.schemas.user_schema import InnStr, PassportStr, PhoneStr
 from src.application.enums import (
     ApplicationStatus,
     BankDecision,
@@ -15,23 +14,13 @@ from src.application.enums import (
     SubjectType,
 )
 from src.application.schemas.bank_schema import BankDTO
-from src.config import settings
+from src.product.schemas.product_schema import (
+    ProductBriefDTO,
+    ProductFieldDTO,
+    TranslationOutDTO,
+)
 
-LegalNameStr = Annotated[str, StringConstraints(min_length=2, max_length=255)]
 ReasonStr = Annotated[str, StringConstraints(min_length=3, max_length=2000)]
-FullNameStr = Annotated[str, StringConstraints(min_length=3, max_length=255)]
-
-
-def _normalize_passport(value):
-    if isinstance(value, str):
-        return value.replace(" ", "").upper()
-    return value
-
-
-def _date_in_past(value: date | None) -> date | None:
-    if value is not None and value >= date.today():
-        raise ValueError("Дата рождения должна быть в прошлом")
-    return value
 
 
 # ---------- вложенные ----------
@@ -46,152 +35,6 @@ class ApplicantSnapshotDTO(BaseModel):
     email: str | None = None
     gender: Gender | None = None
     date_of_birth: date | None = None
-
-
-class CompanyDTO(BaseModel):
-    """Реквизиты ООО и его руководителя. Руководитель может не совпадать с заявителем."""
-
-    inn: InnStr | None = Field(
-        default=None, description="СТИР (ИНН) предприятия.", examples=["305123456"]
-    )
-    director_full_name: FullNameStr | None = Field(
-        default=None, examples=["Каримов Бахтиёр Рустамович"]
-    )
-    director_passport: PassportStr | None = Field(default=None, examples=["AB7654321"])
-    director_phone: PhoneStr | None = Field(default=None, examples=["+998971234567"])
-    director_date_of_birth: date | None = Field(default=None, examples=["1985-11-02"])
-
-    _passport = field_validator("director_passport", mode="before")(_normalize_passport)
-    _dob = field_validator("director_date_of_birth")(_date_in_past)
-
-
-class FounderCreateDTO(BaseModel):
-    full_name: FullNameStr = Field(examples=["Усманов Жасур Абдуллаевич"])
-    passport_number: PassportStr = Field(examples=["AC1122334"])
-    date_of_birth: date = Field(examples=["1990-07-14"])
-
-    _passport = field_validator("passport_number", mode="before")(_normalize_passport)
-    _dob = field_validator("date_of_birth")(_date_in_past)
-
-
-class FounderUpdateDTO(BaseModel):
-    full_name: FullNameStr | None = None
-    passport_number: PassportStr | None = None
-    date_of_birth: date | None = None
-
-    _passport = field_validator("passport_number", mode="before")(_normalize_passport)
-    _dob = field_validator("date_of_birth")(_date_in_past)
-
-
-class FounderDTO(BaseModel):
-    id: int
-    full_name: str
-    passport_number: str
-    date_of_birth: date
-    created_at: datetime
-
-
-class LocationDTO(BaseModel):
-    lat: Decimal = Field(ge=-90, le=90, examples=[41.311081])
-    lng: Decimal = Field(ge=-180, le=180, examples=[69.240562])
-    region: str = Field(min_length=2, max_length=255, description="Область.", examples=["Ташкент"])
-    district: str = Field(
-        min_length=2, max_length=255, description="Район.", examples=["Яккасарайский район"]
-    )
-    makhalla: str = Field(
-        min_length=2, max_length=255, description="Махалля.", examples=["Махалля Кушбеги"]
-    )
-    address: str | None = Field(
-        default=None,
-        max_length=500,
-        description="Улица, дом (уточнение).",
-        examples=["ул. Бабура, 12"],
-    )
-    confirmed: bool = Field(
-        default=False,
-        description="Пользователь подтвердил, что это место деятельности, а не текущее местоположение.",
-    )
-
-
-class ProjectDTO(BaseModel):
-    """Проект, на который запрашивается финансирование."""
-
-    requested_amount: Decimal = Field(
-        gt=0,
-        max_digits=18,
-        decimal_places=2,
-        description="Запрашиваемая сумма, UZS.",
-        examples=[150000000],
-    )
-    loan_term_months: int = Field(
-        ge=settings.LOAN_TERM_MIN_MONTHS,
-        le=settings.LOAN_TERM_MAX_MONTHS,
-        description=(
-            f"Срок кредита в месяцах: от {settings.LOAN_TERM_MIN_MONTHS} "
-            f"до {settings.LOAN_TERM_MAX_MONTHS}."
-        ),
-        examples=[24],
-    )
-    total_cost: Decimal = Field(
-        gt=0,
-        max_digits=18,
-        decimal_places=2,
-        description="Общая стоимость проекта, UZS (не меньше запрашиваемой суммы).",
-        examples=[200000000],
-    )
-    jobs_count: int = Field(
-        ge=0, le=10000, description="Сколько рабочих мест будет создано.", examples=[5]
-    )
-    description: str = Field(
-        min_length=20,
-        max_length=4000,
-        description="Описание проекта: на что пойдут средства.",
-        examples=["Открытие швейного цеха: закупка 10 машин и аренда помещения на 12 месяцев."],
-    )
-
-    @field_validator("total_cost")
-    @classmethod
-    def _amount_within_cost(cls, value: Decimal, info: ValidationInfo) -> Decimal:
-        requested = info.data.get("requested_amount")
-        if requested is not None and requested > value:
-            raise ValueError("Запрашиваемая сумма не может превышать общую стоимость проекта")
-        return value
-
-
-class ProjectResponseDTO(BaseModel):
-    requested_amount: Decimal | None = None
-    loan_term_months: int | None = None
-    total_cost: Decimal | None = None
-    jobs_count: int | None = None
-    description: str | None = None
-
-
-class LocationResponseDTO(BaseModel):
-    lat: Decimal | None = None
-    lng: Decimal | None = None
-    region: str | None = None
-    district: str | None = None
-    makhalla: str | None = None
-    address: str | None = None
-    confirmed: bool = False
-
-
-class PhotoDTO(BaseModel):
-    id: int
-    file_name: str
-    content_type: str
-    size: int
-    url: str
-    created_at: datetime
-
-
-class DocumentDTO(BaseModel):
-    id: int
-    file_name: str
-    content_type: str
-    size: int
-    url: str
-    created_at: datetime
 
 
 class ActorDTO(BaseModel):
@@ -263,29 +106,35 @@ class BankStageDTO(BaseModel):
 
 
 class ApplicationCreateDTO(BaseModel):
-    subject_type: SubjectType | None = None
-    legal_name: LegalNameStr | None = None
-    company: CompanyDTO | None = Field(
+    product_id: int = Field(description="Продукт из `GET /products`.", examples=[3])
+    subject_type: SubjectType = Field(examples=["YATT"])
+    bank_id: int | None = Field(
         default=None,
-        description="Реквизиты предприятия и руководителя (только для ООО).",
-    )
-    founders: list[FounderCreateDTO] | None = Field(
-        default=None,
-        description="Учредители (только для ООО, хотя бы один).",
+        description="Банк из `banks` продукта; можно выбрать позже (`PUT /applications/{id}/bank`).",
+        examples=[1],
     )
 
 
 class ApplicationUpdateDTO(BaseModel):
-    subject_type: SubjectType | None = None
-    legal_name: LegalNameStr | None = None
-    company: CompanyDTO | None = Field(
+    product_id: int | None = Field(
         default=None,
-        description="Передаются только изменяемые поля; `null` очищает поле.",
+        description="Смена продукта очищает ответы анкеты и выбранный банк.",
+    )
+    subject_type: SubjectType | None = None
+
+
+class StageValuesDTO(BaseModel):
+    """Значения полей этапа: ключ — id поля, значение — строка; `null` или "" очищает поле.
+    Меняются только переданные поля. Файлы (PHOTO / FILE) загружаются отдельно."""
+
+    values: dict[int, str | None] = Field(
+        examples=[{"11": "150000000", "13": "2026-12-01", "14": "+998901234567"}]
     )
 
 
 class ApplicationFilterDTO(BaseModel):
     status: ApplicationStatus | None = None
+    product_id: int | None = None
     statuses: list[ApplicationStatus] | None = None
     bank_id: int | None = None
     subject_type: SubjectType | None = None
@@ -326,12 +175,37 @@ class CouncilDecisionDTO(BaseModel):
 # ---------- ответы ----------
 
 
+class FieldFileDTO(BaseModel):
+    id: int
+    file_name: str
+    content_type: str
+    size: int
+    url: str
+    created_at: datetime
+
+
+class FormFieldDTO(ProductFieldDTO):
+    value: str | None = Field(
+        default=None,
+        description="Значение (NUMBER — строкой, DATE — ГГГГ-ММ-ДД). Для PHOTO / FILE — null.",
+    )
+    files: list[FieldFileDTO] = []
+
+
+class FormStageDTO(BaseModel):
+    id: int
+    number: int
+    translations: list[TranslationOutDTO]
+    is_complete: bool = Field(description="Все обязательные поля этапа заполнены.")
+    fields: list[FormFieldDTO] = []
+
+
 class ApplicationListItemDTO(BaseModel):
     id: int
     number: str
     status: ApplicationStatus
+    product: ProductBriefDTO | None = None
     subject_type: SubjectType | None = None
-    legal_name: str | None = None
     bank: BankDTO | None = None
     applicant_full_name: str | None = None
     scoring_retry_required: bool = False
@@ -343,12 +217,7 @@ class ApplicationListItemDTO(BaseModel):
 class ApplicationDetailDTO(ApplicationListItemDTO):
     applicant_id: int
     applicant: ApplicantSnapshotDTO
-    company: CompanyDTO
-    founders: list[FounderDTO] = []
-    project: ProjectResponseDTO
-    location: LocationResponseDTO
-    photos: list[PhotoDTO] = []
-    documents: list[DocumentDTO] = []
+    form: list[FormStageDTO] = Field(default=[], description="Этапы продукта с ответами заявителя.")
     bank_stage: BankStageDTO
     fund_decided_at: datetime | None = None
     fund_reject_reason: str | None = None
@@ -366,17 +235,13 @@ class SubmissionCheckDTO(BaseModel):
 
     is_ready: bool
     missing: list[str]
+    product: ProductBriefDTO | None = None
+    product_available: bool = Field(
+        description="Продукт опубликован, в сроках приёма и подходит по типу субъекта."
+    )
     subject_type: SubjectType | None = None
-    legal_name: str | None = None
     bank: BankDTO | None = None
-    company: CompanyDTO
-    founders_count: int
-    project: ProjectResponseDTO
-    location: LocationResponseDTO
-    photos_count: int
-    max_photos: int
-    documents_count: int
-    max_documents: int
+    stages: list[FormStageDTO] = []
 
 
 class ProgressStepDTO(BaseModel):
@@ -416,64 +281,9 @@ class ApplicationAddDTO(BaseModel):
     applicant_email: str | None = None
     applicant_gender: Gender | None = None
     applicant_date_of_birth: date | None = None
-    subject_type: SubjectType | None = None
-    legal_name: str | None = None
+    product_id: int
+    subject_type: SubjectType
     bank_id: int | None = None
-    company_inn: str | None = None
-    director_full_name: str | None = None
-    director_passport: str | None = None
-    director_phone: str | None = None
-    director_date_of_birth: date | None = None
-
-
-class FounderAddDTO(BaseModel):
-    application_id: int
-    full_name: str
-    passport_number: str
-    date_of_birth: date
-
-
-class ApplicationPatchDTO(BaseModel):
-    """Частичное обновление — только заданные поля."""
-
-    status: ApplicationStatus | None = None
-    subject_type: SubjectType | None = None
-    legal_name: str | None = None
-    bank_id: int | None = None
-    location_lat: Decimal | None = None
-    location_lng: Decimal | None = None
-    location_address: str | None = None
-    location_confirmed: bool | None = None
-    submitted_at: datetime | None = None
-    scoring_retry_required: bool | None = None
-    scoring_error_message: str | None = None
-    sent_to_bank_at: datetime | None = None
-    bank_accepted_by_id: int | None = None
-    bank_accepted_at: datetime | None = None
-    bank_decision: BankDecision | None = None
-    bank_decision_reason: str | None = None
-    bank_decided_by_id: int | None = None
-    bank_decided_at: datetime | None = None
-    fund_decided_by_id: int | None = None
-    fund_decided_at: datetime | None = None
-    fund_reject_reason: str | None = None
-    sent_to_council_at: datetime | None = None
-    sent_to_council_by_id: int | None = None
-    council_decided_at: datetime | None = None
-    council_reject_reason: str | None = None
-    completed_at: datetime | None = None
-
-
-class PhotoAddDTO(BaseModel):
-    application_id: int
-    file_name: str
-    storage_path: str
-    content_type: str
-    size: int
-
-
-class DocumentAddDTO(PhotoAddDTO):
-    pass
 
 
 class StatusHistoryAddDTO(BaseModel):

@@ -3,24 +3,9 @@ import re
 # Человекочитаемые пояснения к незаполненным полям заявки / профиля (ключи
 # совпадают с `missing` в сводке перед отправкой). Остальные поля — "Required".
 REQUIRED_FIELD_MESSAGES: dict[str, str] = {
+    "product_id": "Select a product that is published, open for applications and fits the subject type",
     "subject_type": "Select the subject type",
-    "legal_name": "Legal name is required for this subject type",
-    "bank_id": "Select an active bank that works with this subject type",
-    "location": "Set the business location: coordinates, region, district and makhalla",
-    "location.confirmed": "Confirm that this is the business location",
-    "founders": "Add at least one founder (MCHJ)",
-    "photos": "Too many photos attached",
-    "documents": "Too many documents attached",
-    "company.inn": "Company INN (STIR) is required",
-    "company.director_full_name": "Director full name is required",
-    "company.director_passport": "Director passport is required",
-    "company.director_phone": "Director phone is required",
-    "company.director_date_of_birth": "Director date of birth is required",
-    "project.requested_amount": "Requested amount is required",
-    "project.loan_term_months": "Loan term is required",
-    "project.total_cost": "Total project cost is required",
-    "project.jobs_count": "Number of jobs to be created is required",
-    "project.description": "Project description is required",
+    "bank_id": "Select an active bank of the product that works with this subject type",
     "applicant.phone": "Fill in your phone in the profile",
     "applicant.passport_number": "Fill in your passport in the profile",
     "applicant.inn": "Fill in your INN in the profile",
@@ -33,14 +18,21 @@ REQUIRED_FIELD_MESSAGES: dict[str, str] = {
     "email": "Email is required",
     "gender": "Gender is required",
     "date_of_birth": "Date of birth is required",
+    "bank_ids": "Add at least one active bank",
+    "stages": "Add at least one stage",
 }
 
 
+def _required_message(field: str) -> str:
+    if field.startswith("fields."):
+        return "Fill in this required field of the product form"
+    if field.startswith("stages.") and field.endswith(".fields"):
+        return "Add at least one field to this stage"
+    return REQUIRED_FIELD_MESSAGES.get(field, "Required")
+
+
 def missing_to_errors(missing: list[str]) -> list[dict]:
-    return [
-        {"field": field, "message": REQUIRED_FIELD_MESSAGES.get(field, "Required")}
-        for field in missing
-    ]
+    return [{"field": field, "message": _required_message(field)} for field in missing]
 
 
 def _snake(name: str) -> str:
@@ -193,14 +185,6 @@ class ApplicationNotFoundException(NotFoundException):
     message = "Application not found"
 
 
-class PhotoNotFoundException(NotFoundException):
-    message = "Photo not found in this application"
-
-
-class DocumentNotFoundException(NotFoundException):
-    message = "Document not found in this application"
-
-
 class DemandDocumentNotFoundException(NotFoundException):
     message = "Demand document not found"
 
@@ -297,7 +281,7 @@ class InvalidStatusTransitionException(BadRequestException):
 
 class ApplicationValidationException(BadRequestException):
     message = "Application is not ready for submission"
-    example_missing = ["bank_id", "location.confirmed", "project.requested_amount"]
+    example_missing = ["bank_id", "fields.12", "applicant.phone"]
 
     def __init__(self, missing: list[str] | None = None, message: str | None = None):
         self.missing = missing or []
@@ -313,30 +297,6 @@ class BankSubjectTypeMismatchException(BadRequestException):
     field = "bank_id"
 
 
-class PhotoLimitExceededException(BadRequestException):
-    message = "Maximum number of photos reached"
-    field = "file"
-
-
-class FounderNotFoundException(NotFoundException):
-    message = "Founder not found in this application"
-
-
-class FounderLimitExceededException(BadRequestException):
-    message = "Maximum number of founders reached"
-    field = "founders"
-
-
-class FoundersNotAllowedException(BadRequestException):
-    message = "Founders are specified only for MCHJ (LLC)"
-    field = "founders"
-
-
-class CompanyNotAllowedException(BadRequestException):
-    message = "Company details are specified only for MCHJ (LLC)"
-    field = "company"
-
-
 class InvalidPhotoException(BadRequestException):
     message = "Only JPG, PNG and WEBP images are allowed"
     field = "file"
@@ -344,11 +304,6 @@ class InvalidPhotoException(BadRequestException):
 
 class PhotoTooLargeException(BadRequestException):
     message = "Photo is too large"
-    field = "file"
-
-
-class DocumentLimitExceededException(BadRequestException):
-    message = "Maximum number of documents reached"
     field = "file"
 
 
@@ -360,16 +315,6 @@ class InvalidDocumentException(BadRequestException):
 class DocumentTooLargeException(BadRequestException):
     message = "Document is too large"
     field = "file"
-
-
-class LocationNotConfirmedException(BadRequestException):
-    message = "Business location must be confirmed"
-    field = "location.confirmed"
-
-
-class LegalNameRequiredException(BadRequestException):
-    message = "Legal name is required for this subject type"
-    field = "legal_name"
 
 
 class ScoringNotPendingException(BadRequestException):
@@ -390,6 +335,80 @@ class CouncilDecisionAlreadyMadeException(BadRequestException):
 
 class NoCouncilMembersException(BadRequestException):
     message = "No active council members to assign"
+
+
+# ---------- продукты ----------
+
+
+class ProductNotFoundException(NotFoundException):
+    message = "Product not found"
+
+
+class ProductStageNotFoundException(NotFoundException):
+    message = "Stage not found in this product"
+
+
+class ProductFieldNotFoundException(NotFoundException):
+    message = "Field not found in this product"
+
+
+class ProductLockedException(ConflictException):
+    message = (
+        "Product already has applications: stages and fields cannot be changed. "
+        "Copy the product to change its form"
+    )
+
+
+class ProductInUseException(ConflictException):
+    message = "Product already has applications and cannot be deleted; archive it instead"
+
+
+class StageNumberTakenException(ConflictException):
+    message = "Stage with this number already exists in the product"
+    field = "number"
+
+
+class ProductNotReadyException(BadRequestException):
+    message = "Product is not ready for publishing"
+    example_missing = ["bank_ids", "stages"]
+
+    def __init__(self, missing: list[str] | None = None, message: str | None = None):
+        self.missing = missing or []
+        super().__init__(message)
+
+
+class ProductStatusException(BadRequestException):
+    message = "Action is not allowed in the current product status"
+
+
+class ProductNotAvailableException(BadRequestException):
+    message = (
+        "Product is not available: it is not published, out of the acceptance period "
+        "or not intended for this subject type"
+    )
+    field = "product_id"
+
+
+class BankNotInProductException(BadRequestException):
+    message = "Selected bank does not work with this product"
+    field = "bank_id"
+
+
+class FieldValueInvalidException(BadRequestException):
+    message = "Invalid field values"
+
+
+class FileFieldException(BadRequestException):
+    message = "Files are uploaded only to PHOTO and FILE fields; values are not set for them"
+
+
+class FieldFileLimitExceededException(BadRequestException):
+    message = "Maximum number of files for this field reached"
+    field = "file"
+
+
+class FieldFileNotFoundException(NotFoundException):
+    message = "File not found in this field"
 
 
 # ---------- политика входа: YIA SSO только для заявителей ----------

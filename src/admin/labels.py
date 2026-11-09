@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from markupsafe import Markup, escape
+from sqladmin.i18n import get_locale
 
 from src.admin.i18n import _
 
@@ -56,6 +57,46 @@ SUBJECT_LABELS: dict[str, str] = {
     "MCHJ": "ООО",
     "SELF_EMPLOYED": "Самозанятый",
 }
+
+# продукт Фонда
+PRODUCT_STATUS_LABELS: dict[str, tuple[str, str]] = {
+    "DRAFT": ("Черновик", "secondary"),
+    "PUBLISHED": ("Опубликован", "green"),
+    "ARCHIVED": ("Снят с публикации", "orange"),
+}
+
+FIELD_TYPE_LABELS: dict[str, str] = {
+    "STRING": "Текст",
+    "NUMBER": "Число",
+    "DATE": "Дата",
+    "PHONE": "Телефон",
+    "EMAIL": "Email",
+    "PHOTO": "Фото",
+    "FILE": "Файл",
+}
+
+LANGUAGE_LABELS: dict[str, str] = {"ru": "Русский", "uz": "Узбекский", "en": "Английский"}
+
+
+def tr_name(translations) -> str:
+    """Название из переводов (ru / uz / en) на языке админки; иначе — русское."""
+    items = list(translations or [])
+    if not items:
+        return "—"
+    locale = (get_locale() or "ru").split("_")[0]
+    by_language = {getattr(t.language, "value", t.language): t.name for t in items}
+    return by_language.get(locale) or by_language.get("ru") or items[0].name
+
+
+def field_type_label(value) -> str:
+    key = getattr(value, "value", value)
+    return _(FIELD_TYPE_LABELS.get(key, key)) if key else "—"
+
+
+def language_label(value) -> str:
+    key = getattr(value, "value", value)
+    return _(LANGUAGE_LABELS.get(key, key)) if key else "—"
+
 
 DECISION_LABELS: dict[str, tuple[str, str]] = {
     "APPROVED": ("Одобрено", "green"),

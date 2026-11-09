@@ -63,6 +63,14 @@ def png_bytes() -> bytes:
     )
 
 
+def tr(ru: str, uz: str, en: str) -> list[dict[str, str]]:
+    return [
+        {"language": "ru", "name": ru},
+        {"language": "uz", "name": uz},
+        {"language": "en", "name": en},
+    ]
+
+
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -116,6 +124,7 @@ class Api:
         self.superadmin = superadmin
         self.user_ids: list[int] = []
         self.application_ids: list[int] = []
+        self.product_ids: list[int] = []
 
     @staticmethod
     def fresh_pinfl() -> str:
@@ -159,12 +168,67 @@ class Api:
         login, me = self.sso_login(pinfl)
         return login["headers"], me
 
+    def product(self, headers, bank_ids, subject_types=None, publish=True):
+        c = self.client
+        body = {
+            "translations": tr("TEST Продукт", "TEST Mahsulot", "TEST Product"),
+            "bank_ids": bank_ids,
+        }
+        if subject_types:
+            body["allowed_subject_types"] = subject_types
+        r = c.post("/api/v1/fund/products", headers=headers, json=body)
+        assert r.status_code == 201, r.text
+        product_id = data(r)["id"]
+        self.product_ids.append(product_id)
+
+        r = c.post(
+            f"/api/v1/fund/products/{product_id}/stages",
+            headers=headers,
+            json={"number": 1, "translations": tr("Проект", "Loyiha", "Project")},
+        )
+        assert r.status_code == 201, r.text
+        stage_id = data(r)["stages"][0]["id"]
+        for field in (
+            {
+                "field_type": "NUMBER",
+                "translations": tr("Сумма", "Summa", "Amount"),
+            },
+            {
+                "field_type": "PHOTO",
+                "translations": tr("Фото", "Surat", "Photo"),
+                "max_files": 2,
+            },
+            {
+                "field_type": "STRING",
+                "translations": tr("Комментарий", "Izoh", "Comment"),
+                "is_required": False,
+            },
+        ):
+            r = c.post(
+                f"/api/v1/fund/products/{product_id}/stages/{stage_id}/fields",
+                headers=headers,
+                json=field,
+            )
+            assert r.status_code == 201, r.text
+        if publish:
+            r = c.post(f"/api/v1/fund/products/{product_id}/publish", headers=headers)
+            assert r.status_code == 200, r.text
+        return data(r)
+
     def cleanup(self) -> None:
         async def run(session):
             if self.application_ids:
                 await session.execute(
                     text("DELETE FROM applications WHERE id = ANY(:ids)"),
                     {"ids": self.application_ids},
+                )
+            if self.product_ids:
+                await session.execute(
+                    text("DELETE FROM applications WHERE product_id = ANY(:ids)"),
+                    {"ids": self.product_ids},
+                )
+                await session.execute(
+                    text("DELETE FROM products WHERE id = ANY(:ids)"), {"ids": self.product_ids}
                 )
             if self.user_ids:
                 await session.execute(delete(UserORM).where(UserORM.id.in_(self.user_ids)))
@@ -188,3 +252,23 @@ def api(client, superadmin) -> Iterator[Api]:
 @pytest.fixture
 def photo_upload():
     return lambda name="photo.png": {"file": (name, io.BytesIO(png_bytes()), "image/png")}
+
+
+@pytest.fixture
+def applicant(api):
+    login, _ = api.sso_login(full_name="TEST Applicant")
+    headers = login["headers"]
+    r = api.client.patch(
+        "/api/v1/auth/me",
+        headers=headers,
+        json={
+            "phone": "+998901234567",
+            "passport_number": "AA" + "".join(random.choices("0123456789", k=7)),
+            "inn": "".join(random.choices("0123456789", k=9)),
+            "email": "test@example.com",
+            "gender": "MALE",
+            "date_of_birth": "1995-05-05",
+        },
+    )
+    assert r.status_code == 200 and data(r)["profile_complete"], r.text
+    return headers

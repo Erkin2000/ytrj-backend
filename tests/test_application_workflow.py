@@ -1,5 +1,3 @@
-import random
-
 import pytest
 
 from src.config import settings
@@ -21,68 +19,37 @@ def bank(banks):
 
 
 @pytest.fixture
-def applicant(api):
-    login, _ = api.sso_login(full_name="TEST Applicant")
-    headers = login["headers"]
-    r = api.client.patch(
-        "/api/v1/auth/me",
-        headers=headers,
-        json={
-            "phone": "+998901234567",
-            "passport_number": "AA" + "".join(random.choices("0123456789", k=7)),
-            "inn": "".join(random.choices("0123456789", k=9)),
-            "email": "test@example.com",
-            "gender": "MALE",
-            "date_of_birth": "1995-05-05",
-        },
-    )
-    assert r.status_code == 200 and data(r)["profile_complete"], r.text
-    return headers
+def product(api, role_ids, bank):
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    return api.product(fund, [bank["id"]])
 
 
 @pytest.fixture
-def submitted_application(api, applicant, bank, photo_upload):
+def submitted_application(api, applicant, bank, product, photo_upload):
     c = api.client
-    r = c.post("/api/v1/applications", headers=applicant, json={"subject_type": "SELF_EMPLOYED"})
+    r = c.post(
+        "/api/v1/applications",
+        headers=applicant,
+        json={"product_id": product["id"], "subject_type": "SELF_EMPLOYED", "bank_id": bank["id"]},
+    )
     assert r.status_code == 201, r.text
     app_id = data(r)["id"]
     api.application_ids.append(app_id)
 
-    steps = [
-        (
-            "project",
-            {
-                "requested_amount": 50_000_000,
-                "loan_term_months": 24,
-                "total_cost": 60_000_000,
-                "jobs_count": 3,
-                "description": "TEST project description long enough",
-            },
-        ),
-        (
-            "location",
-            {
-                "lat": 41.31,
-                "lng": 69.28,
-                "region": "Toshkent",
-                "district": "Yunusobod",
-                "makhalla": "TEST",
-                "confirmed": True,
-            },
-        ),
-        ("bank", {"bank_id": bank["id"]}),
-    ]
-    for block, body in steps:
-        r = c.put(f"/api/v1/applications/{app_id}/{block}", headers=applicant, json=body)
-        assert r.status_code == 200, (block, r.text)
-
-    for i in range(settings.MAX_APPLICATION_PHOTOS):
-        r = c.post(
-            f"/api/v1/applications/{app_id}/photos",
-            headers=applicant,
-            files=photo_upload(f"p{i}.png"),
-        )
-        assert r.status_code in (200, 201), r.text
+    stage = product["stages"][0]
+    number, photo, _ = stage["fields"]
+    r = c.put(
+        f"/api/v1/applications/{app_id}/stages/{stage['id']}",
+        headers=applicant,
+        json={"values": {str(number["id"]): "50 000 000"}},
+    )
+    assert r.status_code == 200, r.text
+    r = c.post(
+        f"/api/v1/applications/{app_id}/fields/{photo['id']}/files",
+        headers=applicant,
+        files=photo_upload(),
+    )
+    assert r.status_code == 201, r.text
 
     r = c.post(f"/api/v1/applications/{app_id}/submit", headers=applicant)
     assert r.status_code == 200, r.text

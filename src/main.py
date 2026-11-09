@@ -23,6 +23,7 @@ from src.common.responses.validation_handler import validation_exception_handler
 from src.common.swagger.i18n import DESCRIPTION_UZ, translate_openapi
 from src.common.swagger.openapi import restore_nulls
 from src.config import settings
+from src.product.apis import fund_product_api, product_api
 from src.rbac.apis import permission_api, role_api
 
 DESCRIPTION = """
@@ -33,7 +34,8 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 - **auth** — вход через YIA Portal (SSO) и по паролю, JWT access/refresh с ротацией, сессии;
 - **rbac** — роли и права по модулям (Create / Read / Update / Delete / Approve), серверная проверка;
 - **account** — пользователи, статусы, scope (банк), последний вход и сессии;
-- **application** — заявки: черновик → скоринг KATM → Фонд → Совет → банк → завершение.
+- **product** — продукты Фонда: названия, банки, сроки приёма, этапы и поля анкеты;
+- **application** — заявки по продуктам: черновик → скоринг KATM → Фонд → Совет → банк → завершение.
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
@@ -54,8 +56,16 @@ TAGS_METADATA = [
     {"name": "RBAC: права", "description": "Каталог прав платформы."},
     {"name": "Каталог банков", "description": "Банки-партнёры и правила выбора по типу субъекта."},
     {
+        "name": "Продукты: управление (Фонд)",
+        "description": "Продукты, их банки, сроки приёма, этапы и поля анкеты; публикация.",
+    },
+    {
+        "name": "Продукты: каталог заявителя",
+        "description": "Опубликованные продукты, по которым сейчас принимаются заявки.",
+    },
+    {
         "name": "Заявки: кабинет заявителя",
-        "description": "Создание, заполнение, отправка и отслеживание заявки.",
+        "description": "Заявка по продукту: ответы на поля этапов, файлы, отправка, отслеживание.",
     },
     {
         "name": "Заявки: рабочее окно Фонда",
@@ -160,6 +170,8 @@ app.include_router(user_api.router, prefix=API_PREFIX)
 app.include_router(role_api.router, prefix=API_PREFIX)
 app.include_router(permission_api.router, prefix=API_PREFIX)
 app.include_router(bank_api.router, prefix=API_PREFIX)
+app.include_router(fund_product_api.router, prefix=API_PREFIX)
+app.include_router(product_api.router, prefix=API_PREFIX)
 app.include_router(application_api.router, prefix=API_PREFIX)
 app.include_router(fund_api.router, prefix=API_PREFIX)
 app.include_router(council_api.router, prefix=API_PREFIX)

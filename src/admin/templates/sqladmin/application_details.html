@@ -7,7 +7,7 @@
     <div class="card-body">
       <div class="row align-items-center g-3">
         <div class="col">
-          <div class="page-pretitle">{{ _("Заявка") }} · {{ subject_label(a.subject_type) }}{% if a.legal_name %} · {{ a.legal_name }}{% endif %}</div>
+          <div class="page-pretitle">{{ _("Заявка") }} · {{ subject_label(a.subject_type) }}{% if a.product %} · <a href="{{ url_for('admin:details', identity='product-orm', pk=a.product_id) }}">{{ tr_name(a.product.translations) }}</a>{% elif a.legal_name %} · {{ a.legal_name }}{% endif %}</div>
           <h2 class="page-title mb-1">{{ a.number }} &nbsp;{{ status_badge(a.status) }}
             {% if a.scoring_retry_required %}<span class="badge bg-warning-lt ms-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ _("Ожидает повтора KATM") }}</span>{% endif %}
           </h2>
@@ -34,6 +34,52 @@
     </div>
   </div>
 </div>
+
+{% if a.product %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{{ _("Анкета продукта") }}</h3>
+      <div class="card-actions"><a href="{{ url_for('admin:details', identity='product-orm', pk=a.product_id) }}">{{ tr_name(a.product.translations) }}</a></div>
+    </div>
+    {% for stage in application_form(a) %}
+    <div class="card-header bg-transparent">
+      <h4 class="card-title">{{ stage.number }}. {{ tr_name(stage.translations) }}</h4>
+      <div class="card-actions">{% if stage.is_complete %}<span class="badge bg-green-lt">{{ _("Заполнен") }}</span>{% else %}<span class="badge bg-yellow-lt">{{ _("Не заполнен") }}</span>{% endif %}</div>
+    </div>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <tbody>
+          {% for f in stage.fields %}
+          <tr>
+            <td style="width: 35%">{{ tr_name(f.translations) }}{% if f.is_required %} <span class="text-danger">*</span>{% endif %}
+              <div class="text-muted small">{{ field_type_label(f.field_type) }}</div></td>
+            <td>
+              {% if f.files %}
+                <div class="jg-photos">
+                {% for file in f.files %}
+                  {% if file.content_type.startswith("image/") %}
+                  <a href="{{ admin.base_url }}/application-field-file/{{ file.id }}" target="_blank" title="{{ file.file_name }} · {{ fmt_size(file.size) }}"><img src="{{ admin.base_url }}/application-field-file/{{ file.id }}" alt="{{ file.file_name }}" loading="lazy"></a>
+                  {% else %}
+                  <a href="{{ admin.base_url }}/application-field-file/{{ file.id }}" target="_blank"><i class="fa-solid fa-file-arrow-down me-1"></i>{{ file.file_name }}</a> <span class="text-muted small">{{ fmt_size(file.size) }}</span>
+                  {% endif %}
+                {% endfor %}
+                </div>
+              {% elif f.value %}
+                <span style="white-space: pre-line">{{ f.value }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div class="col-lg-7">
   <div class="card">
@@ -88,6 +134,7 @@
 </div>
 
 <div class="col-lg-5">
+  {% if not a.product_id %}
   <div class="card">
     <div class="card-header"><h3 class="card-title">{{ _("Фотографии") }} <span class="badge bg-secondary-lt ms-2">{{ a.photos | length }}</span></h3></div>
     <div class="card-body">
@@ -181,6 +228,8 @@
       </dl>
     </div>
   </div>
+
+  {% endif %}
 
   <div class="card mt-3">
     <div class="card-header"><h3 class="card-title">{{ _("Решения Совета") }}</h3></div>

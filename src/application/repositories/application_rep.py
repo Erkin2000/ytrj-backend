@@ -8,6 +8,7 @@ from src.application.mappers import ApplicationDataMapper
 from src.application.models.application_model import ApplicationORM
 from src.application.models.council_assignment_model import CouncilAssignmentORM
 from src.application.schemas.application_schema import ApplicationDetailDTO, ApplicationFilterDTO
+from src.product.models.product_model import ProductORM, ProductStageORM
 from src.utils.base_rep.base_rep import BaseRepository
 
 
@@ -29,9 +30,11 @@ class ApplicationRepository(BaseRepository):
 
     def _detail_stmt(self) -> Select:
         return select(self.model).options(
-            selectinload(self.model.photos),
-            selectinload(self.model.documents),
-            selectinload(self.model.founders),
+            selectinload(self.model.product)
+            .selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.fields),
+            selectinload(self.model.field_values),
+            selectinload(self.model.field_files),
             selectinload(self.model.council_assignments),
             selectinload(self.model.demand_document),
             selectinload(self.model.resource_allocation),
@@ -52,6 +55,8 @@ class ApplicationRepository(BaseRepository):
             stmt = stmt.where(self.model.status == filters.status)
         if filters.statuses:
             stmt = stmt.where(self.model.status.in_(filters.statuses))
+        if filters.product_id is not None:
+            stmt = stmt.where(self.model.product_id == filters.product_id)
         if filters.bank_id is not None:
             stmt = stmt.where(self.model.bank_id == filters.bank_id)
         if filters.subject_type is not None:

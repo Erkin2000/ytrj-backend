@@ -1,5 +1,5 @@
-"""Операции заявителя: черновик, форма, место деятельности, фото, отправка,
-прогресс и история."""
+"""Операции заявителя: заявка по продукту Фонда, ответы на поля этапов, файлы,
+отправка, прогресс и история."""
 
 from pathlib import Path
 
@@ -8,21 +8,10 @@ from fastapi import UploadFile
 from src.account.models.user_model import UserORM
 from src.account.profile import missing_profile_fields
 from src.account.schemas.user_schema import CurrentUserDTO
-from src.application.enums import (
-    SUBJECT_TYPES_WITH_COMPANY,
-    SUBJECT_TYPES_WITH_FOUNDERS,
-    SUBJECT_TYPES_WITH_LEGAL_NAME,
-    ApplicationStatus,
-    SubjectType,
-)
-from src.application.mappers import (
-    ApplicationDataMapper,
-    FounderDataMapper,
-    PhotoDataMapper,
-    company_dto,
-    location_dto,
-    project_dto,
-)
+from src.application.enums import ApplicationStatus, SubjectType
+from src.application.field_values import normalize_value
+from src.application.mappers import ApplicationDataMapper, build_form, field_file_dto
+from src.application.models.answer_model import ApplicationFieldFileORM, ApplicationFieldValueORM
 from src.application.models.application_model import ApplicationORM
 from src.application.schemas.application_schema import (
     ApplicationAddDTO,
@@ -32,25 +21,15 @@ from src.application.schemas.application_schema import (
     ApplicationFilterDTO,
     ApplicationProgressDTO,
     ApplicationUpdateDTO,
-    CompanyDTO,
-    DocumentAddDTO,
-    DocumentDTO,
-    FounderAddDTO,
-    FounderCreateDTO,
-    FounderDTO,
-    FounderUpdateDTO,
-    LocationDTO,
-    LocationResponseDTO,
-    PhotoAddDTO,
-    PhotoDTO,
-    ProjectDTO,
-    ProjectResponseDTO,
+    FieldFileDTO,
+    FormStageDTO,
+    StageValuesDTO,
     StatusHistoryDTO,
     SubmissionCheckDTO,
 )
 from src.application.schemas.bank_schema import BankDTO
 from src.application.services.base import ApplicationBaseService, now
-from src.application.services.photo_storage import DocumentStorage, PhotoStorage
+from src.application.services.photo_storage import FieldDocumentStorage, FieldPhotoStorage
 from src.application.services.scoring_service import ScoringService
 from src.application.workflow import build_progress
 from src.common.responses.exceptions import (
@@ -58,23 +37,26 @@ from src.common.responses.exceptions import (
     ApplicationNotEditableException,
     ApplicationValidationException,
     BankNotFoundException,
+    BankNotInProductException,
     BankSubjectTypeMismatchException,
-    CompanyNotAllowedException,
-    DocumentLimitExceededException,
-    DocumentNotFoundException,
-    FounderLimitExceededException,
-    FounderNotFoundException,
-    FoundersNotAllowedException,
-    PhotoLimitExceededException,
-    PhotoNotFoundException,
+    FieldFileLimitExceededException,
+    FieldFileNotFoundException,
+    FieldValueInvalidException,
+    FileFieldException,
+    ProductFieldNotFoundException,
+    ProductNotAvailableException,
+    ProductStageNotFoundException,
     UserNotFoundException,
 )
-from src.config import settings
+from src.product.enums import FILE_FIELD_TYPES, FieldType
+from src.product.mappers import product_brief
+from src.product.models.product_model import ProductFieldORM, ProductORM, ru_name
+from src.product.services.product_service import is_available
 
 
 class ApplicationService(ApplicationBaseService):
-    storage = PhotoStorage()
-    document_storage = DocumentStorage()
+    photo_storage = FieldPhotoStorage()
+    document_storage = FieldDocumentStorage()
 
     # ---------- чтение ----------
 
@@ -131,27 +113,21 @@ class ApplicationService(ApplicationBaseService):
         if missing:
             raise ApplicantProfileIncompleteException(missing=missing)
 
-        self._assert_company_allowed(data.subject_type, data.company)
-        self._assert_founders_allowed(data.subject_type, data.founders)
-
-        number = await self.db.application.next_number()
+        product = await self._available_product(data.product_id, data.subject_type)
+        if data.bank_id is not None:
+            await self._validate_bank(product, data.subject_type, data.bank_id)
 
         created = await self.db.application.add(
             ApplicationAddDTO(
-                number=number,
+                number=await self.db.application.next_number(),
                 applicant_id=applicant.id,
                 # Снимок данных заявителя; в заявке они не редактируются.
                 **self._applicant_snapshot(applicant),
+                product_id=product.id,
                 subject_type=data.subject_type,
-                legal_name=self._legal_name_for(data.subject_type, data.legal_name),
-                **self._company_columns(data.company),
+                bank_id=data.bank_id,
             )
         )
-
-        for founder in data.founders or []:
-            await self.db.application_founder.add(
-                FounderAddDTO(application_id=created.id, **founder.model_dump())
-            )
 
         application = await self.get_orm_or_404(created.id)
         await self.add_history(
@@ -159,7 +135,7 @@ class ApplicationService(ApplicationBaseService):
             to_status=ApplicationStatus.DRAFT,
             event="created",
             actor=user,
-            comment="Заявка создана",
+            comment=f"Заявка создана по продукту «{ru_name(product.translations)}»",
         )
         await self.db.commit()
 
@@ -171,65 +147,67 @@ class ApplicationService(ApplicationBaseService):
         user: CurrentUserDTO,
         data: ApplicationUpdateDTO,
     ) -> ApplicationDetailDTO:
+        """Смена продукта или типа субъекта в черновике."""
         application = await self._get_editable(application_id, user)
-        changes = data.model_dump(exclude_unset=True)
+        subject_type = data.subject_type or application.subject_type
+        product_id = data.product_id or application.product_id
 
-        subject_type = changes.get("subject_type", application.subject_type)
+        if product_id is None:
+            raise ProductNotAvailableException()
+        product = await self._available_product(product_id, subject_type)
 
-        if data.company is not None:
-            self._assert_company_allowed(subject_type, data.company)
-
-        if (
-            subject_type != application.subject_type
-            and application.bank is not None
-            and subject_type not in application.bank.allowed_subject_types
-        ):
-            # Выбранный ранее банк не работает с новым типом субъекта — выбор сбрасывается,
-            # заявитель выбирает банк заново (PUT /applications/{id}/bank).
+        if product.id != application.product_id:
+            # Другая анкета: ответы и банк прежнего продукта больше не подходят.
+            await self._clear_answers(application)
+            application.product_id = product.id
             application.bank_id = None
 
         application.subject_type = subject_type
-        application.legal_name = self._legal_name_for(
-            subject_type,
-            changes.get("legal_name", application.legal_name),
-        )
-
-        if data.company is not None:
-            # Частичное обновление: меняются только переданные поля руководителя.
-            for column, value in self._company_columns(data.company, partial=True).items():
-                setattr(application, column, value)
-
-        if subject_type not in SUBJECT_TYPES_WITH_COMPANY:
-            # ИП / самозанятый: реквизиты предприятия не используются.
-            for column in self._company_columns(None):
-                setattr(application, column, None)
-
-        if subject_type not in SUBJECT_TYPES_WITH_FOUNDERS and application.founders:
-            # ИП / самозанятый: список учредителей не используется.
-            await self.db.application_founder.delete(application_id=application.id)
+        bank = application.bank
+        if bank is not None and (
+            subject_type not in bank.allowed_subject_types
+            or bank.id not in {b.id for b in product.banks}
+        ):
+            application.bank_id = None
 
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
+
+    async def delete_draft(self, application_id: int, user: CurrentUserDTO) -> None:
+        application = await self._get_editable(application_id, user)
+
+        # Файлы черновика удаляются вместе с каталогом заявки.
+        await self.photo_storage.delete_application_dir(application.id)
+
+        await self.db.application.delete(id=application.id)
+        await self.db.commit()
 
     # ---------- банк ----------
 
     async def set_bank(
         self, application_id: int, user: CurrentUserDTO, data: ApplicationBankDTO
     ) -> BankDTO:
-        """Заявитель выбирает банк из каталога (GET /banks?subject_type=...).
-        Банк должен быть активен и работать с типом субъекта заявки."""
+        """Заявитель выбирает банк из банков продукта (`banks` в `GET /products/{id}`)."""
         application = await self._get_editable(application_id, user)
+        if application.product is None:
+            raise ProductNotAvailableException()
 
-        bank = await self._validate_bank(application.subject_type, data.bank_id)
+        bank = await self._validate_bank(
+            application.product, application.subject_type, data.bank_id
+        )
         application.bank_id = bank.id
 
         await self.db.commit()
         return bank
 
-    async def _validate_bank(self, subject_type: SubjectType | None, bank_id: int) -> BankDTO:
+    async def _validate_bank(
+        self, product: ProductORM, subject_type: SubjectType | None, bank_id: int
+    ) -> BankDTO:
         bank = await self.db.bank.get_one_or_none(id=bank_id)
         if bank is None or not bank.is_active:
             raise BankNotFoundException(f"Bank {bank_id} not found or inactive")
+        if bank.id not in {b.id for b in product.banks}:
+            raise BankNotInProductException()
         if subject_type is not None and subject_type not in bank.allowed_subject_types:
             raise BankSubjectTypeMismatchException(
                 f"Bank '{bank.name}' does not work with subject type {subject_type.value}; "
@@ -237,211 +215,119 @@ class ApplicationService(ApplicationBaseService):
             )
         return bank
 
-    # ---------- учредители ----------
+    # ---------- ответы на поля этапов ----------
 
-    async def add_founder(
-        self, application_id: int, user: CurrentUserDTO, data: FounderCreateDTO
-    ) -> FounderDTO:
-        application = await self._get_editable(application_id, user)
-        self._assert_founders_allowed(application.subject_type, [data])
-
-        count = await self.db.application_founder.count_for_application(application.id)
-        if count >= settings.MAX_APPLICATION_FOUNDERS:
-            raise FounderLimitExceededException(
-                f"Maximum number of founders reached: {count} of "
-                f"{settings.MAX_APPLICATION_FOUNDERS}"
-            )
-
-        founder = await self.db.application_founder.add(
-            FounderAddDTO(application_id=application.id, **data.model_dump())
-        )
-        await self.db.commit()
-        return founder
-
-    async def update_founder(
+    async def save_stage(
         self,
         application_id: int,
         user: CurrentUserDTO,
-        founder_id: int,
-        data: FounderUpdateDTO,
-    ) -> FounderDTO:
+        stage_id: int,
+        data: StageValuesDTO,
+    ) -> FormStageDTO:
         application = await self._get_editable(application_id, user)
+        stage = next(
+            (
+                s
+                for s in (application.product.stages if application.product else [])
+                if s.id == stage_id
+            ),
+            None,
+        )
+        if stage is None:
+            raise ProductStageNotFoundException()
 
-        founder = await self.db.application_founder.get_orm(application.id, founder_id)
-        if founder is None:
-            raise FounderNotFoundException()
+        fields = {field.id: field for field in stage.fields}
+        errors: list[dict] = []
+        normalized: dict[int, str | None] = {}
+        for field_id, raw in data.values.items():
+            key = f"values.{field_id}"
+            field = fields.get(field_id)
+            if field is None:
+                errors.append({"field": key, "message": "Field does not belong to this stage"})
+                continue
+            if field.field_type in FILE_FIELD_TYPES:
+                errors.append({"field": key, "message": FileFieldException.message})
+                continue
+            if raw is None or not raw.strip():
+                normalized[field_id] = None
+                continue
+            try:
+                normalized[field_id] = normalize_value(field.field_type, raw)
+            except ValueError as exc:
+                errors.append({"field": key, "message": str(exc)})
+        if errors:
+            raise FieldValueInvalidException(errors=errors)
 
-        for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
-            setattr(founder, field, value)
+        existing = {value.field_id: value for value in application.field_values}
+        for field_id, value in normalized.items():
+            current = existing.get(field_id)
+            if value is None:
+                if current is not None:
+                    application.field_values.remove(current)
+            elif current is not None:
+                current.value = value
+            else:
+                application.field_values.append(
+                    ApplicationFieldValueORM(field_id=field_id, value=value)
+                )
 
         await self.db.commit()
-        return FounderDataMapper.map_to_domain_entity(founder)
+        application = await self.reload(application_id)
+        return next(s for s in build_form(application) if s.id == stage_id)
 
-    async def delete_founder(
-        self, application_id: int, user: CurrentUserDTO, founder_id: int
+    async def add_field_file(
+        self, application_id: int, user: CurrentUserDTO, field_id: int, upload: UploadFile
+    ) -> FieldFileDTO:
+        application = await self._get_editable(application_id, user)
+        field = self._find_field(application, field_id)
+        if field.field_type not in FILE_FIELD_TYPES:
+            raise FileFieldException()
+
+        count = sum(1 for f in application.field_files if f.field_id == field.id)
+        if count >= field.max_files:
+            raise FieldFileLimitExceededException(
+                f"Maximum number of files for this field reached: {count} of {field.max_files}. "
+                "Delete a file before uploading a new one"
+            )
+
+        storage = (
+            self.photo_storage if field.field_type == FieldType.PHOTO else self.document_storage
+        )
+        storage_path, size, content_type = await storage.save(application.id, upload)
+
+        file = ApplicationFieldFileORM(
+            field_id=field.id,
+            file_name=upload.filename or Path(storage_path).name,
+            storage_path=storage_path,
+            content_type=content_type,
+            size=size,
+        )
+        application.field_files.append(file)
+        await self.db.flush()
+        await self.db.session.refresh(file)
+        await self.db.commit()
+        return field_file_dto(file)
+
+    async def delete_field_file(
+        self, application_id: int, user: CurrentUserDTO, field_id: int, file_id: int
     ) -> None:
         application = await self._get_editable(application_id, user)
+        file = self._find_file(application, field_id, file_id)
 
-        founder = await self.db.application_founder.get_orm(application.id, founder_id)
-        if founder is None:
-            raise FounderNotFoundException()
-
-        await self.db.application_founder.delete(id=founder.id)
+        await self.photo_storage.delete(file.storage_path)
+        application.field_files.remove(file)
         await self.db.commit()
 
-    async def set_project(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: ProjectDTO,
-    ) -> ProjectResponseDTO:
-        """Информация о проекте: сумма, срок, стоимость, рабочие места, описание.
-        Заполняется целиком (PUT), доступна только в черновике."""
-        application = await self._get_editable(application_id, user)
-
-        application.project_requested_amount = data.requested_amount
-        application.project_loan_term_months = data.loan_term_months
-        application.project_total_cost = data.total_cost
-        application.project_jobs_count = data.jobs_count
-        application.project_description = data.description
-
-        await self.db.commit()
-        return project_dto(application)
-
-    async def set_location(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: LocationDTO,
-    ) -> LocationResponseDTO:
-        application = await self._get_editable(application_id, user)
-
-        application.location_lat = data.lat
-        application.location_lng = data.lng
-        application.location_region = data.region
-        application.location_district = data.district
-        application.location_makhalla = data.makhalla
-        application.location_address = data.address
-        application.location_confirmed = data.confirmed
-
-        await self.db.commit()
-        return location_dto(application)
-
-    async def delete_draft(self, application_id: int, user: CurrentUserDTO) -> None:
-        application = await self._get_editable(application_id, user)
-
-        # Файлы черновика (фото и документы) удаляются вместе с каталогом заявки.
-        await self.storage.delete_application_dir(application.id)
-
-        await self.db.application.delete(id=application.id)
-        await self.db.commit()
-
-    # ---------- фото ----------
-
-    async def add_photo(
-        self, application_id: int, user: CurrentUserDTO, upload: UploadFile
-    ) -> PhotoDTO:
-        application = await self._get_editable(application_id, user)
-
-        count = await self.db.application_photo.count_for_application(application.id)
-        if count >= settings.MAX_APPLICATION_PHOTOS:
-            raise PhotoLimitExceededException(
-                f"Maximum number of photos reached: {count} of {settings.MAX_APPLICATION_PHOTOS}. "
-                "Delete a photo before uploading a new one"
-            )
-
-        storage_path, size, content_type = await self.storage.save(application.id, upload)
-
-        photo = await self.db.application_photo.add(
-            PhotoAddDTO(
-                application_id=application.id,
-                file_name=upload.filename or Path(storage_path).name,
-                storage_path=storage_path,
-                content_type=content_type,
-                size=size,
-            )
-        )
-        await self.db.commit()
-        return photo
-
-    async def delete_photo(self, application_id: int, user: CurrentUserDTO, photo_id: int) -> None:
-        application = await self._get_editable(application_id, user)
-
-        photo = await self.db.application_photo.get_orm(application.id, photo_id)
-        if photo is None:
-            raise PhotoNotFoundException()
-
-        await self.storage.delete(photo.storage_path)
-        await self.db.application_photo.delete(id=photo.id)
-        await self.db.commit()
-
-    async def get_photo_path(
-        self, application_id: int, user: CurrentUserDTO, photo_id: int
+    async def get_field_file_path(
+        self, application_id: int, user: CurrentUserDTO, field_id: int, file_id: int
     ) -> tuple[Path, str, str]:
         """Файл открывается только тем, кто имеет доступ к заявке."""
         application = await self.get_for_user(application_id, user)
-
-        photo = await self.db.application_photo.get_orm(application.id, photo_id)
-        if photo is None:
-            raise PhotoNotFoundException()
-
-        return self.storage.absolute_path(photo.storage_path), photo.content_type, photo.file_name
-
-    # ---------- документы (PDF / DOCX) ----------
-
-    async def add_document(
-        self, application_id: int, user: CurrentUserDTO, upload: UploadFile
-    ) -> DocumentDTO:
-        application = await self._get_editable(application_id, user)
-
-        count = await self.db.application_document.count_for_application(application.id)
-        if count >= settings.MAX_APPLICATION_DOCUMENTS:
-            raise DocumentLimitExceededException(
-                f"Maximum number of documents reached: {count} of "
-                f"{settings.MAX_APPLICATION_DOCUMENTS}. Delete a document before uploading a new one"
-            )
-
-        storage_path, size, content_type = await self.document_storage.save(application.id, upload)
-
-        document = await self.db.application_document.add(
-            DocumentAddDTO(
-                application_id=application.id,
-                file_name=upload.filename or Path(storage_path).name,
-                storage_path=storage_path,
-                content_type=content_type,
-                size=size,
-            )
-        )
-        await self.db.commit()
-        return document
-
-    async def delete_document(
-        self, application_id: int, user: CurrentUserDTO, document_id: int
-    ) -> None:
-        application = await self._get_editable(application_id, user)
-
-        document = await self.db.application_document.get_orm(application.id, document_id)
-        if document is None:
-            raise DocumentNotFoundException()
-
-        await self.document_storage.delete(document.storage_path)
-        await self.db.application_document.delete(id=document.id)
-        await self.db.commit()
-
-    async def get_document_path(
-        self, application_id: int, user: CurrentUserDTO, document_id: int
-    ) -> tuple[Path, str, str]:
-        """Файл открывается только тем, кто имеет доступ к заявке."""
-        application = await self.get_for_user(application_id, user)
-
-        document = await self.db.application_document.get_orm(application.id, document_id)
-        if document is None:
-            raise DocumentNotFoundException()
-
+        file = self._find_file(application, field_id, file_id)
         return (
-            self.document_storage.absolute_path(document.storage_path),
-            document.content_type,
-            document.file_name,
+            self.photo_storage.absolute_path(file.storage_path),
+            file.content_type,
+            file.file_name,
         )
 
     # ---------- отправка ----------
@@ -450,30 +336,26 @@ class ApplicationService(ApplicationBaseService):
         self, application_id: int, user: CurrentUserDTO
     ) -> SubmissionCheckDTO:
         application = await self.get_for_user(application_id, user)
-        missing = await self._collect_missing(application)
+        missing = self._collect_missing(application)
+        product = application.product
 
         return SubmissionCheckDTO(
             is_ready=not missing,
             missing=missing,
+            product=product_brief(product) if product else None,
+            product_available=product is not None
+            and is_available(product, application.subject_type),
             subject_type=application.subject_type,
-            legal_name=application.legal_name,
-            company=company_dto(application),
-            founders_count=len(application.founders),
-            project=project_dto(application),
             bank=BankDTO.model_validate(application.bank, from_attributes=True)
             if application.bank
             else None,
-            location=location_dto(application),
-            photos_count=len(application.photos),
-            max_photos=settings.MAX_APPLICATION_PHOTOS,
-            documents_count=len(application.documents),
-            max_documents=settings.MAX_APPLICATION_DOCUMENTS,
+            stages=build_form(application),
         )
 
     async def submit(self, application_id: int, user: CurrentUserDTO) -> ApplicationDetailDTO:
         application = await self._get_editable(application_id, user)
 
-        missing = await self._collect_missing(application)
+        missing = self._collect_missing(application)
         if missing:
             raise ApplicationValidationException(missing=missing)
 
@@ -505,6 +387,37 @@ class ApplicationService(ApplicationBaseService):
             raise ApplicationNotEditableException(current_status=application.status.value)
         return application
 
+    async def _available_product(
+        self, product_id: int, subject_type: SubjectType | None
+    ) -> ProductORM:
+        product = await self.db.product.get_orm(product_id)
+        if product is None or not is_available(product, subject_type):
+            raise ProductNotAvailableException()
+        return product
+
+    async def _clear_answers(self, application: ApplicationORM) -> None:
+        for file in list(application.field_files):
+            await self.photo_storage.delete(file.storage_path)
+        application.field_files.clear()
+        application.field_values.clear()
+
+    @staticmethod
+    def _find_field(application: ApplicationORM, field_id: int) -> ProductFieldORM:
+        stages = application.product.stages if application.product else []
+        for stage in stages:
+            for field in stage.fields:
+                if field.id == field_id:
+                    return field
+        raise ProductFieldNotFoundException()
+
+    def _find_file(
+        self, application: ApplicationORM, field_id: int, file_id: int
+    ) -> ApplicationFieldFileORM:
+        for file in application.field_files:
+            if file.id == file_id and file.field_id == field_id:
+                return file
+        raise FieldFileNotFoundException()
+
     @staticmethod
     def _applicant_snapshot(applicant: UserORM) -> dict:
         return {
@@ -518,109 +431,36 @@ class ApplicationService(ApplicationBaseService):
             "applicant_date_of_birth": applicant.date_of_birth,
         }
 
-    # Поле DTO проекта -> колонка заявки.
-    PROJECT_COLUMNS = {
-        "requested_amount": "project_requested_amount",
-        "loan_term_months": "project_loan_term_months",
-        "total_cost": "project_total_cost",
-        "jobs_count": "project_jobs_count",
-        "description": "project_description",
-    }
-
-    # Поле DTO -> колонка заявки.
-    COMPANY_COLUMNS = {
-        "inn": "company_inn",
-        "director_full_name": "director_full_name",
-        "director_passport": "director_passport",
-        "director_phone": "director_phone",
-        "director_date_of_birth": "director_date_of_birth",
-    }
-
-    @classmethod
-    def _company_columns(cls, company: CompanyDTO | None, partial: bool = False) -> dict:
-        if company is None:
-            return dict.fromkeys(cls.COMPANY_COLUMNS.values())
-        values = company.model_dump(exclude_unset=partial)
-        return {cls.COMPANY_COLUMNS[field]: value for field, value in values.items()}
-
     @staticmethod
-    def _assert_company_allowed(
-        subject_type: SubjectType | None, company: CompanyDTO | None
-    ) -> None:
-        if company is None or not any(company.model_dump(exclude_none=True).values()):
-            return
-        if subject_type is not None and subject_type not in SUBJECT_TYPES_WITH_COMPANY:
-            raise CompanyNotAllowedException(
-                f"Company details are specified only for MCHJ (LLC); "
-                f"subject type is {subject_type.value}"
-            )
-
-    @staticmethod
-    def _assert_founders_allowed(subject_type: SubjectType | None, founders: list | None) -> None:
-        if not founders:
-            return
-        if subject_type not in SUBJECT_TYPES_WITH_FOUNDERS:
-            current = subject_type.value if subject_type else "not set"
-            raise FoundersNotAllowedException(
-                f"Founders are specified only for MCHJ (LLC); subject type is {current}"
-            )
-        if len(founders) > settings.MAX_APPLICATION_FOUNDERS:
-            raise FounderLimitExceededException(
-                f"Maximum number of founders reached ({settings.MAX_APPLICATION_FOUNDERS})"
-            )
-
-    @staticmethod
-    def _legal_name_for(subject_type: SubjectType | None, legal_name: str | None) -> str | None:
-        # Для самозанятого поле юридического наименования не используется.
-        if subject_type is not None and subject_type not in SUBJECT_TYPES_WITH_LEGAL_NAME:
-            return None
-        return legal_name
-
-    async def _collect_missing(self, application: ApplicationORM) -> list[str]:
+    def _collect_missing(application: ApplicationORM) -> list[str]:
         missing: list[str] = []
+        product = application.product
 
         if application.subject_type is None:
             missing.append("subject_type")
-        elif (
-            application.subject_type in SUBJECT_TYPES_WITH_LEGAL_NAME and not application.legal_name
-        ):
-            missing.append("legal_name")
 
-        if application.bank is None or not application.bank.is_active:
-            missing.append("bank_id")
-        elif (
-            application.subject_type is not None
-            and application.subject_type not in application.bank.allowed_subject_types
-        ):
-            missing.append("bank_id")
+        if product is None or not is_available(product, application.subject_type):
+            missing.append("product_id")
 
-        if application.subject_type in SUBJECT_TYPES_WITH_COMPANY:
-            for field, column in self.COMPANY_COLUMNS.items():
-                if not getattr(application, column):
-                    missing.append(f"company.{field}")
-
-        if application.subject_type in SUBJECT_TYPES_WITH_FOUNDERS and not application.founders:
-            missing.append("founders")
-
-        for field, column in self.PROJECT_COLUMNS.items():
-            if getattr(application, column) is None:
-                missing.append(f"project.{field}")
-
+        bank = application.bank
         if (
-            application.location_lat is None
-            or application.location_lng is None
-            or not application.location_region
-            or not application.location_district
-            or not application.location_makhalla
+            bank is None
+            or not bank.is_active
+            or product is None
+            or bank.id not in {b.id for b in product.banks}
+            or (
+                application.subject_type is not None
+                and application.subject_type not in bank.allowed_subject_types
+            )
         ):
-            missing.append("location")
-        elif not application.location_confirmed:
-            missing.append("location.confirmed")
+            missing.append("bank_id")
 
-        if len(application.photos) > settings.MAX_APPLICATION_PHOTOS:
-            missing.append("photos")
-        if len(application.documents) > settings.MAX_APPLICATION_DOCUMENTS:
-            missing.append("documents")
+        for stage in build_form(application):
+            missing.extend(
+                f"fields.{field.id}"
+                for field in stage.fields
+                if field.is_required and not field.value and not field.files
+            )
 
         # Проверяем живой профиль, а не снимок: заявитель дополняет данные
         # через PATCH /auth/me уже после создания черновика.
@@ -629,7 +469,3 @@ class ApplicationService(ApplicationBaseService):
         )
 
         return missing
-
-    @staticmethod
-    def photo_to_dto(model) -> PhotoDTO:
-        return PhotoDataMapper.map_to_domain_entity(model)

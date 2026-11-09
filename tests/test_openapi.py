@@ -23,12 +23,20 @@ def test_null_fields_survive_schema_generation():
     assert error["content"]["application/json"]["example"]["errors"] is None
 
 
-def test_auth_and_users_docs_fully_translated_to_uzbek():
+def test_docs_fully_translated_to_uzbek():
     uz = translate_openapi(app.openapi())
-    left = [
-        path
-        for path, _ in untranslated(uz)
-        if ("/auth/" in path or "/redirect" in path or "/users" in path)
-        and path.endswith((".summary", ".description"))
-    ]
-    assert left == []
+    assert untranslated(uz) == []
+
+
+def test_product_and_application_form_endpoints_documented():
+    paths = app.openapi()["paths"]
+    for path in (
+        "/api/v1/products",
+        "/api/v1/fund/products/{product_id}/publish",
+        "/api/v1/fund/products/{product_id}/stages/{stage_id}/fields",
+        "/api/v1/applications/{application_id}/stages/{stage_id}",
+        "/api/v1/applications/{application_id}/fields/{field_id}/files",
+    ):
+        assert path in paths, path
+    for removed in ("project", "location", "founders", "photos", "documents"):
+        assert f"/api/v1/applications/{{application_id}}/{removed}" not in paths, removed
