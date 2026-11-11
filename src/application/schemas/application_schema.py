@@ -200,6 +200,16 @@ class FormStageDTO(BaseModel):
     fields: list[FormFieldDTO] = []
 
 
+class FormProgressDTO(BaseModel):
+    """Насколько заполнена анкета продукта."""
+
+    stages_total: int = Field(description="Сколько этапов в продукте.")
+    stages_complete: int = Field(
+        description="Сколько этапов заполнено (все обязательные поля этапа заполнены)."
+    )
+    is_complete: bool = Field(description="Заполнены все этапы.")
+
+
 class ApplicationListItemDTO(BaseModel):
     id: int
     number: str
@@ -208,6 +218,7 @@ class ApplicationListItemDTO(BaseModel):
     subject_type: SubjectType | None = None
     bank: BankDTO | None = None
     applicant_full_name: str | None = None
+    form_progress: FormProgressDTO
     scoring_retry_required: bool = False
     submitted_at: datetime | None = None
     created_at: datetime

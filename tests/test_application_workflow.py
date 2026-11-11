@@ -66,7 +66,7 @@ def history_statuses(api, app_id, headers):
     return [item.get("to_status") or item.get("status") for item in items]
 
 
-def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_application):
+def test_full_application_lifecycle(api, role_ids, bank, product, applicant, submitted_application):
     c, app_id = api.client, submitted_application
 
     fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
@@ -79,6 +79,20 @@ def test_full_application_lifecycle(api, role_ids, bank, applicant, submitted_ap
 
     assert status(api, app_id, applicant) == "FUND_REVIEW"
     assert c.get("/api/v1/fund/applications", headers=applicant).status_code == 403
+
+    detail = data(c.get(f"/api/v1/fund/applications/{app_id}", headers=fund))
+    assert detail["applicant"]["phone"] == "+998901234567"
+    assert detail["product"]["id"] == product["id"]
+    assert detail["bank"]["id"] == bank["id"]
+    assert detail["form_progress"] == {"stages_total": 1, "stages_complete": 1, "is_complete": True}
+    fields = {f["id"]: f for f in detail["form"][0]["fields"]}
+    number, photo, comment = product["stages"][0]["fields"]
+    assert fields[number["id"]]["value"] == "50000000"
+    assert fields[comment["id"]]["value"] is None
+    assert len(fields[photo["id"]]["files"]) == 1
+    file_url = fields[photo["id"]]["files"][0]["url"]
+    r = c.get(file_url, headers=fund)
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
     def bank_sees():
         items = data(c.get("/api/v1/bank/applications?per_page=100", headers=bank_h))["items"]

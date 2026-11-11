@@ -100,6 +100,7 @@ APPLICATION_EXAMPLE = {
     "subject_type": "YATT",
     "bank": BANK_EXAMPLE,
     "applicant_full_name": "Алиев Али Алиевич",
+    "form_progress": {"stages_total": 2, "stages_complete": 1, "is_complete": False},
     "scoring_retry_required": False,
     "submitted_at": None,
     "created_at": "2026-11-06T10:00:00Z",

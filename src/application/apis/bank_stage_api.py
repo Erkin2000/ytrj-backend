@@ -23,6 +23,7 @@ ITEM = {
     "product": PRODUCT_BRIEF_EXAMPLE,
     "subject_type": "MCHJ",
     "applicant_full_name": "Алиев Али Алиевич",
+    "form_progress": {"stages_total": 2, "stages_complete": 2, "is_complete": True},
     "submitted_at": "2026-10-19T10:05:00Z",
 }
 

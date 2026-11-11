@@ -356,6 +356,10 @@ UZ: dict[str, str] = {
     "Удалить категорию без продуктов": "Mahsulotsiz kategoriyani oʻchirish",
     "Без авторизации.": "Avtorizatsiyasiz.",
     "Без авторизации. ИП и ООО — все 9 банков; самозанятым — только Microcreditbank, Xalq banki и Agrobank.": "Avtorizatsiyasiz. YaTT va MChJ uchun — barcha 9 ta bank; oʻzini oʻzi band qilganlarga — faqat Microcreditbank, Xalq banki va Agrobank.",
+    "Заявки: Super Admin": "Arizalar: Super Admin",
+    "Полное удаление заявки со всеми данными и файлами.": "Arizani barcha maʼlumotlari va fayllari bilan toʻliq oʻchirish.",
+    "Удалить заявку целиком, в любом статусе (только Super Admin)": "Arizani toʻliq oʻchirish, istalgan holatda (faqat Super Admin)",
+    "Удаляет заявку и всё связанное: историю статусов, скоринг, решения Фонда, Совета и банка, ответы анкеты, файлы на диске, документ-требование. Действие необратимо, запись об удалении не сохраняется.": "Arizani va unga bogʻliq hamma narsani oʻchiradi: holatlar tarixi, skoring, Jamgʻarma, Kengash va bank qarorlari, anketa javoblari, diskdagi fayllar, talab hujjati. Amalni qaytarib boʻlmaydi, oʻchirish haqida yozuv saqlanmaydi.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

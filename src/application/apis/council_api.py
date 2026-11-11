@@ -24,6 +24,7 @@ ITEM = {
     "subject_type": "YATT",
     "bank": {"id": 1, "code": "microcreditbank", "name": "Microcreditbank"},
     "applicant_full_name": "Алиев Али Алиевич",
+    "form_progress": {"stages_total": 2, "stages_complete": 2, "is_complete": True},
 }
 
 

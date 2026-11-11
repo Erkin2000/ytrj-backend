@@ -24,6 +24,14 @@
           {% if model_view.check_can_edit(request, model) %}
           <a href="{{ model_view._build_url_for('admin:edit', request, model) }}" class="btn btn-primary">{{ _("Edit") }}</a>
           {% endif %}
+          {% if model_view.check_can_delete(request, model) %}
+          <a href="#" data-name="{{ model_view.name }}" data-pk="{{ get_object_identifier(model) }}"
+             data-url="{{ model_view._url_for_delete(request, model) }}" data-bs-toggle="modal"
+             data-bs-target="#modal-delete" class="btn btn-danger"
+             title="{{ _('Заявка будет удалена целиком: история, решения, ответы анкеты и файлы') }}">
+            <i class="fa-solid fa-trash me-1"></i>{{ _("Удалить целиком") }}
+          </a>
+          {% endif %}
         </div>
       </div>
       <div class="jg-progress mt-4">

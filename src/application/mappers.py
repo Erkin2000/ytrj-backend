@@ -18,6 +18,7 @@ from src.application.schemas.application_schema import (
     DemandDocumentDTO,
     FieldFileDTO,
     FormFieldDTO,
+    FormProgressDTO,
     FormStageDTO,
     ResourceAllocationDTO,
     ScoringAttemptDTO,
@@ -128,6 +129,27 @@ def field_file_dto(model: ApplicationFieldFileORM) -> FieldFileDTO:
     )
 
 
+def _is_filled(field, values: dict[int, str], files_by_field: set[int]) -> bool:
+    return field.id in values or field.id in files_by_field
+
+
+def form_progress(model: ApplicationORM) -> FormProgressDTO:
+    """Сколько этапов продукта и сколько из них заполнено (без построения всей анкеты)."""
+    stages = model.product.stages if model.product else []
+    values = {v.field_id: v.value for v in model.field_values}
+    with_files = {f.field_id for f in model.field_files}
+    complete = sum(
+        1
+        for stage in stages
+        if all(not f.is_required or _is_filled(f, values, with_files) for f in stage.fields)
+    )
+    return FormProgressDTO(
+        stages_total=len(stages),
+        stages_complete=complete,
+        is_complete=bool(stages) and complete == len(stages),
+    )
+
+
 def build_form(model: ApplicationORM) -> list[FormStageDTO]:
     """Этапы продукта заявки с ответами: значения и файлы по каждому полю."""
     if model.product is None:
@@ -187,6 +209,7 @@ class ApplicationDataMapper(DataMapper):
             "subject_type": model.subject_type,
             "bank": BankDataMapper.map_to_domain_entity(model.bank) if model.bank else None,
             "applicant_full_name": model.applicant_full_name,
+            "form_progress": form_progress(model),
             "scoring_retry_required": model.scoring_retry_required,
             "submitted_at": model.submitted_at,
             "created_at": model.created_at,

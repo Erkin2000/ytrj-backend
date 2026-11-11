@@ -117,7 +117,7 @@ class ApplicationService(ApplicationBaseService):
         if data.bank_id is not None:
             await self._validate_bank(product, data.subject_type, data.bank_id)
 
-        created = await self.db.application.add(
+        created_id = await self.db.application.add(
             ApplicationAddDTO(
                 number=await self.db.application.next_number(),
                 applicant_id=applicant.id,
@@ -129,7 +129,7 @@ class ApplicationService(ApplicationBaseService):
             )
         )
 
-        application = await self.get_orm_or_404(created.id)
+        application = await self.get_orm_or_404(created_id)
         await self.add_history(
             application,
             to_status=ApplicationStatus.DRAFT,
@@ -139,7 +139,7 @@ class ApplicationService(ApplicationBaseService):
         )
         await self.db.commit()
 
-        return ApplicationDataMapper.map_to_detail(await self.reload(created.id))
+        return ApplicationDataMapper.map_to_detail(await self.reload(created_id))
 
     async def update(
         self,

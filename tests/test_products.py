@@ -167,6 +167,15 @@ def test_applicant_fills_product_form(api, fund, bank_pair, applicant, photo_upl
     app_id = data(r)["id"]
     assert data(r)["product"]["id"] == product["id"]
 
+    def progress():
+        items = data(c.get("/api/v1/applications?per_page=100", headers=applicant))["items"]
+        listed = next(item for item in items if item["id"] == app_id)["form_progress"]
+        detail = data(c.get(f"/api/v1/applications/{app_id}", headers=applicant))["form_progress"]
+        assert listed == detail
+        return listed
+
+    assert progress() == {"stages_total": 1, "stages_complete": 0, "is_complete": False}
+
     check = data(c.get(f"/api/v1/applications/{app_id}/submission-check", headers=applicant))
     assert not check["is_ready"] and check["product_available"]
     assert set(check["missing"]) == {"bank_id", f"fields.{number['id']}", f"fields.{photo['id']}"}
@@ -211,6 +220,7 @@ def test_applicant_fills_product_form(api, fund, bank_pair, applicant, photo_upl
 
     check = data(c.get(f"/api/v1/applications/{app_id}/submission-check", headers=applicant))
     assert check["is_ready"], check["missing"]
+    assert progress() == {"stages_total": 1, "stages_complete": 1, "is_complete": True}
 
     r = c.put(stage_url, headers=applicant, json={"values": {str(comment["id"]): None}})
     form = data(c.get(f"/api/v1/applications/{app_id}", headers=applicant))["form"]

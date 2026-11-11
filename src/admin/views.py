@@ -53,6 +53,7 @@ from src.application.services.photo_storage import (
     FieldPhotoStorage,
     PhotoStorage,
 )
+from src.application.services.purge_service import ApplicationPurgeService
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
 from src.product.enums import ProductStatus
@@ -67,6 +68,7 @@ from src.product.models.product_model import (
 from src.rbac.access import DIRECTION_ROLES, uses_personal_permissions
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
+from src.utils.db_manager import DBManager
 
 CATEGORY_ACCESS = _l("Пользователи и доступ")
 CATEGORY_DICTS = _l("Справочники")
@@ -677,10 +679,10 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.created_at: fmt_datetime,
         ApplicationORM.updated_at: fmt_datetime,
     }
-    # Статусы меняются только через бизнес-операции API — здесь только просмотр
-    # и исправление справочных полей черновика.
+    # Статусы меняются только через бизнес-операции API — здесь просмотр,
+    # исправление справочных полей черновика и полное удаление заявки (delete_model).
     can_create = False
-    can_delete = False
+    can_delete = True
     form_columns = [
         ApplicationORM.subject_type,
         ApplicationORM.legal_name,
@@ -691,6 +693,11 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.location_address,
     ]
     page_size = 25
+
+    async def delete_model(self, request: Request, pk) -> None:
+        """Удаление заявки целиком: записи в БД (каскадом) и файлы на диске."""
+        async with DBManager(async_session_maker) as db:
+            await ApplicationPurgeService(db).purge(int(pk))
 
     async def get_object_for_details(self, request: Request):
         # Карточка заявки показывает таймлайн, фото, решения Совета и т.д.

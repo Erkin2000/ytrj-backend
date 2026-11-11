@@ -1,6 +1,7 @@
 from datetime import datetime, time, timedelta
 
-from sqlalchemy import Select, func, or_, select, text
+from pydantic import BaseModel
+from sqlalchemy import Select, func, insert, or_, select, text
 from sqlalchemy.orm import selectinload
 
 from src.application.enums import ApplicationStatus
@@ -25,6 +26,12 @@ class ApplicationRepository(BaseRepository):
     async def next_demand_document_number(self) -> str:
         seq = await self.session.scalar(text("SELECT nextval('demand_document_number_seq')"))
         return f"TD-{datetime.now().year}-{int(seq):06d}"
+
+    async def add(self, data: BaseModel) -> int:
+        """Создаёт заявку и возвращает её id. DTO здесь не строится: для него нужны
+        связи (продукт, ответы), которые загружает get_orm."""
+        stmt = insert(self.model).values(**data.model_dump()).returning(self.model.id)
+        return await self.session.scalar(stmt)
 
     # ---------- выборки ----------
 
@@ -96,7 +103,18 @@ class ApplicationRepository(BaseRepository):
         """Список заявок с учётом scope:
         applicant_id — только свои; bank_id — только заявки банка;
         council_member_id — только направленные этому члену Совета."""
-        stmt = select(self.model).order_by(self.model.updated_at.desc(), self.model.id.desc())
+        stmt = (
+            select(self.model)
+            .options(
+                # для form_progress в списке: этапы и поля продукта, ответы и файлы
+                selectinload(self.model.product)
+                .selectinload(ProductORM.stages)
+                .selectinload(ProductStageORM.fields),
+                selectinload(self.model.field_values),
+                selectinload(self.model.field_files),
+            )
+            .order_by(self.model.updated_at.desc(), self.model.id.desc())
+        )
 
         if applicant_id is not None:
             stmt = stmt.where(self.model.applicant_id == applicant_id)

@@ -897,3 +897,11 @@ msgstr "Select an active category"
 
 msgid "неактивна"
 msgstr "inactive"
+
+# ---------- удаление заявки ----------
+
+msgid "Удалить целиком"
+msgstr "Delete completely"
+
+msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
+msgstr "The application will be deleted completely: history, decisions, form answers and files"

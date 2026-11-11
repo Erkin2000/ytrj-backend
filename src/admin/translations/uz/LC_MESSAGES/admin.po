@@ -1092,3 +1092,11 @@ msgstr "Faol kategoriyani tanlang"
 
 msgid "неактивна"
 msgstr "nofaol"
+
+# ---------- удаление заявки ----------
+
+msgid "Удалить целиком"
+msgstr "Toʻliq oʻchirish"
+
+msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
+msgstr "Ariza toʻliq oʻchiriladi: tarix, qarorlar, anketa javoblari va fayllar"

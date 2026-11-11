@@ -10,6 +10,7 @@ from scalar_fastapi import OpenAPISource, get_scalar_api_reference
 from src.account.apis import user_api
 from src.admin.admin import setup_admin
 from src.application.apis import (
+    admin_application_api,
     application_api,
     bank_api,
     bank_stage_api,
@@ -79,6 +80,10 @@ TAGS_METADATA = [
     {
         "name": "Заявки: рабочее окно банка",
         "description": "Приём и результат по утверждённым Советом заявкам своего банка.",
+    },
+    {
+        "name": "Заявки: Super Admin",
+        "description": "Полное удаление заявки со всеми данными и файлами.",
     },
 ]
 
@@ -180,6 +185,7 @@ app.include_router(product_api.router, prefix=API_PREFIX)
 app.include_router(application_api.router, prefix=API_PREFIX)
 app.include_router(fund_api.router, prefix=API_PREFIX)
 app.include_router(council_api.router, prefix=API_PREFIX)
+app.include_router(admin_application_api.router, prefix=API_PREFIX)
 app.include_router(bank_stage_api.router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)

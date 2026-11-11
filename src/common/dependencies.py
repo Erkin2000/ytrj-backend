@@ -74,6 +74,13 @@ def require_permission(module: Module, action: Action):
     return check_permission
 
 
+async def require_superuser(user: CurrentUserDep) -> CurrentUserDTO:
+    """Только суперпользователь (Super Admin)."""
+    if not user.is_superuser:
+        raise PermissionDeniedException()
+    return user
+
+
 def require_any_permission(*codes: str):
     """Пускает, если у пользователя есть хотя бы одно из перечисленных прав."""
 
