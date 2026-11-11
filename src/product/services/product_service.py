@@ -150,8 +150,8 @@ class ProductService(BaseService):
         """Публичный список всех продуктов (включая черновики и снятые с публикации)."""
         return await self.db.product.get_page(filters, page, per_page)
 
-    async def get_detail(self, user: CurrentUserDTO, product_id: int) -> ProductDetailDTO:
-        ApplicationBaseService.assert_global_scope(user)
+    async def get_detail(self, product_id: int) -> ProductDetailDTO:
+        """Публичная карточка любого продукта (в том числе черновика)."""
         return await self._detail(product_id)
 
     async def create(self, user: CurrentUserDTO, data: ProductCreateDTO) -> ProductDetailDTO:

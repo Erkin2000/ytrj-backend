@@ -22,7 +22,6 @@ from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
     COMMON_ERRORS,
     PUBLIC_ERRORS,
-    READ_ERRORS,
     error_examples,
     paginated_example,
     success_example,
@@ -93,15 +92,15 @@ async def create_product(data: ProductCreateDTO, db: DBDep, user: CurrentUserDep
 @router.get(
     "/{product_id}",
     summary="Продукт с банками, этапами и полями",
-    dependencies=[read_dep],
+    description="Без авторизации.",
     responses={
         200: success_example(PRODUCT_DETAIL_EXAMPLE, "Product found."),
-        **READ_ERRORS,
+        **PUBLIC_ERRORS,
         **NOT_FOUND,
     },
 )
-async def get_product(product_id: int, db: DBDep, user: CurrentUserDep):
-    product = await ProductService(db).get_detail(user, product_id)
+async def get_product(product_id: int, db: DBDep):
+    product = await ProductService(db).get_detail(product_id)
     return ResponseBuilder.success(data=product, message="Product found.")
 
 

@@ -365,6 +365,7 @@ def test_product_categories(api, fund, bank_pair, applicant):
 def test_public_catalog_endpoints(api, fund, banks):
     c = api.client
     category = api.category(fund)
+    product = api.product(fund, [banks[0]["id"]], category_id=category["id"], publish=False)
     for path in (
         "/api/v1/fund/product-categories",
         f"/api/v1/fund/product-categories/{category['id']}",
@@ -372,6 +373,7 @@ def test_public_catalog_endpoints(api, fund, banks):
         f"/api/v1/banks/{banks[0]['id']}",
         "/api/v1/fund/products",
         f"/api/v1/fund/products?category_id={category['id']}",
+        f"/api/v1/fund/products/{product['id']}",
     ):
         assert c.get(path).status_code == 200, path
     assert c.get("/api/v1/fund/product-categories/999999999").status_code == 404
@@ -381,5 +383,7 @@ def test_public_catalog_endpoints(api, fund, banks):
     assert c.post("/api/v1/fund/product-categories", json=body).status_code == 401
     assert c.post("/api/v1/banks", json={"code": "test_x", "name": "TEST"}).status_code == 401
     assert c.post("/api/v1/fund/products", json={"category_id": category["id"]}).status_code == 401
-    assert c.get("/api/v1/fund/products/1").status_code == 401
+    assert c.get("/api/v1/fund/products/999999999").status_code == 404
+    assert c.patch(f"/api/v1/fund/products/{product['id']}", json={}).status_code == 401
+    assert c.post(f"/api/v1/fund/products/{product['id']}/publish").status_code == 401
     assert c.get("/api/v1/products").status_code == 401
