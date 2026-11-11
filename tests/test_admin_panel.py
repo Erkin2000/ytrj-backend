@@ -6,7 +6,7 @@ from src.product.models.product_model import ProductTranslationORM
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 from src.rbac.models.role_permission_model import RolePermissionORM
-from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, data, db_all
+from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME, data, db_all, tr
 
 
 @pytest.fixture
@@ -201,6 +201,8 @@ def test_admin_product_pages(admin_client, product_application):
     for path in (
         "/admin/product-orm/list",
         "/admin/product-translation-orm/list",
+        "/admin/product-category-orm/list",
+        f"/admin/product-category-orm/details/{product['category']['id']}",
         f"/admin/product-orm/edit/{product['id']}",
     ):
         assert admin_client.get(path).status_code == 200, path
@@ -222,6 +224,7 @@ def test_admin_product_edit_validation(api, admin_client, product_application):
     product, _, _ = product_application
     url = f"/admin/product-orm/edit/{product['id']}"
     bank_ids = [str(b["id"]) for b in product["banks"]]
+    category = str(product["category"]["id"])
 
     r = admin_client.post(
         url,
@@ -230,6 +233,7 @@ def test_admin_product_edit_validation(api, admin_client, product_application):
             "accept_from": "2026-12-31",
             "accept_to": "2026-01-01",
             "banks": bank_ids,
+            "category": category,
         },
         follow_redirects=False,
     )
@@ -242,6 +246,7 @@ def test_admin_product_edit_validation(api, admin_client, product_application):
             "accept_from": "",
             "accept_to": "",
             "banks": bank_ids,
+            "category": category,
         },
         follow_redirects=False,
     )
@@ -254,10 +259,31 @@ def test_admin_product_edit_validation(api, admin_client, product_application):
             "accept_from": "2026-01-01",
             "accept_to": "",
             "banks": bank_ids,
+            "category": category,
         },
         follow_redirects=False,
     )
     assert r.status_code in (302, 303)
+    fund = api.client.post(
+        "/api/v1/fund/product-categories",
+        headers=api.superadmin,
+        json={"translations": tr("TEST Н", "TEST N", "TEST I"), "is_active": False},
+    )
+    assert fund.status_code == 201, fund.text
+    api.category_ids.append(data(fund)["id"])
+    r = admin_client.post(
+        url,
+        data={
+            "allowed_subject_types": ["SELF_EMPLOYED"],
+            "accept_from": "",
+            "accept_to": "",
+            "banks": bank_ids,
+            "category": str(data(fund)["id"]),
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+
     detail = data(api.client.get(f"/api/v1/fund/products/{product['id']}", headers=api.superadmin))
     assert detail["accept_from"] == "2026-01-01" and detail["accept_to"] is None
     assert detail["allowed_subject_types"] == ["SELF_EMPLOYED", "MCHJ"]

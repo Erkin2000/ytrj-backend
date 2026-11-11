@@ -98,10 +98,40 @@ TRANSLATIONS_NOTE = (
 )
 
 
+CATEGORY_TRANSLATIONS_EXAMPLE = [
+    {"language": "ru", "name": "Кредиты для бизнеса", "description": None},
+    {"language": "uz", "name": "Biznes uchun kreditlar", "description": None},
+    {"language": "en", "name": "Business loans", "description": None},
+]
+
+
 # ---------- запросы ----------
 
 
+class CategoryCreateDTO(BaseModel):
+    translations: ProductTranslations = Field(
+        description=TRANSLATIONS_NOTE + " Описание — на всех трёх языках или ни на одном.",
+        examples=[CATEGORY_TRANSLATIONS_EXAMPLE],
+    )
+    is_active: bool = Field(
+        default=True,
+        description="Неактивную категорию нельзя выбрать для продукта; её продукты не видны заявителям.",
+    )
+    sort_order: int = Field(default=0, ge=0, description="Порядок в списке категорий.")
+
+
+class CategoryUpdateDTO(BaseModel):
+    translations: ProductTranslations | None = Field(
+        default=None, description=TRANSLATIONS_NOTE, examples=[CATEGORY_TRANSLATIONS_EXAMPLE]
+    )
+    is_active: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0)
+
+
 class ProductCreateDTO(BaseModel):
+    category_id: int = Field(
+        description="Категория из `GET /fund/product-categories` (активная).", examples=[1]
+    )
     translations: ProductTranslations = Field(
         description=TRANSLATIONS_NOTE + " Описание — на всех трёх языках или ни на одном.",
         examples=[PRODUCT_TRANSLATIONS_EXAMPLE],
@@ -131,6 +161,9 @@ class ProductCreateDTO(BaseModel):
 
 
 class ProductUpdateDTO(BaseModel):
+    category_id: int | None = Field(
+        default=None, description="Перенос в другую активную категорию."
+    )
     translations: ProductTranslations | None = Field(
         default=None, description=TRANSLATIONS_NOTE, examples=[PRODUCT_TRANSLATIONS_EXAMPLE]
     )
@@ -189,6 +222,7 @@ class FieldUpdateDTO(BaseModel):
 
 class ProductFilterDTO(BaseModel):
     status: ProductStatus | None = None
+    category_id: int | None = None
     search: str | None = Field(default=None, description="Поиск по названию на любом языке.")
 
 
@@ -209,6 +243,24 @@ class ProductBriefDTO(BaseModel):
     translations: list[TranslationOutDTO]
 
 
+class CategoryBriefDTO(BaseModel):
+    id: int
+    translations: list[TranslationOutDTO]
+
+
+class CategoryDTO(BaseModel):
+    id: int
+    translations: list[ProductTranslationOutDTO]
+    is_active: bool
+    sort_order: int
+    products_count: int = Field(
+        default=0,
+        description="Фонду — все продукты категории; заявителю — доступные сейчас.",
+    )
+    created_at: datetime
+    updated_at: datetime
+
+
 class ProductFieldDTO(BaseModel):
     id: int
     field_type: FieldType
@@ -227,6 +279,7 @@ class ProductStageDTO(BaseModel):
 
 class ProductListItemDTO(BaseModel):
     id: int
+    category: CategoryBriefDTO
     translations: list[ProductTranslationOutDTO]
     status: ProductStatus
     allowed_subject_types: list[SubjectType]

@@ -16,7 +16,12 @@ from src.application.models.resource_allocation_model import ResourceAllocationO
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
 from src.auth.models.refresh_token_model import RefreshTokenORM
-from src.product.models.product_model import ProductFieldORM, ProductORM, ProductStageORM
+from src.product.models.product_model import (
+    ProductCategoryORM,
+    ProductFieldORM,
+    ProductORM,
+    ProductStageORM,
+)
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 from src.rbac.models.role_permission_model import RolePermissionORM
@@ -37,6 +42,7 @@ __all__ = [
     "ScoringAttemptORM",
     "StatusHistoryORM",
     "RefreshTokenORM",
+    "ProductCategoryORM",
     "ProductORM",
     "ProductStageORM",
     "ProductFieldORM",

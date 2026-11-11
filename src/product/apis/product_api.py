@@ -7,7 +7,12 @@ from src.common.dependencies import DBDep, require_permission
 from src.common.responses.exceptions import ProductNotFoundException
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import READ_ERRORS, error_examples, success_example
-from src.product.apis.examples import FIELD_TYPES_EXAMPLE, PRODUCT_DETAIL_EXAMPLE, PRODUCT_EXAMPLE
+from src.product.apis.examples import (
+    CATEGORY_EXAMPLE,
+    FIELD_TYPES_EXAMPLE,
+    PRODUCT_DETAIL_EXAMPLE,
+    PRODUCT_EXAMPLE,
+)
 from src.product.field_types import field_types
 from src.product.services.product_service import ProductService
 from src.rbac.permissions import Action, Module
@@ -33,11 +38,35 @@ async def get_field_types():
 
 
 @router.get(
+    "/categories",
+    summary="Категории, в которых сейчас есть продукты для подачи заявки",
+    description=(
+        "Только активные категории; `products_count` — сколько продуктов категории сейчас "
+        "принимают заявки (с `subject_type` — для этого типа субъекта)."
+    ),
+    dependencies=[read_dep],
+    responses={
+        200: success_example([CATEGORY_EXAMPLE], "Categories retrieved."),
+        **READ_ERRORS,
+    },
+)
+async def get_available_categories(
+    db: DBDep,
+    subject_type: SubjectType | None = Query(
+        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED"
+    ),
+):
+    data = await ProductService(db).get_available_categories(subject_type)
+    return ResponseBuilder.success(data=data, message="Categories retrieved.")
+
+
+@router.get(
     "",
     summary="Продукты, по которым сейчас принимаются заявки",
     description=(
-        "Опубликованные продукты в сроках приёма. С `subject_type` — только продукты для этого "
-        "типа субъекта. В `banks` — только активные банки продукта."
+        "Опубликованные продукты активных категорий в сроках приёма. С `subject_type` — только "
+        "продукты для этого типа субъекта, с `category_id` — только этой категории. "
+        "В `banks` — только активные банки продукта."
     ),
     dependencies=[read_dep],
     responses={200: success_example([PRODUCT_EXAMPLE], "Products retrieved."), **READ_ERRORS},
@@ -47,8 +76,9 @@ async def get_available_products(
     subject_type: SubjectType | None = Query(
         None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED"
     ),
+    category_id: int | None = Query(None, description="Категория из `GET /products/categories`"),
 ):
-    data = await ProductService(db).get_available(subject_type)
+    data = await ProductService(db).get_available(subject_type, category_id)
     return ResponseBuilder.success(data=data, message="Products retrieved.")
 
 

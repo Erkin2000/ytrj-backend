@@ -23,7 +23,7 @@ from src.common.responses.validation_handler import validation_exception_handler
 from src.common.swagger.i18n import DESCRIPTION_UZ, translate_openapi
 from src.common.swagger.openapi import restore_nulls
 from src.config import settings
-from src.product.apis import fund_product_api, product_api
+from src.product.apis import fund_category_api, fund_product_api, product_api
 from src.rbac.apis import permission_api, role_api
 
 DESCRIPTION = """
@@ -55,6 +55,10 @@ TAGS_METADATA = [
     {"name": "RBAC: роли", "description": "Каталог ролей и матрица разрешений."},
     {"name": "RBAC: права", "description": "Каталог прав платформы."},
     {"name": "Каталог банков", "description": "Банки-партнёры и правила выбора по типу субъекта."},
+    {
+        "name": "Продукты: категории (Фонд)",
+        "description": "Категории продуктов; продукт относится к одной категории.",
+    },
     {
         "name": "Продукты: управление (Фонд)",
         "description": "Продукты, их банки, сроки приёма, этапы и поля анкеты; публикация.",
@@ -170,6 +174,7 @@ app.include_router(user_api.router, prefix=API_PREFIX)
 app.include_router(role_api.router, prefix=API_PREFIX)
 app.include_router(permission_api.router, prefix=API_PREFIX)
 app.include_router(bank_api.router, prefix=API_PREFIX)
+app.include_router(fund_category_api.router, prefix=API_PREFIX)
 app.include_router(fund_product_api.router, prefix=API_PREFIX)
 app.include_router(product_api.router, prefix=API_PREFIX)
 app.include_router(application_api.router, prefix=API_PREFIX)

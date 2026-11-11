@@ -125,6 +125,7 @@ class Api:
         self.user_ids: list[int] = []
         self.application_ids: list[int] = []
         self.product_ids: list[int] = []
+        self.category_ids: list[int] = []
 
     @staticmethod
     def fresh_pinfl() -> str:
@@ -168,9 +169,25 @@ class Api:
         login, me = self.sso_login(pinfl)
         return login["headers"], me
 
-    def product(self, headers, bank_ids, subject_types=None, publish=True):
+    def category(self, headers, active=True):
+        r = self.client.post(
+            "/api/v1/fund/product-categories",
+            headers=headers,
+            json={
+                "translations": tr("TEST Категория", "TEST Kategoriya", "TEST Category"),
+                "is_active": active,
+            },
+        )
+        assert r.status_code == 201, r.text
+        self.category_ids.append(data(r)["id"])
+        return data(r)
+
+    def product(self, headers, bank_ids, subject_types=None, publish=True, category_id=None):
         c = self.client
+        if category_id is None:
+            category_id = self.category(headers)["id"]
         body = {
+            "category_id": category_id,
             "translations": tr("TEST Продукт", "TEST Mahsulot", "TEST Product"),
             "bank_ids": bank_ids,
         }
@@ -229,6 +246,15 @@ class Api:
                 )
                 await session.execute(
                     text("DELETE FROM products WHERE id = ANY(:ids)"), {"ids": self.product_ids}
+                )
+            if self.category_ids:
+                await session.execute(
+                    text("DELETE FROM products WHERE category_id = ANY(:ids)"),
+                    {"ids": self.category_ids},
+                )
+                await session.execute(
+                    text("DELETE FROM product_categories WHERE id = ANY(:ids)"),
+                    {"ids": self.category_ids},
                 )
             if self.user_ids:
                 await session.execute(delete(UserORM).where(UserORM.id.in_(self.user_ids)))

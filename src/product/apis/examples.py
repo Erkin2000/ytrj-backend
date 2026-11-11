@@ -1,6 +1,7 @@
 """Примеры продуктов для Swagger."""
 
 from src.product.schemas.product_schema import (
+    CATEGORY_TRANSLATIONS_EXAMPLE,
     FIELD_TRANSLATIONS_EXAMPLE,
     PRODUCT_TRANSLATIONS_EXAMPLE,
     STAGE_TRANSLATIONS_EXAMPLE,
@@ -14,6 +15,23 @@ BANK_EXAMPLE = {
     "allowed_subject_types": ["YATT", "MCHJ", "SELF_EMPLOYED"],
     "is_active": True,
     "sort_order": 1,
+}
+
+CATEGORY_EXAMPLE = {
+    "id": 1,
+    "translations": CATEGORY_TRANSLATIONS_EXAMPLE,
+    "is_active": True,
+    "sort_order": 0,
+    "products_count": 3,
+    "created_at": "2026-11-11T09:00:00Z",
+    "updated_at": "2026-11-11T09:00:00Z",
+}
+
+CATEGORY_BRIEF_EXAMPLE = {
+    "id": 1,
+    "translations": [
+        {"language": t["language"], "name": t["name"]} for t in CATEGORY_TRANSLATIONS_EXAMPLE
+    ],
 }
 
 PRODUCT_BRIEF_EXAMPLE = {
@@ -55,6 +73,7 @@ STAGE_EXAMPLE = {
 
 PRODUCT_EXAMPLE = {
     "id": 3,
+    "category": CATEGORY_BRIEF_EXAMPLE,
     "translations": PRODUCT_TRANSLATIONS_EXAMPLE,
     "status": "PUBLISHED",
     "allowed_subject_types": ["YATT", "MCHJ", "SELF_EMPLOYED"],

@@ -10,6 +10,9 @@ from src.application.models.bank_model import BankORM
 from src.application.services.base import ApplicationBaseService
 from src.common.responses.exceptions import (
     BankNotFoundException,
+    ProductCategoryInactiveException,
+    ProductCategoryInUseException,
+    ProductCategoryNotFoundException,
     ProductFieldNotFoundException,
     ProductInUseException,
     ProductLockedException,
@@ -20,8 +23,10 @@ from src.common.responses.exceptions import (
     StageNumberTakenException,
 )
 from src.product.enums import FILE_FIELD_TYPES, ProductStatus
-from src.product.mappers import ProductDataMapper
+from src.product.mappers import ProductDataMapper, category_dto
 from src.product.models.product_model import (
+    ProductCategoryORM,
+    ProductCategoryTranslationORM,
     ProductFieldORM,
     ProductFieldTranslationORM,
     ProductORM,
@@ -30,6 +35,9 @@ from src.product.models.product_model import (
     ProductTranslationORM,
 )
 from src.product.schemas.product_schema import (
+    CategoryCreateDTO,
+    CategoryDTO,
+    CategoryUpdateDTO,
     FieldCreateDTO,
     FieldUpdateDTO,
     ProductCreateDTO,
@@ -44,10 +52,10 @@ from src.utils.base_service import BaseService
 
 
 def is_available(product: ProductORM, subject_type: SubjectType | None = None) -> bool:
-    """Продукт принимает заявки: опубликован, сегодня в сроках приёма и,
-    если указан тип субъекта, рассчитан на него."""
+    """Продукт принимает заявки: опубликован, его категория активна, сегодня в
+    сроках приёма и, если указан тип субъекта, рассчитан на него."""
     today = date.today()
-    if product.status != ProductStatus.PUBLISHED:
+    if product.status != ProductStatus.PUBLISHED or not product.category.is_active:
         return False
     if product.accept_from is not None and today < product.accept_from:
         return False
@@ -73,9 +81,60 @@ def apply_translations(current: list, items: list, orm_class: type) -> None:
 class ProductService(BaseService):
     # ---------- каталог для заявителя ----------
 
-    async def get_available(self, subject_type: SubjectType | None) -> list[ProductListItemDTO]:
-        products = await self.db.product.get_available(date.today(), subject_type)
+    async def get_available(
+        self, subject_type: SubjectType | None, category_id: int | None = None
+    ) -> list[ProductListItemDTO]:
+        products = await self.db.product.get_available(date.today(), subject_type, category_id)
         return [ProductDataMapper.map_to_applicant(p) for p in products]
+
+    async def get_available_categories(self, subject_type: SubjectType | None) -> list[CategoryDTO]:
+        """Активные категории, в которых сейчас есть продукты для подачи заявки."""
+        counts = await self.db.product.available_per_category(date.today(), subject_type)
+        categories = await self.db.product.get_categories(only_active=True)
+        return [category_dto(c, counts[c.id]) for c in categories if counts.get(c.id)]
+
+    # ---------- категории (Фонд) ----------
+
+    async def get_categories(self) -> list[CategoryDTO]:
+        """Публичный справочник: все категории, включая неактивные."""
+        counts = await self.db.product.products_per_category()
+        categories = await self.db.product.get_categories()
+        return [category_dto(c, counts.get(c.id, 0)) for c in categories]
+
+    async def get_category(self, category_id: int) -> CategoryDTO:
+        return await self._category_detail(category_id)
+
+    async def create_category(self, user: CurrentUserDTO, data: CategoryCreateDTO) -> CategoryDTO:
+        ApplicationBaseService.assert_global_scope(user)
+        category = ProductCategoryORM(is_active=data.is_active, sort_order=data.sort_order)
+        apply_translations(category.translations, data.translations, ProductCategoryTranslationORM)
+        self.db.session.add(category)
+        await self.db.commit()
+        return await self._category_detail(category.id)
+
+    async def update_category(
+        self, user: CurrentUserDTO, category_id: int, data: CategoryUpdateDTO
+    ) -> CategoryDTO:
+        ApplicationBaseService.assert_global_scope(user)
+        category = await self._category(category_id)
+        if data.translations is not None:
+            apply_translations(
+                category.translations, data.translations, ProductCategoryTranslationORM
+            )
+        if data.is_active is not None:
+            category.is_active = data.is_active
+        if data.sort_order is not None:
+            category.sort_order = data.sort_order
+        await self.db.commit()
+        return await self._category_detail(category_id)
+
+    async def delete_category(self, user: CurrentUserDTO, category_id: int) -> None:
+        ApplicationBaseService.assert_global_scope(user)
+        category = await self._category(category_id)
+        if (await self.db.product.products_per_category()).get(category_id):
+            raise ProductCategoryInUseException()
+        await self.db.session.delete(category)
+        await self.db.commit()
 
     async def get_available_detail(self, product_id: int) -> ProductDetailDTO:
         product = await self.db.product.get_orm(product_id)
@@ -101,7 +160,9 @@ class ProductService(BaseService):
 
     async def create(self, user: CurrentUserDTO, data: ProductCreateDTO) -> ProductDetailDTO:
         ApplicationBaseService.assert_global_scope(user)
+        await self._active_category(data.category_id)
         product = ProductORM(
+            category_id=data.category_id,
             allowed_subject_types=[s.value for s in data.allowed_subject_types],
             accept_from=data.accept_from,
             accept_to=data.accept_to,
@@ -121,6 +182,10 @@ class ProductService(BaseService):
         product = await self._get(product_id)
         changes = data.model_dump(exclude_unset=True)
 
+        category_id = changes.pop("category_id", None)
+        if category_id is not None and category_id != product.category_id:
+            await self._active_category(category_id)
+            product.category_id = category_id
         bank_ids = changes.pop("bank_ids", None)
         if bank_ids is not None:
             product.banks = await self._banks(bank_ids)
@@ -184,6 +249,7 @@ class ProductService(BaseService):
                 ProductTranslationORM(language=t.language, name=t.name, description=t.description)
                 for t in source.translations
             ],
+            category_id=source.category_id,
             allowed_subject_types=list(source.allowed_subject_types),
             accept_from=source.accept_from,
             accept_to=source.accept_to,
@@ -308,6 +374,23 @@ class ProductService(BaseService):
         if product is None:
             raise ProductNotFoundException()
         return product
+
+    async def _category(self, category_id: int) -> ProductCategoryORM:
+        category = await self.db.product.get_category(category_id)
+        if category is None:
+            raise ProductCategoryNotFoundException()
+        return category
+
+    async def _active_category(self, category_id: int) -> ProductCategoryORM:
+        category = await self._category(category_id)
+        if not category.is_active:
+            raise ProductCategoryInactiveException()
+        return category
+
+    async def _category_detail(self, category_id: int) -> CategoryDTO:
+        category = await self._category(category_id)
+        counts = await self.db.product.products_per_category()
+        return category_dto(category, counts.get(category_id, 0))
 
     async def _get_unlocked(self, product_id: int) -> ProductORM:
         product = await self._get(product_id)

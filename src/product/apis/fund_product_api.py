@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.exceptions import (
     BankNotFoundException,
+    ProductCategoryInactiveException,
+    ProductCategoryNotFoundException,
     ProductFieldNotFoundException,
     ProductInUseException,
     ProductLockedException,
@@ -61,7 +63,7 @@ STRUCTURE_NOTE = (
 
 @router.get(
     "",
-    summary="Все продукты (фильтр по статусу, поиск по названию)",
+    summary="Все продукты (фильтр по статусу и категории, поиск по названию)",
     dependencies=[read_dep],
     responses={200: paginated_example(PRODUCT_EXAMPLE, "Products retrieved."), **READ_ERRORS},
 )
@@ -74,12 +76,14 @@ async def get_products(
 
 @router.post(
     "",
-    summary="Создать продукт (черновик): названия, описания, типы субъекта, сроки, банки",
+    summary="Создать продукт (черновик): категория, названия, описания, типы субъекта, сроки, банки",
+    description="`category_id` обязателен: активная категория из `GET /fund/product-categories`.",
     dependencies=[create_dep],
     responses={
         201: success_example({**DRAFT_EXAMPLE, "stages": []}, "Product created."),
         **COMMON_ERRORS,
-        404: error_examples(BankNotFoundException),
+        400: error_examples(ProductCategoryInactiveException),
+        404: error_examples(ProductCategoryNotFoundException, BankNotFoundException),
     },
 )
 async def create_product(data: ProductCreateDTO, db: DBDep, user: CurrentUserDep):
@@ -104,7 +108,7 @@ async def get_product(product_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.patch(
     "/{product_id}",
-    summary="Изменить названия, описания, типы субъекта, сроки приёма или банки",
+    summary="Изменить категорию, названия, описания, типы субъекта, сроки приёма или банки",
     description=(
         "Передаются только изменяемые поля. `bank_ids` заменяет список банков целиком. "
         "Разрешено и при наличии заявок."
@@ -113,8 +117,10 @@ async def get_product(product_id: int, db: DBDep, user: CurrentUserDep):
     responses={
         200: success_example(PRODUCT_DETAIL_EXAMPLE, "Product updated."),
         **COMMON_ERRORS,
-        400: error_examples(ProductStatusException),
-        404: error_examples(ProductNotFoundException, BankNotFoundException),
+        400: error_examples(ProductStatusException, ProductCategoryInactiveException),
+        404: error_examples(
+            ProductNotFoundException, ProductCategoryNotFoundException, BankNotFoundException
+        ),
     },
 )
 async def update_product(product_id: int, data: ProductUpdateDTO, db: DBDep, user: CurrentUserDep):

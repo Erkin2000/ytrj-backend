@@ -877,3 +877,23 @@ msgstr "The stage has no fields."
 
 msgid "Этапов пока нет."
 msgstr "No stages yet."
+
+# ---------- категории продуктов ----------
+
+msgid "Категория продуктов"
+msgstr "Product category"
+
+msgid "Категории продуктов"
+msgstr "Product categories"
+
+msgid "Категория"
+msgstr "Category"
+
+msgid "Активна"
+msgstr "Active"
+
+msgid "Выберите активную категорию"
+msgstr "Select an active category"
+
+msgid "неактивна"
+msgstr "inactive"

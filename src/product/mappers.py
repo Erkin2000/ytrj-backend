@@ -1,6 +1,13 @@
 from src.application.schemas.bank_schema import BankDTO
-from src.product.models.product_model import ProductFieldORM, ProductORM, ProductStageORM
+from src.product.models.product_model import (
+    ProductCategoryORM,
+    ProductFieldORM,
+    ProductORM,
+    ProductStageORM,
+)
 from src.product.schemas.product_schema import (
+    CategoryBriefDTO,
+    CategoryDTO,
     ProductBriefDTO,
     ProductDetailDTO,
     ProductFieldDTO,
@@ -49,6 +56,9 @@ class ProductDataMapper(DataMapper):
         banks = [b for b in model.banks if b.is_active] if only_active_banks else model.banks
         return {
             "id": model.id,
+            "category": CategoryBriefDTO(
+                id=model.category.id, translations=names(model.category.translations)
+            ),
             "translations": [
                 ProductTranslationOutDTO(
                     language=t.language, name=t.name, description=t.description
@@ -84,3 +94,18 @@ class ProductDataMapper(DataMapper):
             applications_count=applications_count,
             is_locked=applications_count > 0,
         )
+
+
+def category_dto(model: ProductCategoryORM, products_count: int = 0) -> CategoryDTO:
+    return CategoryDTO(
+        id=model.id,
+        translations=[
+            ProductTranslationOutDTO(language=t.language, name=t.name, description=t.description)
+            for t in model.translations
+        ],
+        is_active=model.is_active,
+        sort_order=model.sort_order,
+        products_count=products_count,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )

@@ -118,5 +118,10 @@ COMMON_ERRORS = {
     500: INTERNAL_SERVER_ERROR,
 }
 
+# Для публичных GET-ручек (без авторизации): нет 400, 401 и 403.
+PUBLIC_ERRORS = {
+    status: body for status, body in COMMON_ERRORS.items() if status in (404, 422, 500)
+}
+
 # Для GET-ручек: 400 они не возвращают.
 READ_ERRORS = {status: body for status, body in COMMON_ERRORS.items() if status != 400}

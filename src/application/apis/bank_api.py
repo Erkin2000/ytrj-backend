@@ -5,7 +5,7 @@ from src.application.schemas.bank_schema import BankRequestAddDTO, BankRequestUp
 from src.application.services.bank_service import BankService
 from src.common.dependencies import DBDep, require_permission
 from src.common.responses.response import ResponseBuilder
-from src.common.swagger.responses import COMMON_ERRORS, CONFLICT, success_example
+from src.common.swagger.responses import COMMON_ERRORS, CONFLICT, PUBLIC_ERRORS, success_example
 from src.rbac.permissions import Action, Module
 
 router = APIRouter(prefix="/banks", tags=["Каталог банков"])
@@ -24,11 +24,13 @@ BANK_EXAMPLE = {
 @router.get(
     "",
     summary="Банки для окна выбора (фильтр по типу субъекта)",
-    description="ИП и ООО — все 9 банков; самозанятым — только Microcreditbank, Xalq banki и Agrobank.",
-    dependencies=[Depends(require_permission(Module.BANKS, Action.READ))],
+    description=(
+        "Без авторизации. ИП и ООО — все 9 банков; самозанятым — только Microcreditbank, "
+        "Xalq banki и Agrobank."
+    ),
     responses={
         200: success_example([BANK_EXAMPLE], "Banks retrieved successfully."),
-        **COMMON_ERRORS,
+        **PUBLIC_ERRORS,
     },
 )
 async def get_banks(
@@ -45,8 +47,8 @@ async def get_banks(
 @router.get(
     "/{bank_id}",
     summary="Банк по ID",
-    dependencies=[Depends(require_permission(Module.BANKS, Action.READ))],
-    responses={200: success_example(BANK_EXAMPLE, "Bank found."), **COMMON_ERRORS},
+    description="Без авторизации.",
+    responses={200: success_example(BANK_EXAMPLE, "Bank found."), **PUBLIC_ERRORS},
 )
 async def get_bank(bank_id: int, db: DBDep):
     data = await BankService(db).get_bank(bank_id)

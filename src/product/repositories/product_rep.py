@@ -7,6 +7,7 @@ from src.application.models.application_model import ApplicationORM
 from src.product.enums import ProductStatus
 from src.product.mappers import ProductDataMapper
 from src.product.models.product_model import (
+    ProductCategoryORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -28,6 +29,7 @@ class ProductRepository(BaseRepository):
             .where(ProductORM.id == product_id)
             .options(
                 selectinload(ProductORM.translations),
+                selectinload(ProductORM.category).selectinload(ProductCategoryORM.translations),
                 selectinload(ProductORM.banks),
                 selectinload(ProductORM.stages).selectinload(ProductStageORM.translations),
                 selectinload(ProductORM.stages)
@@ -48,6 +50,8 @@ class ProductRepository(BaseRepository):
         stmt = select(self.model).order_by(self.model.id.desc())
         if filters.status is not None:
             stmt = stmt.where(self.model.status == filters.status)
+        if filters.category_id is not None:
+            stmt = stmt.where(self.model.category_id == filters.category_id)
         if filters.search:
             pattern = f"%{filters.search}%"
             stmt = stmt.where(
@@ -57,14 +61,23 @@ class ProductRepository(BaseRepository):
 
     @staticmethod
     def _available_stmt(today: date) -> Select:
-        return select(ProductORM).where(
-            ProductORM.status == ProductStatus.PUBLISHED,
-            or_(ProductORM.accept_from.is_(None), ProductORM.accept_from <= today),
-            or_(ProductORM.accept_to.is_(None), ProductORM.accept_to >= today),
+        return (
+            select(ProductORM)
+            .join(ProductCategoryORM)
+            .where(
+                ProductCategoryORM.is_active.is_(True),
+                ProductORM.status == ProductStatus.PUBLISHED,
+                or_(ProductORM.accept_from.is_(None), ProductORM.accept_from <= today),
+                or_(ProductORM.accept_to.is_(None), ProductORM.accept_to >= today),
+            )
         )
 
-    async def get_available(self, today: date, subject_type: str | None) -> list[ProductORM]:
+    async def get_available(
+        self, today: date, subject_type: str | None, category_id: int | None = None
+    ) -> list[ProductORM]:
         stmt = self._available_stmt(today).order_by(ProductORM.id.desc())
+        if category_id is not None:
+            stmt = stmt.where(ProductORM.category_id == category_id)
         if subject_type:
             stmt = stmt.where(subject_type == any_(ProductORM.allowed_subject_types))
         return list((await self.session.scalars(stmt)).all())
@@ -92,3 +105,36 @@ class ProductRepository(BaseRepository):
         if exclude_stage_id is not None:
             stmt = stmt.where(ProductStageORM.id != exclude_stage_id)
         return bool(await self.session.scalar(stmt))
+
+    # ---------- категории ----------
+
+    async def get_category(self, category_id: int) -> ProductCategoryORM | None:
+        stmt = (
+            select(ProductCategoryORM)
+            .where(ProductCategoryORM.id == category_id)
+            .options(selectinload(ProductCategoryORM.translations))
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
+    async def get_categories(self, only_active: bool = False) -> list[ProductCategoryORM]:
+        stmt = select(ProductCategoryORM).order_by(
+            ProductCategoryORM.sort_order, ProductCategoryORM.id
+        )
+        if only_active:
+            stmt = stmt.where(ProductCategoryORM.is_active.is_(True))
+        return list((await self.session.scalars(stmt)).all())
+
+    async def products_per_category(self) -> dict[int, int]:
+        stmt = select(ProductORM.category_id, func.count()).group_by(ProductORM.category_id)
+        return dict((await self.session.execute(stmt)).all())
+
+    async def available_per_category(self, today: date, subject_type: str | None) -> dict[int, int]:
+        stmt = (
+            self._available_stmt(today)
+            .with_only_columns(ProductORM.category_id, func.count())
+            .group_by(ProductORM.category_id)
+        )
+        if subject_type:
+            stmt = stmt.where(subject_type == any_(ProductORM.allowed_subject_types))
+        return dict((await self.session.execute(stmt)).all())

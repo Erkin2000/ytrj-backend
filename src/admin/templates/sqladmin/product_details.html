@@ -7,7 +7,7 @@
     <div class="card-body">
       <div class="row align-items-center g-3">
         <div class="col">
-          <div class="page-pretitle">{{ _("Продукт") }} #{{ pr.id }}</div>
+          <div class="page-pretitle">{{ _("Продукт") }} #{{ pr.id }} · <a href="{{ url_for('admin:details', identity='product-category-orm', pk=pr.category_id) }}">{{ tr_name(pr.category.translations) }}</a></div>
           <h2 class="page-title mb-1">{{ tr_name(pr.translations) }} &nbsp;{{ product_status_badge(pr.status) }}
             {% if pr.applications_count %}<span class="badge bg-orange-lt ms-1"><i class="fa-solid fa-lock me-1"></i>{{ _("Есть заявки — этапы и поля не меняются") }}</span>{% endif %}
           </h2>
@@ -47,6 +47,8 @@
     <div class="card-header"><h3 class="card-title">{{ _("Условия") }}</h3></div>
     <div class="card-body">
       <dl class="jg-kv">
+        <dt>{{ _("Категория") }}</dt>
+        <dd><a href="{{ url_for('admin:details', identity='product-category-orm', pk=pr.category_id) }}">{{ tr_name(pr.category.translations) }}</a>{% if not pr.category.is_active %} <span class="badge bg-secondary-lt">{{ _("неактивна") }}</span>{% endif %}</dd>
         <dt>{{ _("Типы субъектов") }}</dt>
         <dd>{% for s in pr.allowed_subject_types %}<span class="badge bg-blue-lt me-1">{{ subject_label(s) }}</span>{% else %}—{% endfor %}</dd>
         <dt>{{ _("Банки") }}</dt>

@@ -51,10 +51,49 @@ def ru_name(translations) -> str:
     return translations[0].name if translations else ""
 
 
+class ProductCategoryORM(TimestampMixin, Base):
+    """Категория продуктов. Создаёт оператор Фонда; каждый продукт относится к одной категории."""
+
+    __tablename__ = "product_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Неактивную категорию нельзя выбрать для продукта, её продукты не видны заявителям.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    translations: Mapped[list["ProductCategoryTranslationORM"]] = relationship(
+        back_populates="category",
+        cascade="all, delete-orphan",
+        order_by="ProductCategoryTranslationORM.language",
+        lazy="selectin",
+    )
+
+    def __str__(self) -> str:
+        return ru_name(self.translations)
+
+
+class ProductCategoryTranslationORM(Base):
+    __tablename__ = "product_category_translations"
+    __table_args__ = (UniqueConstraint("category_id", "language"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("product_categories.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    language: Mapped[Language] = mapped_column(LanguageType, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+
+    category: Mapped["ProductCategoryORM"] = relationship(back_populates="translations")
+
+
 class ProductORM(TimestampMixin, Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("product_categories.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     status: Mapped[ProductStatus] = mapped_column(
         Enum(ProductStatus, name="product_status"),
         default=ProductStatus.DRAFT,
@@ -74,6 +113,7 @@ class ProductORM(TimestampMixin, Base):
     )
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
+    category: Mapped["ProductCategoryORM"] = relationship(lazy="selectin")
     translations: Mapped[list["ProductTranslationORM"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",

@@ -344,6 +344,20 @@ class ProductNotFoundException(NotFoundException):
     message = "Product not found"
 
 
+class ProductCategoryNotFoundException(NotFoundException):
+    message = "Product category not found"
+    field = "category_id"
+
+
+class ProductCategoryInactiveException(BadRequestException):
+    message = "Product category is inactive and cannot be selected"
+    field = "category_id"
+
+
+class ProductCategoryInUseException(ConflictException):
+    message = "Category has products and cannot be deleted; deactivate it or move the products"
+
+
 class ProductStageNotFoundException(NotFoundException):
     message = "Stage not found in this product"
 

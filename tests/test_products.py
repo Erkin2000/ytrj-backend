@@ -43,14 +43,22 @@ def test_fund_builds_and_publishes_product(api, fund, bank_pair, applicant):
     c = api.client
     bank, _ = bank_pair
 
+    category = api.category(fund)
     r = c.post(
         "/api/v1/fund/products",
         headers=fund,
         json={"translations": tr("TEST П", "TEST M", "TEST P")},
     )
+    assert r.status_code == 422
+    r = c.post(
+        "/api/v1/fund/products",
+        headers=fund,
+        json={"category_id": category["id"], "translations": tr("TEST П", "TEST M", "TEST P")},
+    )
     assert r.status_code == 201, r.text
     product = data(r)
     api.product_ids.append(product["id"])
+    assert product["category"]["id"] == category["id"]
     assert product["status"] == "DRAFT" and product["stages"] == []
     assert product["allowed_subject_types"] == ["YATT", "MCHJ", "SELF_EMPLOYED"]
 
@@ -216,6 +224,15 @@ def test_applicant_fills_product_form(api, fund, bank_pair, applicant, photo_upl
 def test_product_availability_rules(api, fund, bank_pair, applicant):
     c = api.client
     bank, _ = bank_pair
+    r = c.post("/api/v1/applications", headers=applicant, json={"subject_type": "SELF_EMPLOYED"})
+    assert r.status_code == 422
+    r = c.post(
+        "/api/v1/applications",
+        headers=applicant,
+        json={"product_id": 999999999, "subject_type": "SELF_EMPLOYED"},
+    )
+    assert r.status_code == 400 and r.json()["code"] == "product_not_available"
+
     only_llc = api.product(fund, [bank["id"]], subject_types=["MCHJ"])
     r = create_application(api, applicant, only_llc["id"])
     assert r.status_code == 400 and r.json()["code"] == "product_not_available"
@@ -241,15 +258,19 @@ def test_translations_require_each_language_once(api, fund):
     c = api.client
     url = "/api/v1/fund/products"
     ru, uz, en = tr("TEST П", "TEST M", "TEST P")
+    category_id = api.category(fund)["id"]
 
     for translations in ([ru, uz], [ru, uz, en, ru], [ru, ru, en], [ru, uz, {**en, "name": " "}]):
-        r = c.post(url, headers=fund, json={"translations": translations})
+        r = c.post(
+            url, headers=fund, json={"category_id": category_id, "translations": translations}
+        )
         assert r.status_code == 422, translations
 
     partial = [{**ru, "description": "Описание"}, uz, en]
-    assert c.post(url, headers=fund, json={"translations": partial}).status_code == 422
+    body = {"category_id": category_id, "translations": partial}
+    assert c.post(url, headers=fund, json=body).status_code == 422
 
-    r = c.post(url, headers=fund, json={"translations": [en, ru, uz]})
+    r = c.post(url, headers=fund, json={"category_id": category_id, "translations": [en, ru, uz]})
     assert r.status_code == 201, r.text
     product = data(r)
     api.product_ids.append(product["id"])
@@ -280,3 +301,83 @@ def test_field_types_catalog(api, fund, applicant, role_ids, bank_pair):
     assert c.get("/api/v1/products/field-types", headers=applicant).status_code == 200
     bank_h, _ = api.staff(role_id=role_ids["BANK_EMPLOYEE"], bank_id=bank_pair[0]["id"])
     assert c.get("/api/v1/products/field-types", headers=bank_h).status_code == 403
+
+
+def test_product_categories(api, fund, bank_pair, applicant):
+    c = api.client
+    bank, _ = bank_pair
+    url = "/api/v1/fund/product-categories"
+
+    body = {"translations": tr("TEST К", "TEST K", "TEST C")}
+    assert c.post(url, headers=applicant, json=body).status_code == 403
+    r = c.post(url, headers=fund, json={"translations": tr("TEST К", "TEST K", "TEST C")[:2]})
+    assert r.status_code == 422
+
+    category = api.category(fund)
+    other = api.category(fund)
+    inactive = api.category(fund, active=False)
+    assert category["products_count"] == 0
+
+    r = c.post(
+        "/api/v1/fund/products",
+        headers=fund,
+        json={"category_id": inactive["id"], "translations": tr("TEST П", "TEST M", "TEST P")},
+    )
+    assert r.status_code == 400 and r.json()["code"] == "product_category_inactive"
+    r = c.post(
+        "/api/v1/fund/products",
+        headers=fund,
+        json={"category_id": 999999999, "translations": tr("TEST П", "TEST M", "TEST P")},
+    )
+    assert r.status_code == 404 and r.json()["code"] == "product_category_not_found"
+
+    product = api.product(fund, [bank["id"]], category_id=category["id"])
+    assert product["category"]["id"] == category["id"]
+    assert data(c.get(f"{url}/{category['id']}", headers=fund))["products_count"] == 1
+
+    categories = {x["id"]: x for x in data(c.get("/api/v1/products/categories", headers=applicant))}
+    assert categories[category["id"]]["products_count"] == 1
+    assert other["id"] not in categories and inactive["id"] not in categories
+    query = f"/api/v1/products?category_id={category['id']}"
+    assert [p["id"] for p in data(c.get(query, headers=applicant))] == [product["id"]]
+    query = f"/api/v1/products?category_id={other['id']}"
+    assert data(c.get(query, headers=applicant)) == []
+
+    r = c.delete(f"{url}/{category['id']}", headers=fund)
+    assert r.status_code == 409 and r.json()["code"] == "product_category_in_use"
+
+    r = c.patch(f"{url}/{category['id']}", headers=fund, json={"is_active": False})
+    assert r.status_code == 200 and not data(r)["is_active"]
+    assert product["id"] not in available_ids(api, applicant)
+    r = create_application(api, applicant, product["id"])
+    assert r.status_code == 400 and r.json()["code"] == "product_not_available"
+
+    r = c.patch(
+        f"/api/v1/fund/products/{product['id']}", headers=fund, json={"category_id": other["id"]}
+    )
+    assert r.status_code == 200 and data(r)["category"]["id"] == other["id"]
+    assert product["id"] in available_ids(api, applicant)
+
+    assert c.delete(f"{url}/{category['id']}", headers=fund).status_code == 200
+    api.category_ids.remove(category["id"])
+    assert c.get(f"{url}/{category['id']}", headers=fund).status_code == 404
+
+
+def test_public_catalog_endpoints(api, fund, banks):
+    c = api.client
+    category = api.category(fund)
+    for path in (
+        "/api/v1/fund/product-categories",
+        f"/api/v1/fund/product-categories/{category['id']}",
+        "/api/v1/banks",
+        f"/api/v1/banks/{banks[0]['id']}",
+    ):
+        assert c.get(path).status_code == 200, path
+    assert c.get("/api/v1/fund/product-categories/999999999").status_code == 404
+    assert c.get("/api/v1/banks/999999999").status_code == 404
+
+    body = {"translations": tr("TEST К", "TEST K", "TEST C")}
+    assert c.post("/api/v1/fund/product-categories", json=body).status_code == 401
+    assert c.post("/api/v1/banks", json={"code": "test_x", "name": "TEST"}).status_code == 401
+    assert c.get("/api/v1/fund/products").status_code == 401
+    assert c.get("/api/v1/products").status_code == 401

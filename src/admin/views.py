@@ -57,6 +57,7 @@ from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.database import async_session_maker
 from src.product.enums import ProductStatus
 from src.product.models.product_model import (
+    ProductCategoryORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -223,6 +224,25 @@ def fmt_translation_product(model, attribute) -> Markup | str:
     if product is None:
         return "—"
     return Markup(f'<a href="/admin/product-orm/details/{product.id}">#{product.id}</a>')
+
+
+def fmt_product_category(model, attribute) -> Markup | str:
+    category = getattr(model, "category", None)
+    if category is None:
+        return "—"
+    return Markup(
+        f'<a href="/admin/product-category-orm/details/{category.id}">'
+        f"{escape(ru_name(category.translations))}</a>"
+    )
+
+
+def fmt_translations(model, attribute) -> Markup | str:
+    items = getattr(model, "translations", None) or []
+    if not items:
+        return "—"
+    return Markup("<br>").join(
+        Markup("{}: {}").format(language_label(t.language), t.name) for t in items
+    )
 
 
 def fmt_language(model, attribute) -> str:
@@ -1040,6 +1060,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     column_list = [
         ProductORM.id,
         ProductORM.translations,
+        ProductORM.category,
         ProductORM.status,
         ProductORM.allowed_subject_types,
         ProductORM.accept_from,
@@ -1060,6 +1081,8 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     column_labels = {
         ProductORM.id: "ID",
         ProductORM.translations: "Название",
+        ProductORM.category: "Категория",
+        ProductORM.category_id: "Категория",
         ProductORM.status: "Статус",
         ProductORM.allowed_subject_types: "Типы субъектов",
         ProductORM.accept_from: "Приём с",
@@ -1071,6 +1094,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     }
     column_formatters = {
         ProductORM.translations: fmt_product_name,
+        ProductORM.category: fmt_product_category,
         ProductORM.status: fmt_product_status,
         ProductORM.allowed_subject_types: fmt_subject_types,
         ProductORM.accept_from: fmt_date,
@@ -1082,6 +1106,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     can_create = False
     can_delete = False
     form_columns = [
+        ProductORM.category,
         ProductORM.allowed_subject_types,
         ProductORM.accept_from,
         ProductORM.accept_to,
@@ -1090,6 +1115,16 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     page_size = 25
 
     async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
+        category = data.get("category")
+        if category is not None and str(getattr(category, "id", category)) != str(
+            model.category_id
+        ):
+            async with async_session_maker() as session:
+                chosen = await session.get(
+                    ProductCategoryORM, int(getattr(category, "id", category))
+                )
+            if chosen is None or not chosen.is_active:
+                raise ValueError(_("Выберите активную категорию"))
         accept_from = data.get("accept_from", model.accept_from)
         accept_to = data.get("accept_to", model.accept_to)
         if accept_from and accept_to and accept_from > accept_to:
@@ -1105,6 +1140,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
     async def get_object_for_details(self, request: Request):
         stmt = self.details_query(request).options(
             selectinload(ProductORM.translations),
+            selectinload(ProductORM.category).selectinload(ProductCategoryORM.translations),
             selectinload(ProductORM.banks),
             selectinload(ProductORM.stages).selectinload(ProductStageORM.translations),
             selectinload(ProductORM.stages)
@@ -1118,6 +1154,55 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
                     select(func.count()).where(ApplicationORM.product_id == product.id)
                 )
         return product
+
+
+class ProductCategoryAdmin(LocalizedLabelsMixin, ModelView, model=ProductCategoryORM):
+    """Категории продуктов. Создание и названия на ru / uz / en — через API Фонда
+    (`/fund/product-categories`); здесь — активность и порядок."""
+
+    name = _l("Категория продуктов")
+    name_plural = _l("Категории продуктов")
+    icon = "fa-solid fa-folder-tree"
+    category = CATEGORY_PRODUCTS
+
+    column_list = [
+        ProductCategoryORM.id,
+        ProductCategoryORM.translations,
+        ProductCategoryORM.is_active,
+        ProductCategoryORM.sort_order,
+        ProductCategoryORM.updated_at,
+    ]
+    column_details_list = [
+        ProductCategoryORM.id,
+        ProductCategoryORM.translations,
+        ProductCategoryORM.is_active,
+        ProductCategoryORM.sort_order,
+        ProductCategoryORM.created_at,
+        ProductCategoryORM.updated_at,
+    ]
+    column_default_sort = [(ProductCategoryORM.sort_order, False)]
+    column_labels = {
+        ProductCategoryORM.id: "ID",
+        ProductCategoryORM.translations: "Название",
+        ProductCategoryORM.is_active: "Активна",
+        ProductCategoryORM.sort_order: "Порядок",
+        ProductCategoryORM.created_at: "Создана",
+        ProductCategoryORM.updated_at: "Обновлена",
+    }
+    column_formatters = {
+        ProductCategoryORM.translations: fmt_product_name,
+        ProductCategoryORM.is_active: fmt_bool,
+        ProductCategoryORM.updated_at: fmt_datetime,
+    }
+    column_formatters_detail = {
+        ProductCategoryORM.translations: fmt_translations,
+        ProductCategoryORM.is_active: fmt_bool,
+        ProductCategoryORM.created_at: fmt_datetime,
+        ProductCategoryORM.updated_at: fmt_datetime,
+    }
+    can_create = False
+    can_delete = False
+    form_columns = [ProductCategoryORM.is_active, ProductCategoryORM.sort_order]
 
 
 class ProductTranslationAdmin(LocalizedLabelsMixin, ModelView, model=ProductTranslationORM):
@@ -1277,6 +1362,7 @@ ALL_VIEWS = [
     PermissionAdmin,
     RefreshTokenAdmin,
     BankAdmin,
+    ProductCategoryAdmin,
     ProductAdmin,
     ProductTranslationAdmin,
     ApplicationAdmin,

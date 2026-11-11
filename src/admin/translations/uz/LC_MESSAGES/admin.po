@@ -1072,3 +1072,23 @@ msgstr "Bosqichda maydonlar yoʻq."
 
 msgid "Этапов пока нет."
 msgstr "Hozircha bosqichlar yoʻq."
+
+# ---------- категории продуктов ----------
+
+msgid "Категория продуктов"
+msgstr "Mahsulot kategoriyasi"
+
+msgid "Категории продуктов"
+msgstr "Mahsulot kategoriyalari"
+
+msgid "Категория"
+msgstr "Kategoriya"
+
+msgid "Активна"
+msgstr "Faol"
+
+msgid "Выберите активную категорию"
+msgstr "Faol kategoriyani tanlang"
+
+msgid "неактивна"
+msgstr "nofaol"
