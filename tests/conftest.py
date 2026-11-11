@@ -182,7 +182,9 @@ class Api:
         self.category_ids.append(data(r)["id"])
         return data(r)
 
-    def product(self, headers, bank_ids, subject_types=None, publish=True, category_id=None):
+    def product(
+        self, headers, bank_ids, subject_types=None, publish=True, category_id=None, uses_bank=True
+    ):
         c = self.client
         if category_id is None:
             category_id = self.category(headers)["id"]
@@ -190,6 +192,7 @@ class Api:
             "category_id": category_id,
             "translations": tr("TEST Продукт", "TEST Mahsulot", "TEST Product"),
             "bank_ids": bank_ids,
+            "uses_bank": uses_bank,
         }
         if subject_types:
             body["allowed_subject_types"] = subject_types

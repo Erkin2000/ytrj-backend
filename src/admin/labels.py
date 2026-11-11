@@ -144,6 +144,7 @@ EVENT_LABELS: dict[str, str] = {
     "scoring_retry": "Повтор скоринга",
     "eligibility_failed": "Не соответствует требованиям Фонда",
     "fund_rejected": "Фонд отказал",
+    "fund_approved": "Фонд одобрил (продукт без банка)",
     "workflow_migrated": "Перенос в новый порядок обработки",
     "sent_to_bank": "Направлена в банк",
     "bank_accepted": "Банк принял заявку",

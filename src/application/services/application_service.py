@@ -46,6 +46,7 @@ from src.common.responses.exceptions import (
     ProductFieldNotFoundException,
     ProductNotAvailableException,
     ProductStageNotFoundException,
+    ProductWithoutBankException,
     UserNotFoundException,
 )
 from src.product.enums import FILE_FIELD_TYPES, FieldType
@@ -95,7 +96,11 @@ class ApplicationService(ApplicationBaseService):
             status=application.status,
             is_rejected=detail.rejection_reason is not None,
             rejection_message=detail.rejection_reason,
-            steps=build_progress(application.status, application.scoring_retry_required),
+            steps=build_progress(
+                application.status,
+                application.scoring_retry_required,
+                uses_bank=application.product.uses_bank if application.product else True,
+            ),
         )
 
     # ---------- черновик ----------
@@ -115,6 +120,8 @@ class ApplicationService(ApplicationBaseService):
 
         product = await self._available_product(data.product_id, data.subject_type)
         if data.bank_id is not None:
+            if not product.uses_bank:
+                raise ProductWithoutBankException()
             await self._validate_bank(product, data.subject_type, data.bank_id)
 
         created_id = await self.db.application.add(
@@ -191,6 +198,8 @@ class ApplicationService(ApplicationBaseService):
         application = await self._get_editable(application_id, user)
         if application.product is None:
             raise ProductNotAvailableException()
+        if not application.product.uses_bank:
+            raise ProductWithoutBankException()
 
         bank = await self._validate_bank(
             application.product, application.subject_type, data.bank_id
@@ -442,8 +451,9 @@ class ApplicationService(ApplicationBaseService):
         if product is None or not is_available(product, application.subject_type):
             missing.append("product_id")
 
+        # Продукт без банка: банк не выбирается, заявку решает Фонд.
         bank = application.bank
-        if (
+        if (product is None or product.uses_bank) and (
             bank is None
             or not bank.is_active
             or product is None

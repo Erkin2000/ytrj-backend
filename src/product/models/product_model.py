@@ -100,6 +100,9 @@ class ProductORM(TimestampMixin, Base):
         nullable=False,
         index=True,
     )
+    # true — заявка идёт Фонд → Совет → банк; false — продукт без банка:
+    # заявку одобряет или отклоняет только Фонд, дальше она не идёт.
+    uses_bank: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Для каких типов субъекта доступен продукт.
     allowed_subject_types: Mapped[list[str]] = mapped_column(
         ARRAY(String(20)), nullable=False, default=list

@@ -905,3 +905,20 @@ msgstr "Delete completely"
 
 msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
 msgstr "The application will be deleted completely: history, decisions, form answers and files"
+
+# ---------- продукты без банка ----------
+
+msgid "Фонд одобрил (продукт без банка)"
+msgstr "Approved by the Fund (product without a bank)"
+
+msgid "Через банк"
+msgstr "Via a bank"
+
+msgid "Да: Фонд → Совет → банк"
+msgstr "Yes: Fund → Council → bank"
+
+msgid "Нет: решение принимает Фонд"
+msgstr "No: the Fund decides"
+
+msgid "У продукта без банка не может быть банков"
+msgstr "A product without a bank cannot have banks"

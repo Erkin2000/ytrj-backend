@@ -24,7 +24,9 @@ def names(translations) -> list[TranslationOutDTO]:
 
 
 def product_brief(model: ProductORM) -> ProductBriefDTO:
-    return ProductBriefDTO(id=model.id, translations=names(model.translations))
+    return ProductBriefDTO(
+        id=model.id, translations=names(model.translations), uses_bank=model.uses_bank
+    )
 
 
 def field_dto(model: ProductFieldORM) -> ProductFieldDTO:
@@ -66,6 +68,7 @@ class ProductDataMapper(DataMapper):
                 for t in model.translations
             ],
             "status": model.status,
+            "uses_bank": model.uses_bank,
             "allowed_subject_types": model.allowed_subject_types,
             "accept_from": model.accept_from,
             "accept_to": model.accept_to,

@@ -1069,6 +1069,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
         ProductORM.translations,
         ProductORM.category,
         ProductORM.status,
+        ProductORM.uses_bank,
         ProductORM.allowed_subject_types,
         ProductORM.accept_from,
         ProductORM.accept_to,
@@ -1091,6 +1092,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
         ProductORM.category: "Категория",
         ProductORM.category_id: "Категория",
         ProductORM.status: "Статус",
+        ProductORM.uses_bank: "Через банк",
         ProductORM.allowed_subject_types: "Типы субъектов",
         ProductORM.accept_from: "Приём с",
         ProductORM.accept_to: "Приём по",
@@ -1103,6 +1105,7 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
         ProductORM.translations: fmt_product_name,
         ProductORM.category: fmt_product_category,
         ProductORM.status: fmt_product_status,
+        ProductORM.uses_bank: fmt_bool,
         ProductORM.allowed_subject_types: fmt_subject_types,
         ProductORM.accept_from: fmt_date,
         ProductORM.accept_to: fmt_date,
@@ -1132,6 +1135,8 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
                 )
             if chosen is None or not chosen.is_active:
                 raise ValueError(_("Выберите активную категорию"))
+        if not model.uses_bank and data.get("banks"):
+            raise ValueError(_("У продукта без банка не может быть банков"))
         accept_from = data.get("accept_from", model.accept_from)
         accept_to = data.get("accept_to", model.accept_to)
         if accept_from and accept_to and accept_from > accept_to:

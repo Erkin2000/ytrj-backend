@@ -12,7 +12,8 @@ TRANSITIONS: dict[S, set[S]] = {
     S.DRAFT: {S.SUBMITTED},
     S.SUBMITTED: {S.SCORING_IN_PROGRESS},
     S.SCORING_IN_PROGRESS: {S.SCORING_FAILED, S.ELIGIBILITY_FAILED, S.FUND_REVIEW},
-    S.FUND_REVIEW: {S.FUND_REJECTED, S.COUNCIL_REVIEW},
+    # COMPLETED из FUND_REVIEW — только для продуктов без банка (решает Фонд).
+    S.FUND_REVIEW: {S.FUND_REJECTED, S.COUNCIL_REVIEW, S.COMPLETED},
     S.COUNCIL_REVIEW: {S.COUNCIL_APPROVED, S.COUNCIL_REJECTED},
     S.COUNCIL_APPROVED: {S.SENT_TO_BANK},
     S.SENT_TO_BANK: {S.BANK_REVIEW},
@@ -116,13 +117,45 @@ STATUS_STEP_INDEX: dict[S, int] = {
 }
 
 
-def build_progress(status: S, scoring_retry_required: bool = False) -> list[ProgressStepDTO]:
-    active = STATUS_STEP_INDEX[status]
+# Продукт без банка: после решения Фонда заявка завершена.
+NO_BANK_PROGRESS_STEPS = [
+    *PROGRESS_STEPS[:2],
+    (
+        "fund_review",
+        "Рассмотрение Фондом",
+        "Оператор Фонда проверяет заявку и принимает решение.",
+        None,
+    ),
+    (
+        "completed",
+        "Заявка одобрена",
+        "Фонд одобрил заявку. Процесс на платформе завершён.",
+        None,
+    ),
+]
+NO_BANK_STEP_INDEX: dict[S, int] = {
+    S.DRAFT: -1,
+    S.SUBMITTED: 0,
+    S.SCORING_IN_PROGRESS: 1,
+    S.SCORING_FAILED: 1,
+    S.ELIGIBILITY_FAILED: 1,
+    S.FUND_REVIEW: 2,
+    S.FUND_REJECTED: 2,
+    S.COMPLETED: 3,
+}
+
+
+def build_progress(
+    status: S, scoring_retry_required: bool = False, uses_bank: bool = True
+) -> list[ProgressStepDTO]:
+    steps_source = PROGRESS_STEPS if uses_bank else NO_BANK_PROGRESS_STEPS
+    index_map = STATUS_STEP_INDEX if uses_bank else NO_BANK_STEP_INDEX
+    active = index_map.get(status, STATUS_STEP_INDEX[status])
     rejected = status in REJECTED_STATUSES
     completed = status == S.COMPLETED
 
     steps: list[ProgressStepDTO] = []
-    for index, (key, title, description, action) in enumerate(PROGRESS_STEPS):
+    for index, (key, title, description, action) in enumerate(steps_source):
         if index < active or completed:
             state = "done"
         elif index == active:

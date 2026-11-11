@@ -51,6 +51,8 @@
         <dd><a href="{{ url_for('admin:details', identity='product-category-orm', pk=pr.category_id) }}">{{ tr_name(pr.category.translations) }}</a>{% if not pr.category.is_active %} <span class="badge bg-secondary-lt">{{ _("неактивна") }}</span>{% endif %}</dd>
         <dt>{{ _("Типы субъектов") }}</dt>
         <dd>{% for s in pr.allowed_subject_types %}<span class="badge bg-blue-lt me-1">{{ subject_label(s) }}</span>{% else %}—{% endfor %}</dd>
+        <dt>{{ _("Через банк") }}</dt>
+        <dd>{% if pr.uses_bank %}{{ _("Да: Фонд → Совет → банк") }}{% else %}{{ _("Нет: решение принимает Фонд") }}{% endif %}</dd>
         <dt>{{ _("Банки") }}</dt>
         <dd>{% for b in pr.banks %}<a class="badge {{ 'bg-indigo-lt' if b.is_active else 'bg-secondary-lt' }} me-1" href="{{ url_for('admin:details', identity='bank-orm', pk=b.id) }}">{{ b.name }}</a>{% else %}—{% endfor %}</dd>
       </dl>

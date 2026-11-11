@@ -147,9 +147,17 @@ class ProductCreateDTO(BaseModel):
     accept_to: date | None = Field(
         default=None, description="Конец приёма заявок (включительно).", examples=["2026-12-31"]
     )
+    uses_bank: bool = Field(
+        default=True,
+        description=(
+            "true — заявка идёт Фонд → Совет → банк, банки обязательны для публикации; "
+            "false — продукт без банка: заявку одобряет или отклоняет только Фонд."
+        ),
+    )
     bank_ids: list[int] = Field(
         default_factory=list,
-        description="Банки, через которые работает продукт (из каталога банков).",
+        description="Банки, через которые работает продукт (из каталога банков). "
+        "Для продукта без банка — пусто.",
         examples=[[1, 2]],
     )
 
@@ -157,6 +165,8 @@ class ProductCreateDTO(BaseModel):
     def _dates_in_order(self):
         if self.accept_from and self.accept_to and self.accept_from > self.accept_to:
             raise ValueError("accept_from не может быть позже accept_to")
+        if not self.uses_bank and self.bank_ids:
+            raise ValueError("У продукта без банка не может быть банков (bank_ids)")
         return self
 
 
@@ -168,6 +178,10 @@ class ProductUpdateDTO(BaseModel):
         default=None, description=TRANSLATIONS_NOTE, examples=[PRODUCT_TRANSLATIONS_EXAMPLE]
     )
     allowed_subject_types: list[SubjectType] | None = Field(default=None, min_length=1)
+    uses_bank: bool | None = Field(
+        default=None,
+        description="Сменить нельзя, если по продукту уже есть заявки. false очищает банки.",
+    )
     accept_from: date | None = None
     accept_to: date | None = None
     bank_ids: list[int] | None = Field(
@@ -241,6 +255,7 @@ class ProductTranslationOutDTO(TranslationOutDTO):
 class ProductBriefDTO(BaseModel):
     id: int
     translations: list[TranslationOutDTO]
+    uses_bank: bool = Field(default=True, description="false — продукт без банка.")
 
 
 class CategoryBriefDTO(BaseModel):
@@ -282,6 +297,7 @@ class ProductListItemDTO(BaseModel):
     category: CategoryBriefDTO
     translations: list[ProductTranslationOutDTO]
     status: ProductStatus
+    uses_bank: bool
     allowed_subject_types: list[SubjectType]
     accept_from: date | None = None
     accept_to: date | None = None

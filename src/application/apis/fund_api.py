@@ -6,13 +6,24 @@ from fastapi import APIRouter, Depends
 
 from src.application.schemas.application_schema import (
     ApplicationFilterDTO,
+    FundApproveDTO,
     FundRejectDTO,
     SendToCouncilDTO,
 )
 from src.application.services.fund_service import FundService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
+from src.common.responses.exceptions import (
+    CouncilRequiredException,
+    FundDecidesWithoutBankException,
+    InvalidStatusTransitionException,
+)
 from src.common.responses.response import ResponseBuilder
-from src.common.swagger.responses import COMMON_ERRORS, paginated_example, success_example
+from src.common.swagger.responses import (
+    COMMON_ERRORS,
+    error_examples,
+    paginated_example,
+    success_example,
+)
 from src.product.apis.examples import PRODUCT_BRIEF_EXAMPLE
 from src.rbac.permissions import Action, Module
 
@@ -134,6 +145,7 @@ async def retry_scoring(application_id: int, db: DBDep, user: CurrentUserDep):
     responses={
         200: success_example({**ITEM, "status": "COUNCIL_REVIEW"}, "Application sent to council."),
         **COMMON_ERRORS,
+        400: error_examples(FundDecidesWithoutBankException, InvalidStatusTransitionException),
     },
 )
 async def send_to_council(
@@ -145,8 +157,11 @@ async def send_to_council(
 
 @router.post(
     "/{application_id}/reject",
-    summary="Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)",
-    description="Причина обязательна и показывается заявителю.",
+    summary="Отклонить заявку (FUND_REVIEW → FUND_REJECTED)",
+    description=(
+        "Причина обязательна и показывается заявителю. Работает для любых продуктов: "
+        "с банком — до Совета, без банка — окончательное решение Фонда."
+    ),
     dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
     responses={
         200: success_example({**ITEM, "status": "FUND_REJECTED"}, "Application rejected."),
@@ -158,3 +173,32 @@ async def reject_application(
 ):
     result = await FundService(db).reject(application_id, user, data)
     return ResponseBuilder.success(data=result, message="Application rejected.")
+
+
+@router.post(
+    "/{application_id}/approve",
+    summary="Одобрить заявку по продукту без банка (FUND_REVIEW → COMPLETED)",
+    description=(
+        "Только для продуктов без банка (`product.uses_bank = false`): решение Фонда "
+        "окончательное, в Совет и банк заявка не идёт. Для продуктов с банком — "
+        "`send-to-council`."
+    ),
+    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
+    responses={
+        200: success_example(
+            {
+                **ITEM,
+                "status": "COMPLETED",
+                "product": {**PRODUCT_BRIEF_EXAMPLE, "uses_bank": False},
+            },
+            "Application approved.",
+        ),
+        **COMMON_ERRORS,
+        400: error_examples(CouncilRequiredException, InvalidStatusTransitionException),
+    },
+)
+async def approve_application(
+    application_id: int, data: FundApproveDTO, db: DBDep, user: CurrentUserDep
+):
+    result = await FundService(db).approve(application_id, user, data)
+    return ResponseBuilder.success(data=result, message="Application approved.")

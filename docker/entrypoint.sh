@@ -2,8 +2,9 @@
 # Entrypoint контейнера приложения:
 #   1) ждём PostgreSQL;
 #   2) alembic upgrade head (схема + сид: права, роли, банки);
-#   3) создаём суперпользователя SUPERUSER с паролем ADMIN_PASSWORD (идемпотентно);
-#   4) запускаем команду из CMD (uvicorn).
+#   3) временно: категории и продукты (python -m src.product.seed, SEED_PRODUCTS=true);
+#   4) создаём суперпользователя SUPERUSER с паролем ADMIN_PASSWORD (идемпотентно);
+#   5) запускаем команду из CMD (uvicorn).
 set -eu
 
 : "${DB_HOST:=db}"
@@ -12,6 +13,7 @@ set -eu
 : "${ADMIN_PASSWORD:=admin12345}"
 : "${RUN_MIGRATIONS:=true}"
 : "${CREATE_SUPERUSER:=true}"
+: "${SEED_PRODUCTS:=true}"
 export DB_HOST DB_PORT SUPERUSER ADMIN_PASSWORD
 
 echo "[entrypoint] waiting for PostgreSQL at ${DB_HOST}:${DB_PORT} ..."
@@ -39,6 +41,14 @@ done
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[entrypoint] alembic upgrade head"
     alembic upgrade head
+fi
+
+# Временно: начальные категории и продукты (src/product/seed.py) — 2 категории,
+# 13 продуктов с этапами и полями на ru/uz/en. Повторный запуск ничего не дублирует.
+# Ошибка сида не мешает старту приложения. После первого деплоя этот блок удаляется.
+if [ "$SEED_PRODUCTS" = "true" ]; then
+    echo "[entrypoint] seed product categories and products"
+    python -m src.product.seed || echo "[entrypoint] WARNING: product seed failed" >&2
 fi
 
 if [ "$CREATE_SUPERUSER" = "true" ]; then

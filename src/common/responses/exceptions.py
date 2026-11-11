@@ -358,6 +358,27 @@ class ProductCategoryInUseException(ConflictException):
     message = "Category has products and cannot be deleted; deactivate it or move the products"
 
 
+class ProductWithoutBankException(BadRequestException):
+    message = "Product works without a bank: banks are not selected for it"
+    field = "bank_id"
+
+
+class FundDecidesWithoutBankException(BadRequestException):
+    message = (
+        "Product works without a bank: the Fund approves or rejects the application itself, "
+        "it is not sent to the Council"
+    )
+
+
+class CouncilRequiredException(BadRequestException):
+    message = "Applications for products with a bank go to the Council: use send-to-council"
+
+
+class ProductUsesBankChangeException(ConflictException):
+    message = "Product already has applications: uses_bank cannot be changed"
+    field = "uses_bank"
+
+
 class ProductStageNotFoundException(NotFoundException):
     message = "Stage not found in this product"
 

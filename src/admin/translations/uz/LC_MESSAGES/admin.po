@@ -1100,3 +1100,20 @@ msgstr "Toʻliq oʻchirish"
 
 msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
 msgstr "Ariza toʻliq oʻchiriladi: tarix, qarorlar, anketa javoblari va fayllar"
+
+# ---------- продукты без банка ----------
+
+msgid "Фонд одобрил (продукт без банка)"
+msgstr "Jamgʻarma maʼqulladi (banksiz mahsulot)"
+
+msgid "Через банк"
+msgstr "Bank orqali"
+
+msgid "Да: Фонд → Совет → банк"
+msgstr "Ha: Jamgʻarma → Kengash → bank"
+
+msgid "Нет: решение принимает Фонд"
+msgstr "Yoʻq: qarorni Jamgʻarma qabul qiladi"
+
+msgid "У продукта без банка не может быть банков"
+msgstr "Banksiz mahsulotda banklar boʻlishi mumkin emas"
