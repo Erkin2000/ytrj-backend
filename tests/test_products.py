@@ -113,7 +113,6 @@ def test_product_management_permissions(api, role_ids, bank_pair, applicant):
     body = {"translations": tr("TEST П", "TEST M", "TEST P")}
 
     assert c.post("/api/v1/fund/products", headers=applicant, json=body).status_code == 403
-    assert c.get("/api/v1/fund/products", headers=applicant).status_code == 403
     assert c.get("/api/v1/products", headers=applicant).status_code == 200
     assert c.get("/api/v1/products", headers=bank_h).status_code == 403
     assert c.post("/api/v1/fund/products", headers=bank_h, json=body).status_code == 403
@@ -371,6 +370,8 @@ def test_public_catalog_endpoints(api, fund, banks):
         f"/api/v1/fund/product-categories/{category['id']}",
         "/api/v1/banks",
         f"/api/v1/banks/{banks[0]['id']}",
+        "/api/v1/fund/products",
+        f"/api/v1/fund/products?category_id={category['id']}",
     ):
         assert c.get(path).status_code == 200, path
     assert c.get("/api/v1/fund/product-categories/999999999").status_code == 404
@@ -379,5 +380,6 @@ def test_public_catalog_endpoints(api, fund, banks):
     body = {"translations": tr("TEST К", "TEST K", "TEST C")}
     assert c.post("/api/v1/fund/product-categories", json=body).status_code == 401
     assert c.post("/api/v1/banks", json={"code": "test_x", "name": "TEST"}).status_code == 401
-    assert c.get("/api/v1/fund/products").status_code == 401
+    assert c.post("/api/v1/fund/products", json={"category_id": category["id"]}).status_code == 401
+    assert c.get("/api/v1/fund/products/1").status_code == 401
     assert c.get("/api/v1/products").status_code == 401

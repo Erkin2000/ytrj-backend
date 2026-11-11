@@ -145,13 +145,9 @@ class ProductService(BaseService):
     # ---------- ведение (Фонд) ----------
 
     async def get_page(
-        self,
-        user: CurrentUserDTO,
-        filters: ProductFilterDTO,
-        page: int | None,
-        per_page: int | None,
+        self, filters: ProductFilterDTO, page: int | None, per_page: int | None
     ) -> dict:
-        ApplicationBaseService.assert_global_scope(user)
+        """Публичный список всех продуктов (включая черновики и снятые с публикации)."""
         return await self.db.product.get_page(filters, page, per_page)
 
     async def get_detail(self, user: CurrentUserDTO, product_id: int) -> ProductDetailDTO:

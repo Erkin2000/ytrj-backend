@@ -188,10 +188,6 @@ UZ: dict[str, str] = {
     "Банки для окна выбора (фильтр по типу субъекта)": (
         "Tanlash oynasi uchun banklar (subyekt turi boʻyicha filtr)"
     ),
-    "ИП и ООО — все 9 банков; самозанятым — только Microcreditbank, Xalq banki и Agrobank.": (
-        "YaTT va MChJ — barcha 9 ta bank; oʻzini oʻzi band qilganlar uchun — "
-        "faqat Microcreditbank, Xalq banki va Agrobank."
-    ),
     "Тип субъекта: YATT, MCHJ, SELF_EMPLOYED": "Subyekt turi: YATT, MCHJ, SELF_EMPLOYED",
     "АКБ «Микрокредитбанк»": "ATB «Mikrokreditbank»",
     "Добавление банка в каталог": "Katalogga bank qoʻshish",
@@ -358,6 +354,8 @@ UZ: dict[str, str] = {
     "Создать продукт (черновик): категория, названия, описания, типы субъекта, сроки, банки": "Mahsulot yaratish (qoralama): kategoriya, nomlar, tavsiflar, subyekt turlari, muddatlar, banklar",
     "Только активные категории; `products_count` — сколько продуктов категории сейчас принимают заявки (с `subject_type` — для этого типа субъекта).": "Faqat faol kategoriyalar; `products_count` — kategoriyaning nechta mahsuloti hozir ariza qabul qilmoqda (`subject_type` bilan — shu subyekt turi uchun).",
     "Удалить категорию без продуктов": "Mahsulotsiz kategoriyani oʻchirish",
+    "Без авторизации.": "Avtorizatsiyasiz.",
+    "Без авторизации. ИП и ООО — все 9 банков; самозанятым — только Microcreditbank, Xalq banki и Agrobank.": "Avtorizatsiyasiz. YaTT va MChJ uchun — barcha 9 ta bank; oʻzini oʻzi band qilganlarga — faqat Microcreditbank, Xalq banki va Agrobank.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

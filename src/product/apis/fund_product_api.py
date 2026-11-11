@@ -21,6 +21,7 @@ from src.common.responses.exceptions import (
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
     COMMON_ERRORS,
+    PUBLIC_ERRORS,
     READ_ERRORS,
     error_examples,
     paginated_example,
@@ -64,13 +65,11 @@ STRUCTURE_NOTE = (
 @router.get(
     "",
     summary="Все продукты (фильтр по статусу и категории, поиск по названию)",
-    dependencies=[read_dep],
-    responses={200: paginated_example(PRODUCT_EXAMPLE, "Products retrieved."), **READ_ERRORS},
+    description="Без авторизации.",
+    responses={200: paginated_example(PRODUCT_EXAMPLE, "Products retrieved."), **PUBLIC_ERRORS},
 )
-async def get_products(
-    db: DBDep, user: CurrentUserDep, pagination: PaginationDep, filters: FilterDep
-):
-    data = await ProductService(db).get_page(user, filters, pagination.page, pagination.per_page)
+async def get_products(db: DBDep, pagination: PaginationDep, filters: FilterDep):
+    data = await ProductService(db).get_page(filters, pagination.page, pagination.per_page)
     return ResponseBuilder.success(data=data, message="Products retrieved.")
 
 
