@@ -155,12 +155,6 @@ class ApplicationBankDTO(BaseModel):
     bank_id: int = Field(examples=[1])
 
 
-class FundApproveDTO(BaseModel):
-    comment: str | None = Field(
-        default=None, max_length=2000, description="Комментарий к решению (необязательно)."
-    )
-
-
 class FundRejectDTO(BaseModel):
     reason: ReasonStr = Field(description="Причина отказа Фонда (видна заявителю).")
 

@@ -174,23 +174,10 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
    (иначе 400 `product_not_ready` со списком `bank_ids`, `stages`, `stages.<номер>.fields`).
    `POST .../archive` → `ARCHIVED`: новые заявки не принимаются, черновики не отправляются; повторный `publish` возвращает продукт.
 
-**Продукты без банка** (`uses_bank=false` при создании): банки не выбираются ни Фондом, ни заявителем
-(иначе 400 `product_without_bank`), для публикации банк не нужен. Заявка проходит скоринг и попадает в Фонд;
-решение Фонда окончательное: `POST /fund/applications/{id}/approve` → `COMPLETED` или `.../reject` → `FUND_REJECTED`.
-В Совет и банк такая заявка не идёт (`send-to-council` → 400 `fund_decides_without_bank`), а `approve` для продукта
-с банком → 400 `council_required`. Индикатор прогресса: подана → скоринг → Фонд → завершена.
-`uses_bank` нельзя сменить, если по продукту уже есть заявки (409 `product_uses_bank_change`). Миграция `d1f3a5c7e9b1`.
-
 Когда по продукту есть хотя бы одна заявка (включая черновики), этапы и поля менять нельзя (409 `product_locked`),
 продукт нельзя удалить (409 `product_in_use`). Названия, описания, банки, типы субъекта и сроки менять можно.
 Чтобы изменить анкету — `POST /fund/products/{id}/copy`: новый черновик с теми же банками, этапами и полями
 (`copied_from_id`). В ответе `GET /fund/products/{id}` — `applications_count` и `is_locked`.
-
-Начальные продукты: `python -m src.product.seed` заводит из перечней документов (`products/*.docx`) категории
-«Займы и ссуды» (01–07, глава 3; `src/product/seed_data.py`) и «Возмещение расходов» (08–12, 15, глава 4;
-`src/product/seed_data_reimbursement.py`) — черновиками без банков; повторный запуск ничего не дублирует.
-Продукты «Возмещения расходов» — без банка (`uses_bank=false`).
-Инвестиции (13, 14) и Combinator (16) пока не заводятся.
 
 Справочник типов полей — `GET /products/field-types` (Фонд и заявитель): для каждого типа названия на ru/uz/en, `is_file`, формат и пример значения, `pattern` / `max_length` / `max_digits`, для PHOTO и FILE — допустимые форматы, размер файла и предел `max_files`.
 

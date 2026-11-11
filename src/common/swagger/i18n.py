@@ -263,6 +263,8 @@ UZ: dict[str, str] = {
     "Сайт, с которого начат вход: `yoshlarfondi` — основной (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — админка (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Сайт подписывается в `state`: `POST /auth/sso/callback` меняет `code` тем же клиентом портала, а `/redirect/from-backend` возвращает браузер на фронт этого сайта.": "Kirish boshlangan sayt: `yoshlarfondi` — asosiy sayt (`SSO_CLIENT_ID`, `SSO_REDIRECT_URI`), `admin` — admin panel (`SSO_CLIENT_ID_ADMIN`, `SSO_REDIRECT_URI_ADMIN`). Sayt `state` ichida imzolanadi: `POST /auth/sso/callback` `code`ni portalning oʻsha mijozi orqali almashtiradi, `/redirect/from-backend` esa brauzerni shu saytning frontendiga qaytaradi.",
     "Фронт, на который вернуть браузер: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Без параметра сайт берётся из подписанного `state` (тот, что передан в `GET /auth/sso/authorize?site=`). Сам `site` на фронт не пересылается.": "Brauzer qaytariladigan frontend: `yoshlarfondi` — `SSO_FRONTEND_REDIRECT_URL`, `admin` — `SSO_FRONTEND_REDIRECT_URL_ADMIN`. Parametr berilmasa, sayt imzolangan `state`dan olinadi (`GET /auth/sso/authorize?site=` da berilgan sayt). `site`ning oʻzi frontendga uzatilmaydi.",
     "Направить заявку в Совет (FUND_REVIEW → COUNCIL_REVIEW)": "Arizani Kengashga yoʻnaltirish (FUND_REVIEW → COUNCIL_REVIEW)",
+    "Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)": "Arizani Kengashgacha rad etish (FUND_REVIEW → FUND_REJECTED)",
+    "Причина обязательна и показывается заявителю.": "Sabab majburiy va ariza beruvchiga koʻrsatiladi.",
     "Причина отказа Фонда (видна заявителю).": "Jamgʻarmaning rad etish sababi (ariza beruvchiga koʻrinadi).",
     # ---------- продукты ----------
     "Продукты: управление (Фонд)": "Mahsulotlar: boshqaruv (Jamgʻarma)",
@@ -318,6 +320,7 @@ UZ: dict[str, str] = {
     "Для каких типов субъекта доступен продукт.": "Mahsulot qaysi subyekt turlari uchun mavjud.",
     "Начало приёма заявок (включительно).": "Arizalarni qabul qilish boshlanishi (shu kun ham).",
     "Конец приёма заявок (включительно).": "Arizalarni qabul qilish tugashi (shu kun ham).",
+    "Банки, через которые работает продукт (из каталога банков).": "Mahsulot ishlaydigan banklar (banklar katalogidan).",
     "Полный список банков продукта (заменяет текущий).": "Mahsulot banklarining toʻliq roʻyxati (joriysini almashtiradi).",
     "Номер этапа (порядок).": "Bosqich raqami (tartib).",
     'Значения полей этапа: ключ — id поля, значение — строка; `null` или "" очищает поле.\nМеняются только переданные поля. Файлы (PHOTO / FILE) загружаются отдельно.': 'Bosqich maydonlari qiymatlari: kalit — maydon id, qiymat — satr; `null` yoki "" maydonni tozalaydi. Faqat yuborilgan maydonlar oʻzgaradi. Fayllar (PHOTO / FILE) alohida yuklanadi.',
@@ -357,14 +360,6 @@ UZ: dict[str, str] = {
     "Полное удаление заявки со всеми данными и файлами.": "Arizani barcha maʼlumotlari va fayllari bilan toʻliq oʻchirish.",
     "Удалить заявку целиком, в любом статусе (только Super Admin)": "Arizani toʻliq oʻchirish, istalgan holatda (faqat Super Admin)",
     "Удаляет заявку и всё связанное: историю статусов, скоринг, решения Фонда, Совета и банка, ответы анкеты, файлы на диске, документ-требование. Действие необратимо, запись об удалении не сохраняется.": "Arizani va unga bogʻliq hamma narsani oʻchiradi: holatlar tarixi, skoring, Jamgʻarma, Kengash va bank qarorlari, anketa javoblari, diskdagi fayllar, talab hujjati. Amalni qaytarib boʻlmaydi, oʻchirish haqida yozuv saqlanmaydi.",
-    "true — заявка идёт Фонд → Совет → банк, банки обязательны для публикации; false — продукт без банка: заявку одобряет или отклоняет только Фонд.": "true — ariza Jamgʻarma → Kengash → bank boʻyicha oʻtadi, eʼlon qilish uchun banklar majburiy; false — banksiz mahsulot: arizani faqat Jamgʻarma maʼqullaydi yoki rad etadi.",
-    "Банки, через которые работает продукт (из каталога банков). Для продукта без банка — пусто.": "Mahsulot ishlaydigan banklar (banklar katalogidan). Banksiz mahsulot uchun — boʻsh.",
-    "Комментарий к решению (необязательно).": "Qarorga izoh (ixtiyoriy).",
-    "Одобрить заявку по продукту без банка (FUND_REVIEW → COMPLETED)": "Banksiz mahsulot boʻyicha arizani maʼqullash (FUND_REVIEW → COMPLETED)",
-    "Отклонить заявку (FUND_REVIEW → FUND_REJECTED)": "Arizani rad etish (FUND_REVIEW → FUND_REJECTED)",
-    "Причина обязательна и показывается заявителю. Работает для любых продуктов: с банком — до Совета, без банка — окончательное решение Фонда.": "Sabab majburiy va ariza beruvchiga koʻrsatiladi. Har qanday mahsulot uchun ishlaydi: bankli — Kengashgacha, banksiz — Jamgʻarmaning yakuniy qarori.",
-    "Сменить нельзя, если по продукту уже есть заявки. false очищает банки.": "Mahsulot boʻyicha arizalar boʻlsa, oʻzgartirib boʻlmaydi. false banklarni tozalaydi.",
-    "Только для продуктов без банка (`product.uses_bank = false`): решение Фонда окончательное, в Совет и банк заявка не идёт. Для продуктов с банком — `send-to-council`.": "Faqat banksiz mahsulotlar uchun (`product.uses_bank = false`): Jamgʻarma qarori yakuniy, ariza Kengash va bankka bormaydi. Bankli mahsulotlar uchun — `send-to-council`.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

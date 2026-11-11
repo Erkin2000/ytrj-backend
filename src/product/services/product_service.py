@@ -20,8 +20,6 @@ from src.common.responses.exceptions import (
     ProductNotReadyException,
     ProductStageNotFoundException,
     ProductStatusException,
-    ProductUsesBankChangeException,
-    ProductWithoutBankException,
     StageNumberTakenException,
 )
 from src.product.enums import FILE_FIELD_TYPES, ProductStatus
@@ -161,7 +159,6 @@ class ProductService(BaseService):
         await self._active_category(data.category_id)
         product = ProductORM(
             category_id=data.category_id,
-            uses_bank=data.uses_bank,
             allowed_subject_types=[s.value for s in data.allowed_subject_types],
             accept_from=data.accept_from,
             accept_to=data.accept_to,
@@ -185,17 +182,8 @@ class ProductService(BaseService):
         if category_id is not None and category_id != product.category_id:
             await self._active_category(category_id)
             product.category_id = category_id
-        uses_bank = changes.pop("uses_bank", None)
-        if uses_bank is not None and uses_bank != product.uses_bank:
-            if await self.db.product.applications_count(product_id):
-                raise ProductUsesBankChangeException()
-            product.uses_bank = uses_bank
         bank_ids = changes.pop("bank_ids", None)
-        if not product.uses_bank:
-            if bank_ids:
-                raise ProductWithoutBankException(field="bank_ids")
-            product.banks = []
-        elif bank_ids is not None:
+        if bank_ids is not None:
             product.banks = await self._banks(bank_ids)
         if changes.pop("translations", None) is not None:
             apply_translations(product.translations, data.translations, ProductTranslationORM)
@@ -227,7 +215,7 @@ class ProductService(BaseService):
             raise ProductStatusException("Product is already published")
 
         missing: list[str] = []
-        if product.uses_bank and not any(bank.is_active for bank in product.banks):
+        if not any(bank.is_active for bank in product.banks):
             missing.append("bank_ids")
         if not product.stages:
             missing.append("stages")
@@ -258,7 +246,6 @@ class ProductService(BaseService):
                 for t in source.translations
             ],
             category_id=source.category_id,
-            uses_bank=source.uses_bank,
             allowed_subject_types=list(source.allowed_subject_types),
             accept_from=source.accept_from,
             accept_to=source.accept_to,

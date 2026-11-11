@@ -34,7 +34,6 @@ from src.common.responses.exceptions import (
     ProductFieldNotFoundException,
     ProductNotAvailableException,
     ProductStageNotFoundException,
-    ProductWithoutBankException,
 )
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
@@ -194,7 +193,6 @@ async def get_my_applications(
             ApplicantProfileIncompleteException,
             ProductNotAvailableException,
             BankNotInProductException,
-            ProductWithoutBankException,
             BankSubjectTypeMismatchException,
         ),
         404: error_examples(BankNotFoundException),
@@ -274,7 +272,6 @@ async def delete_draft(application_id: int, db: DBDep, user: CurrentUserDep):
             ApplicationNotEditableException,
             ProductNotAvailableException,
             BankNotInProductException,
-            ProductWithoutBankException,
             BankSubjectTypeMismatchException,
         ),
         403: BY_ID_ERRORS[403],

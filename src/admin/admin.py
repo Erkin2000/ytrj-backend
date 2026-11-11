@@ -235,11 +235,7 @@ class JamgarmaAdmin(Admin):
 
 def _application_progress(application: ApplicationORM) -> list[dict]:
     """Шаги индикатора прогресса (как в API) с переведёнными названиями."""
-    steps = build_progress(
-        application.status,
-        application.scoring_retry_required,
-        uses_bank=application.product.uses_bank if application.product else True,
-    )
+    steps = build_progress(application.status, application.scoring_retry_required)
     return [{"key": s.key, "title": _(s.title), "state": s.state} for s in steps]
 
 

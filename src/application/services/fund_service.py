@@ -8,7 +8,6 @@ from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationFilterDTO,
     CouncilAssignmentAddDTO,
-    FundApproveDTO,
     FundRejectDTO,
     ScoringAttemptDTO,
     SendToCouncilDTO,
@@ -16,8 +15,6 @@ from src.application.schemas.application_schema import (
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.scoring_service import ScoringService
 from src.common.responses.exceptions import (
-    CouncilRequiredException,
-    FundDecidesWithoutBankException,
     NoCouncilMembersException,
     UserNotFoundException,
 )
@@ -112,32 +109,6 @@ class FundService(ApplicationBaseService):
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
 
-    async def approve(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: FundApproveDTO,
-    ) -> ApplicationDetailDTO:
-        """Продукт без банка: Фонд одобряет заявку, FUND_REVIEW → COMPLETED.
-        Дальше (Совет, банк) заявка не идёт."""
-        application = await self.get_for_user(application_id, user)
-        if application.product is None or application.product.uses_bank:
-            raise CouncilRequiredException()
-
-        application.fund_decided_by_id = user.id
-        application.fund_decided_at = now()
-        application.completed_at = application.fund_decided_at
-        await self.transition(
-            application,
-            ApplicationStatus.COMPLETED,
-            event="fund_approved",
-            actor=user,
-            comment=data.comment or "Фонд одобрил заявку",
-        )
-
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
-
     # ---------- Совет ----------
 
     async def send_to_council(
@@ -147,8 +118,6 @@ class FundService(ApplicationBaseService):
         data: SendToCouncilDTO,
     ) -> ApplicationDetailDTO:
         application = await self.get_for_user(application_id, user)
-        if application.product is not None and not application.product.uses_bank:
-            raise FundDecidesWithoutBankException()
 
         if data.council_member_ids:
             members = []
