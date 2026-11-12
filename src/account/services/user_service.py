@@ -1,15 +1,3 @@
-"""Управление сотрудниками.
-
-Два уровня доступа:
-- глобальный — право users.<action> (Super Admin): любые пользователи;
-- админ направления (users.is_direction_admin) — только рядовые сотрудники
-  своего направления (та же роль; для банка — тот же банк). Выдаёт только те
-  права, которые есть у него самого, и только в пределах прав роли.
-
-Администраторов (суперпользователей и админов направлений) назначает и
-меняет только Super Admin.
-"""
-
 import asyncio
 
 from src.account.mappers import UserDataMapper
@@ -52,7 +40,6 @@ from src.utils.base_service import BaseService
 
 
 class UserService(BaseService):
-    # ---------- кто кем управляет ----------
 
     @staticmethod
     def _is_global(actor: CurrentUserDTO, action: Action) -> bool:
@@ -60,7 +47,6 @@ class UserService(BaseService):
 
     @staticmethod
     def _direction(actor: CurrentUserDTO) -> tuple[int, int | None]:
-        """(role_id, bank_id) направления админа; bank_id только у банка."""
         if not actor.is_direction_admin or actor.role is None:
             raise PermissionDeniedException()
         if actor.role.code not in DIRECTION_ROLES:
@@ -86,7 +72,6 @@ class UserService(BaseService):
         target = await self._get_orm(user_id)
         if self._is_global(actor, Action.READ) or self._in_direction(actor, target):
             return target
-        # Чужое направление: не раскрываем, что пользователь существует.
         raise UserNotFoundException()
 
     async def _get_manageable(self, user_id: int, actor: CurrentUserDTO, action: Action) -> UserORM:
@@ -102,7 +87,6 @@ class UserService(BaseService):
             raise UserOutOfScopeException()
         return target
 
-    # ---------- роли и права ----------
 
     async def _get_role(self, role_id: int) -> RoleORM:
         role = await self.db.role.get_orm_one_or_none(id=role_id)
@@ -115,10 +99,8 @@ class UserService(BaseService):
             raise BankNotFoundException()
         if role is None:
             return
-        # Сотрудник банка без привязки к банку не увидит ни одной заявки.
         if role.code == RoleCode.BANK_EMPLOYEE and bank_id is None:
             raise BankScopeRequiredException()
-        # Заявители появляются только через YIA SSO; вручную эту роль не выдаём.
         if role.code == RoleCode.APPLICANT:
             raise ApplicantRoleNotAssignableException()
 
@@ -146,7 +128,6 @@ class UserService(BaseService):
         role: RoleORM | None,
         requested: list[str] | None,
     ) -> None:
-        """Записывает личные права. None — всё, что создающий может выдать для роли."""
         if role is None or not uses_personal_permissions(role):
             await self.db.permission.set_user_permissions(user_id, [])
             return
@@ -163,7 +144,6 @@ class UserService(BaseService):
         await self.db.permission.set_user_permissions(user_id, permission_ids)
 
     async def _ensure_pinfl_free(self, pinfl: str | None, user_id: int | None = None) -> None:
-        # По ПИНФЛ YIA SSO находит сотрудника, поэтому он должен быть уникален.
         if pinfl is None:
             return
         owner = await self.db.user.get_orm_by_pinfl(pinfl)
@@ -174,11 +154,9 @@ class UserService(BaseService):
         user = await self.db.user.get_orm_by_id(user_id)
         if user is None:
             raise UserNotFoundException()
-        # expire_on_commit=False: после UPDATE/INSERT прав объект в сессии устарел.
         await self.db.session.refresh(user)
         return UserDataMapper.map_to_detail(user)
 
-    # ---------- чтение ----------
 
     async def get_all_users(
         self,
@@ -202,7 +180,6 @@ class UserService(BaseService):
     async def get_grantable_permissions(
         self, actor: CurrentUserDTO, role_id: int | None
     ) -> GrantablePermissionsDTO:
-        """Какие права текущий пользователь может выдать сотруднику роли role_id."""
         if not self._is_global(actor, Action.CREATE):
             own_role_id, _ = self._direction(actor)
             if role_id not in (None, own_role_id):
@@ -217,7 +194,6 @@ class UserService(BaseService):
             role_id=role.id, role_code=role.code, permissions=sorted(permissions)
         )
 
-    # ---------- изменение ----------
 
     async def add_user(self, data: UserRequestAddDTO, actor: CurrentUserDTO) -> UserDetailDTO:
         role_id, bank_id = data.role_id, data.bank_id
@@ -279,7 +255,6 @@ class UserService(BaseService):
         pinfl_changed = "pinfl" in update_data and update_data["pinfl"] != target.pinfl
         if pinfl_changed:
             await self._ensure_pinfl_free(update_data["pinfl"], user_id)
-            # Новый ПИНФЛ — другой человек на портале: снимаем старую привязку SSO.
             update_data["sso_sub"] = None
 
         role_id = update_data.get("role_id", target.role_id)
@@ -299,11 +274,9 @@ class UserService(BaseService):
         await self.db.user.edit(update_dto, exclude_unset=True, id=user_id)
 
         if data.permissions is not None or role_changed:
-            # Новая роль — новый потолок: без явного списка выдаём всё доступное.
             await self._set_permissions(user_id, actor, role, data.permissions)
 
         if data.password or pinfl_changed:
-            # Смена пароля или ПИНФЛ завершает все активные сессии пользователя.
             await self.db.refresh_token.delete(user_id=user_id)
 
         await self.db.commit()
@@ -322,7 +295,6 @@ class UserService(BaseService):
         await self.db.user.edit(UserUpdateDTO(status=data.status), exclude_unset=True, id=user_id)
 
         if data.status == UserStatus.BLOCKED:
-            # Блокировка завершает все сессии.
             await self.db.refresh_token.delete(user_id=user_id)
 
         await self.db.commit()
@@ -332,7 +304,6 @@ class UserService(BaseService):
         self, user_id: int, data: UserRoleAssignDTO, actor: CurrentUserDTO
     ) -> UserDetailDTO:
         target = await self._get_manageable(user_id, actor, Action.UPDATE)
-        # Админ направления роль не меняет: у его сотрудников роль одна.
         if not self._is_global(actor, Action.UPDATE):
             raise UserOutOfScopeException()
 
@@ -340,7 +311,6 @@ class UserService(BaseService):
         role = await self._get_role(data.role_id) if data.role_id is not None else None
         await self._validate_role_and_scope(role, bank_id)
 
-        # Без роли направления админом направления быть нельзя.
         keep_admin = target.is_direction_admin and role is not None
         if role is None or role.code not in DIRECTION_ROLES:
             keep_admin = False

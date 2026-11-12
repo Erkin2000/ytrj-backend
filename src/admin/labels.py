@@ -1,9 +1,3 @@
-"""Подписи статусов и справочных значений для админ-панели.
-
-Значения словарей — русские msgid; перевод выполняется в момент
-отрисовки (``_``), чтобы учитывать язык текущего запроса.
-"""
-
 from __future__ import annotations
 
 from markupsafe import Markup, escape
@@ -11,7 +5,6 @@ from sqladmin.i18n import get_locale
 
 from src.admin.i18n import _
 
-# статус заявки → (подпись, цвет Tabler)
 STATUS_LABELS: dict[str, tuple[str, str]] = {
     "DRAFT": ("Черновик", "secondary"),
     "SUBMITTED": ("Подана", "blue"),
@@ -58,7 +51,6 @@ SUBJECT_LABELS: dict[str, str] = {
     "SELF_EMPLOYED": "Самозанятый",
 }
 
-# продукт Фонда
 PRODUCT_STATUS_LABELS: dict[str, tuple[str, str]] = {
     "DRAFT": ("Черновик", "secondary"),
     "PUBLISHED": ("Опубликован", "green"),
@@ -79,7 +71,6 @@ LANGUAGE_LABELS: dict[str, str] = {"ru": "Русский", "uz": "Узбекск
 
 
 def tr_name(translations) -> str:
-    """Название из переводов (ru / uz / en) на языке админки; иначе — русское."""
     items = list(translations or [])
     if not items:
         return "—"

@@ -1,10 +1,3 @@
-"""Админ-панель на SQLAdmin (Tabler UI): вход только для роли с is_superuser.
-
-Интерфейс двуязычный (ru/uz): системные строки SQLAdmin и наши подписи
-переводятся через Babel, язык выбирается переключателем в верхней панели
-(`?lang=`, сохраняется в cookie).
-"""
-
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -58,7 +51,6 @@ from src.utils.db_manager import DBManager
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
-# Иконка вкладки: синий квадрат с буквой J (SVG data URI, без статики).
 FAVICON = (
     "data:image/svg+xml,"
     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
@@ -69,7 +61,6 @@ FAVICON = (
 
 
 class AdminAuth(AuthenticationBackend):
-    """Логин/пароль платформы; в админку пускается только суперпользователь."""
 
     async def login(self, request: Request) -> bool:
         form = await request.form()
@@ -118,7 +109,6 @@ class AdminAuth(AuthenticationBackend):
 
 
 class JamgarmaAdmin(Admin):
-    """Admin с дашбордом на главной странице."""
 
     @login_required
     async def index(self, request: Request) -> Response:
@@ -234,7 +224,6 @@ class JamgarmaAdmin(Admin):
 
 
 def _application_progress(application: ApplicationORM) -> list[dict]:
-    """Шаги индикатора прогресса (как в API) с переведёнными названиями."""
     steps = build_progress(application.status, application.scoring_retry_required)
     return [{"key": s.key, "title": _(s.title), "state": s.state} for s in steps]
 
@@ -256,7 +245,6 @@ def setup_admin(app: FastAPI) -> Admin:
         ),
     )
 
-    # Хелперы для наших шаблонов (дашборд, карточка заявки, верхняя панель).
     admin.templates.env.globals.update(
         {
             "admin_env": {"scoring_mode": settings.SCORING_MODE, "sso_mock": settings.SSO_MOCK},

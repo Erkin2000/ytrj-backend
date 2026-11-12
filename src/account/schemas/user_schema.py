@@ -21,9 +21,7 @@ UsernameStr = Annotated[
 ]
 PhoneStr = Annotated[str, StringConstraints(pattern=r"^\+998\d{9}$")]
 PinflStr = Annotated[str, StringConstraints(pattern=r"^\d{14}$")]
-# Серия и номер паспорта / ID-карты РУз: две латинские буквы и семь цифр (AA1234567).
 PassportStr = Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}\d{7}$")]
-# ИНН физического лица — 9 цифр.
 InnStr = Annotated[str, StringConstraints(pattern=r"^\d{9}$")]
 
 
@@ -58,12 +56,10 @@ class UserDetailDTO(UserDTO):
     gender: Gender | None = None
     date_of_birth: date | None = None
     updated_at: datetime | None = None
-    # Действующие права (личные права в пределах прав роли).
     permissions: list[str] = []
 
 
 class UserProfileDTO(BaseModel):
-    """Собственный профиль (для /auth/me)."""
 
     id: int
     username: str
@@ -155,11 +151,8 @@ class UserRequestAddDTO(BaseModel):
     username: UsernameStr
     password: PasswordStr | None = None
     pinfl: PinflStr | None = Field(default=None, examples=["30101900000011"])
-    # Админ направления может не передавать: подставляется его роль.
     role_id: int | None = None
-    # Коды прав; None — все права, которые создающий может выдать для этой роли.
     permissions: list[str] | None = Field(default=None, examples=[["applications.read"]])
-    # Назначает только Super Admin; роль должна быть ролью направления.
     is_direction_admin: bool = False
     full_name: str | None = None
     phone: PhoneStr | None = None
@@ -181,7 +174,6 @@ class UserRequestUpdateDTO(BaseModel):
     username: UsernameStr | None = None
     password: PasswordStr | None = None
     pinfl: PinflStr | None = None
-    # Полная замена личных прав.
     permissions: list[str] | None = None
     is_direction_admin: bool | None = None
     role_id: int | None = None

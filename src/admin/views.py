@@ -1,10 +1,3 @@
-"""ModelView-ы SQLAdmin: подписи (ru/uz), фильтры, поиск, значки.
-
-Подписи колонок хранятся как русские msgid и переводятся на язык запроса
-(``LocalizedLabelsMixin``). Имена моделей, категорий и фильтров объявляются
-при импорте, поэтому для них используется отложенный перевод ``_l``.
-"""
-
 from __future__ import annotations
 
 import re
@@ -76,7 +69,6 @@ CATEGORY_APPLICATIONS = _l("Заявки")
 CATEGORY_PRODUCTS = _l("Продукты")
 
 
-# ---------- локализация подписей колонок ----------
 
 
 class LocalizedLabelsMixin:
@@ -93,8 +85,6 @@ class LocalizedLabelsMixin:
     def _column_labels(self, value: dict) -> None:
         self.__dict__["_column_labels_source"] = value
 
-
-# ---------- форматтеры ----------
 
 
 def _attr_value(model, attribute):
@@ -251,8 +241,6 @@ def fmt_language(model, attribute) -> str:
     return language_label(_attr_value(model, attribute))
 
 
-# ---------- Пользователи и доступ ----------
-
 
 PINFL_RE = re.compile(r"\d{14}")
 
@@ -327,15 +315,12 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         UserORM.created_at: fmt_datetime,
         UserORM.updated_at: fmt_datetime,
     }
-    # Пароль задаётся через API или CLI (хеш нельзя вводить руками).
     form_excluded_columns = [
         UserORM.hashed_password,
         UserORM.created_at,
         UserORM.updated_at,
         UserORM.last_login_at,
     ]
-    # Личные права действуют только в пределах прав роли (src/rbac/access.py),
-    # поэтому лишнее право, отмеченное здесь, ни на что не повлияет.
     form_ajax_refs = {
         "permissions": {"fields": ("code", "name"), "order_by": "code"},
     }
@@ -345,8 +330,6 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
         await self._check_direction_admin(data, model)
         await self._default_permissions(data, model, is_created)
 
-        # По ПИНФЛ сотрудник входит через YIA Portal: проверяем формат и
-        # уникальность до записи, чтобы показать понятную ошибку в форме.
         if "pinfl" not in data:
             return
         pinfl = (data["pinfl"] or "").strip() or None
@@ -361,7 +344,6 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
                 raise ValueError(_("Пользователь с таким ПИНФЛ уже существует"))
 
         if not is_created and pinfl != model.pinfl:
-            # Новый ПИНФЛ — другой человек на портале: снимаем старую привязку SSO.
             data["sso_sub"] = None
 
     @staticmethod
@@ -371,7 +353,6 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
             return
         role = data["role"] if "role" in data else getattr(model, "role", None)
         if role is not None and not hasattr(role, "code"):
-            # Форма передаёт id выбранной роли.
             async with async_session_maker() as session:
                 role = await session.get(RoleORM, int(role))
         if role is None or role.code not in DIRECTION_ROLES:
@@ -379,10 +360,6 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
 
     @staticmethod
     async def _default_permissions(data: dict, model, is_created: bool) -> None:
-        """Права сотрудника хранятся поштучно (src/rbac/access.py). Если в форме
-        «Личные права» не отмечены, а пользователь создаётся, получает другую роль
-        (например, заявитель становится оператором Фонда) или прав у него ещё нет,
-        выдаём все права роли — как это делает API. Отмеченные вручную не трогаем."""
         if "permissions" not in data or data["permissions"]:
             return
         role_value = data.get("role")
@@ -494,7 +471,6 @@ class RefreshTokenAdmin(LocalizedLabelsMixin, ModelView, model=RefreshTokenORM):
     page_size = 25
 
 
-# ---------- Справочники ----------
 
 
 class BankAdmin(LocalizedLabelsMixin, ModelView, model=BankORM):
@@ -534,8 +510,6 @@ class BankAdmin(LocalizedLabelsMixin, ModelView, model=BankORM):
     }
     form_excluded_columns = [BankORM.created_at, BankORM.updated_at]
 
-
-# ---------- Заявки ----------
 
 
 class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
@@ -679,8 +653,6 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
         ApplicationORM.created_at: fmt_datetime,
         ApplicationORM.updated_at: fmt_datetime,
     }
-    # Статусы меняются только через бизнес-операции API — здесь просмотр,
-    # исправление справочных полей черновика и полное удаление заявки (delete_model).
     can_create = False
     can_delete = True
     form_columns = [

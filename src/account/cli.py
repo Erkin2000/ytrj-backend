@@ -1,13 +1,3 @@
-"""Управление администраторами из консоли.
-
-    python -m src.account.cli create-superuser      # роль SUPER_ADMIN + пользователь settings.SUPERUSER
-    python -m src.account.cli create-superuser --if-missing   # ничего не менять, если пользователь уже есть
-    python -m src.account.cli set-password <username>
-
-Пароль спрашивается интерактивно либо берётся из переменной окружения
-ADMIN_PASSWORD (для неинтерактивного запуска).
-"""
-
 import argparse
 import asyncio
 import getpass

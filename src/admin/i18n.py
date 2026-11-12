@@ -1,20 +1,3 @@
-"""Локализация админ-панели: русский (по умолчанию), узбекский и английский.
-
-SQLAdmin переводит собственные строки интерфейса через Babel и поставляет
-каталоги только для en/de/az/ru/tr/ja. Узбекский каталог лежит рядом
-(``translations/uz/LC_MESSAGES/admin.po``) и содержит два слоя:
-
-* системные строки SQLAdmin (английские msgid → узбекский);
-* строки нашей админки — подписи моделей, колонок, статусов, дашборда
-  (русские msgid → узбекский). Для русского перевода не нужно: исходные
-  строки уже русские, а системные строки берутся из каталога SQLAdmin.
-
-Английский каталог (``translations/en/LC_MESSAGES/admin.po``) содержит только
-второй слой: системные строки SQLAdmin уже английские.
-
-Каталог компилируется из .po при старте, .mo в репозитории не храним.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -41,8 +24,6 @@ TRANSLATIONS_DIR = Path(__file__).resolve().parent / "translations"
 DEFAULT_ADMIN_LOCALE = "ru"
 ADMIN_LOCALES = ["ru", "uz", "en"]
 
-# Узбекистан — единый пояс UTC+5 без перехода на летнее время, поэтому
-# фиксированное смещение надёжнее zoneinfo (на Windows без tzdata его нет).
 TASHKENT_TZ = timezone(timedelta(hours=5), name="Asia/Tashkent")
 
 
@@ -59,11 +40,6 @@ def _load_catalog(locale: str) -> Translations | None:
 
 
 def register_locales() -> None:
-    """Регистрирует наши каталоги в SQLAdmin (идемпотентно).
-
-    Локали без собственного .po (ru) используют каталог SQLAdmin как есть;
-    наш .po (uz, en) объединяется поверх пакетного, если такой есть.
-    """
     if not sqladmin_i18n.BABEL_INSTALLED:
         return
 
@@ -80,11 +56,8 @@ def register_locales() -> None:
             sqladmin_i18n.SUPPORTED_LOCALES.append(locale)
 
 
-# ---------- форматирование под локаль ----------
-
 
 def fmt_dt(value: datetime | None, with_time: bool = True) -> str:
-    """Дата/время в тайм-зоне Ташкента: 23.10.2026 14:05."""
     if value is None:
         return "—"
     if value.tzinfo is not None:
@@ -93,7 +66,6 @@ def fmt_dt(value: datetime | None, with_time: bool = True) -> str:
 
 
 def fmt_money(amount: Decimal | int | float | None, currency: str | None = "UZS") -> str:
-    """1 500 000,00 UZS — разряды пробелом, дробная часть запятой (ru/uz)."""
     if amount is None:
         return "—"
     text = f"{Decimal(amount):,.2f}".replace(",", " ").replace(".", ",")
