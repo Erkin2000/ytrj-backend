@@ -56,7 +56,6 @@ def register_locales() -> None:
             sqladmin_i18n.SUPPORTED_LOCALES.append(locale)
 
 
-
 def fmt_dt(value: datetime | None, with_time: bool = True) -> str:
     if value is None:
         return "—"

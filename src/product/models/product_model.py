@@ -8,6 +8,8 @@
 Условный показ: этап или поле может зависеть от ответа на поле с вариантами
 (SELECT / RADIO / CHECKBOX), расположенное раньше в анкете: `condition_field_id`
 + `condition_option_ids` — показывать, если выбран хотя бы один из вариантов.
+Внешний ключ условия проверяется в конце транзакции (DEFERRABLE INITIALLY DEFERRED):
+при удалении продукта или этапа поля удаляются в произвольном порядке.
 """
 
 from datetime import date, datetime
@@ -164,7 +166,13 @@ class ProductStageORM(Base):
     number: Mapped[int] = mapped_column(Integer, nullable=False)
     # Условие показа этапа: поле с вариантами из более раннего этапа и выбранные варианты.
     condition_field_id: Mapped[int | None] = mapped_column(
-        ForeignKey("product_fields.id", ondelete="RESTRICT", use_alter=True)
+        ForeignKey(
+            "product_fields.id",
+            use_alter=True,
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        index=True,
     )
     condition_option_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     created_at: Mapped[datetime] = mapped_column(
@@ -220,7 +228,8 @@ class ProductFieldORM(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Условие показа поля: поле с вариантами, расположенное раньше, и выбранные варианты.
     condition_field_id: Mapped[int | None] = mapped_column(
-        ForeignKey("product_fields.id", ondelete="RESTRICT")
+        ForeignKey("product_fields.id", deferrable=True, initially="DEFERRED"),
+        index=True,
     )
     condition_option_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     created_at: Mapped[datetime] = mapped_column(

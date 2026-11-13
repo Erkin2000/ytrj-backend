@@ -736,3 +736,25 @@ def test_copy_remaps_conditions(api, fund, bank_pair):
     }
     r = c.post(f"/api/v1/fund/products/{copy['id']}/publish", headers=fund)
     assert r.status_code == 200, r.text
+
+
+def test_delete_product_and_stages_with_conditions(api, fund, bank_pair):
+    c = api.client
+    bank, _ = bank_pair
+    base = "/api/v1/fund/products"
+
+    product = api.conditional_product(fund, [bank["id"]], publish=False)
+    r = c.delete(f"{base}/{product['id']}", headers=fund)
+    assert r.status_code == 200, r.text
+    assert c.get(f"{base}/{product['id']}", headers=fund).status_code == 404
+
+    product = api.conditional_product(fund, [bank["id"]], publish=False)
+    stages = by_ru(product["stages"])
+    r = c.delete(f"{base}/{product['id']}/stages/{stages['Основное']['id']}", headers=fund)
+    assert r.status_code == 409, r.text
+    for name in ("Синее", "Сок"):
+        r = c.delete(f"{base}/{product['id']}/stages/{stages[name]['id']}", headers=fund)
+        assert r.status_code == 200, r.text
+    r = c.delete(f"{base}/{product['id']}/stages/{stages['Основное']['id']}", headers=fund)
+    assert r.status_code == 200, r.text
+    assert data(r)["stages"] == []

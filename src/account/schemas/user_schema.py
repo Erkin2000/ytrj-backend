@@ -60,7 +60,6 @@ class UserDetailDTO(UserDTO):
 
 
 class UserProfileDTO(BaseModel):
-
     id: int
     username: str
     full_name: str | None = None

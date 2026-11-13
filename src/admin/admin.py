@@ -61,7 +61,6 @@ FAVICON = (
 
 
 class AdminAuth(AuthenticationBackend):
-
     async def login(self, request: Request) -> bool:
         form = await request.form()
         username = str(form.get("username", "")).strip()
@@ -109,7 +108,6 @@ class AdminAuth(AuthenticationBackend):
 
 
 class JamgarmaAdmin(Admin):
-
     @login_required
     async def index(self, request: Request) -> Response:
         now = datetime.now(TASHKENT_TZ)

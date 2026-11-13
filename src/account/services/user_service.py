@@ -40,7 +40,6 @@ from src.utils.base_service import BaseService
 
 
 class UserService(BaseService):
-
     @staticmethod
     def _is_global(actor: CurrentUserDTO, action: Action) -> bool:
         return actor.has_permission(permission_code(Module.USERS, action))
@@ -86,7 +85,6 @@ class UserService(BaseService):
         if target.id == actor.id or self._is_admin(target):
             raise UserOutOfScopeException()
         return target
-
 
     async def _get_role(self, role_id: int) -> RoleORM:
         role = await self.db.role.get_orm_one_or_none(id=role_id)
@@ -157,7 +155,6 @@ class UserService(BaseService):
         await self.db.session.refresh(user)
         return UserDataMapper.map_to_detail(user)
 
-
     async def get_all_users(
         self,
         filters: UserFilterDTO,
@@ -193,7 +190,6 @@ class UserService(BaseService):
         return GrantablePermissionsDTO(
             role_id=role.id, role_code=role.code, permissions=sorted(permissions)
         )
-
 
     async def add_user(self, data: UserRequestAddDTO, actor: CurrentUserDTO) -> UserDetailDTO:
         role_id, bank_id = data.role_id, data.bank_id
