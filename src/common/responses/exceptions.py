@@ -28,6 +28,8 @@ def _required_message(field: str) -> str:
         return "Fill in this required field of the product form"
     if field.startswith("stages.") and field.endswith(".fields"):
         return "Add at least one field to this stage"
+    if field.startswith("stages.") and field.endswith(".options"):
+        return "Add at least two options to this choice field"
     return REQUIRED_FIELD_MESSAGES.get(field, "Required")
 
 
@@ -423,6 +425,44 @@ class FieldFileLimitExceededException(BadRequestException):
 
 class FieldFileNotFoundException(NotFoundException):
     message = "File not found in this field"
+
+
+# ---------- поля с вариантами и условный показ ----------
+
+
+class ProductFieldOptionNotFoundException(NotFoundException):
+    message = "Option not found in this product"
+
+
+class FieldOptionsException(BadRequestException):
+    message = "Options are allowed only for SELECT, RADIO and CHECKBOX fields"
+    field = "options"
+
+
+class FieldConditionException(BadRequestException):
+    message = "Invalid visibility condition"
+    example_errors = [
+        {
+            "field": "visible_when",
+            "message": "Controlling field must be a SELECT, RADIO or CHECKBOX field "
+            "placed earlier in the form",
+        }
+    ]
+
+
+class FieldInUseByConditionException(ConflictException):
+    message = (
+        "This field or option controls visibility of other fields or stages; "
+        "remove those conditions first"
+    )
+
+
+class StageHiddenException(BadRequestException):
+    message = "Stage is hidden by the current selection and cannot be filled in"
+
+
+class FieldHiddenException(BadRequestException):
+    message = "Field is hidden by the current selection"
 
 
 # ---------- политика входа: YIA SSO только для заявителей ----------

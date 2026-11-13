@@ -65,6 +65,9 @@ FIELD_TYPE_LABELS: dict[str, str] = {
     "EMAIL": "Email",
     "PHOTO": "Фото",
     "FILE": "Файл",
+    "SELECT": "Выбор из списка",
+    "RADIO": "Один вариант",
+    "CHECKBOX": "Несколько вариантов",
 }
 
 LANGUAGE_LABELS: dict[str, str] = {"ru": "Русский", "uz": "Узбекский", "en": "Английский"}

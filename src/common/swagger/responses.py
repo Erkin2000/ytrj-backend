@@ -64,8 +64,14 @@ def error_examples(*exceptions, description: str | None = None) -> dict:
     examples = {}
     for exc_cls in exceptions:
         example_missing = getattr(exc_cls, "example_missing", None)
-        # Исключения со списком незаполненных полей — показываем реалистичный список.
-        instance = exc_cls(missing=example_missing) if example_missing else exc_cls()
+        example_errors = getattr(exc_cls, "example_errors", None)
+        # Исключения со списком незаполненных полей или ошибок — показываем реалистичный список.
+        if example_missing:
+            instance = exc_cls(missing=example_missing)
+        elif example_errors:
+            instance = exc_cls(errors=example_errors)
+        else:
+            instance = exc_cls()
         examples[exc_cls.code] = {
             "summary": exc_cls.code,
             "value": keep_nulls(

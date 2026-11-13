@@ -73,6 +73,8 @@
                   {% endif %}
                 {% endfor %}
                 </div>
+              {% elif f.selected_options %}
+                {% for o in f.selected_options %}<span class="badge bg-azure-lt">{{ tr_name(o.translations) }}</span> {% endfor %}
               {% elif f.value %}
                 <span style="white-space: pre-line">{{ f.value }}</span>
               {% else %}

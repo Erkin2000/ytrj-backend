@@ -17,7 +17,9 @@ from src.application.schemas.bank_schema import BankDTO
 from src.product.schemas.product_schema import (
     ProductBriefDTO,
     ProductFieldDTO,
+    ProductFieldOptionDTO,
     TranslationOutDTO,
+    VisibleWhenDTO,
 )
 
 ReasonStr = Annotated[str, StringConstraints(min_length=3, max_length=2000)]
@@ -125,10 +127,11 @@ class ApplicationUpdateDTO(BaseModel):
 
 class StageValuesDTO(BaseModel):
     """Значения полей этапа: ключ — id поля, значение — строка; `null` или "" очищает поле.
-    Меняются только переданные поля. Файлы (PHOTO / FILE) загружаются отдельно."""
+    SELECT / RADIO — id варианта, CHECKBOX — список id вариантов. Меняются только
+    переданные поля. Файлы (PHOTO / FILE) загружаются отдельно."""
 
-    values: dict[int, str | None] = Field(
-        examples=[{"11": "150000000", "13": "2026-12-01", "14": "+998901234567"}]
+    values: dict[int, str | int | list[int] | None] = Field(
+        examples=[{"11": "150000000", "10": "21", "15": [31, 32], "14": "+998901234567"}]
     )
 
 
@@ -187,7 +190,13 @@ class FieldFileDTO(BaseModel):
 class FormFieldDTO(ProductFieldDTO):
     value: str | None = Field(
         default=None,
-        description="Значение (NUMBER — строкой, DATE — ГГГГ-ММ-ДД). Для PHOTO / FILE — null.",
+        description=(
+            "Значение (NUMBER — строкой, DATE — ГГГГ-ММ-ДД, SELECT / RADIO — id варианта, "
+            "CHECKBOX — id вариантов через запятую). Для PHOTO / FILE — null."
+        ),
+    )
+    selected_options: list[ProductFieldOptionDTO] = Field(
+        default=[], description="Выбранные варианты SELECT / RADIO / CHECKBOX с названиями."
     )
     files: list[FieldFileDTO] = []
 
@@ -196,6 +205,7 @@ class FormStageDTO(BaseModel):
     id: int
     number: int
     translations: list[TranslationOutDTO]
+    visible_when: VisibleWhenDTO | None = None
     is_complete: bool = Field(description="Все обязательные поля этапа заполнены.")
     fields: list[FormFieldDTO] = []
 
@@ -228,7 +238,10 @@ class ApplicationListItemDTO(BaseModel):
 class ApplicationDetailDTO(ApplicationListItemDTO):
     applicant_id: int
     applicant: ApplicantSnapshotDTO
-    form: list[FormStageDTO] = Field(default=[], description="Этапы продукта с ответами заявителя.")
+    form: list[FormStageDTO] = Field(
+        default=[],
+        description="Этапы продукта с ответами заявителя — только видимые при текущих ответах.",
+    )
     bank_stage: BankStageDTO
     fund_decided_at: datetime | None = None
     fund_reject_reason: str | None = None

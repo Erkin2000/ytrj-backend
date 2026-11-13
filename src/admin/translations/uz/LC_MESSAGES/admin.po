@@ -1100,3 +1100,20 @@ msgstr "Toʻliq oʻchirish"
 
 msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
 msgstr "Ariza toʻliq oʻchiriladi: tarix, qarorlar, anketa javoblari va fayllar"
+
+# ---- поля с вариантами и условный показ ----
+
+msgid "Выбор из списка"
+msgstr "Roʻyxatdan tanlash"
+
+msgid "Один вариант"
+msgstr "Bitta variant"
+
+msgid "Несколько вариантов"
+msgstr "Bir nechta variant"
+
+msgid "Варианты"
+msgstr "Variantlar"
+
+msgid "Показывать, если"
+msgstr "Koʻrsatish sharti:"

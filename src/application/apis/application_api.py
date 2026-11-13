@@ -26,6 +26,7 @@ from src.common.responses.exceptions import (
     DocumentTooLargeException,
     FieldFileLimitExceededException,
     FieldFileNotFoundException,
+    FieldHiddenException,
     FieldValueInvalidException,
     FileFieldException,
     InvalidDocumentException,
@@ -34,6 +35,7 @@ from src.common.responses.exceptions import (
     ProductFieldNotFoundException,
     ProductNotAvailableException,
     ProductStageNotFoundException,
+    StageHiddenException,
 )
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
@@ -84,10 +86,18 @@ FORM_STAGE_EXAMPLE = {
     "id": 5,
     "number": 1,
     "translations": STAGE_EXAMPLE["translations"],
+    "visible_when": None,
     "is_complete": True,
     "fields": [
-        {**FIELD_EXAMPLES[0], "value": "150000000", "files": []},
-        {**FIELD_EXAMPLES[1], "value": None, "files": [FILE_EXAMPLE]},
+        {**FIELD_EXAMPLES[0], "value": "150000000", "selected_options": [], "files": []},
+        {**FIELD_EXAMPLES[1], "value": None, "selected_options": [], "files": [FILE_EXAMPLE]},
+        {
+            **FIELD_EXAMPLES[2],
+            "value": "21",
+            "selected_options": [FIELD_EXAMPLES[2]["options"][0]],
+            "files": [],
+        },
+        {**FIELD_EXAMPLES[3], "value": "Трикотаж", "selected_options": [], "files": []},
     ],
 }
 
@@ -289,22 +299,26 @@ async def set_bank(application_id: int, data: ApplicationBankDTO, db: DBDep, use
     description=(
         "`values` — словарь «id поля → значение». Меняются только переданные поля; `null` или "
         "пустая строка очищает поле. Проверка по типу: NUMBER — число, DATE — ГГГГ-ММ-ДД, "
-        "PHONE — +998XXXXXXXXX, EMAIL — адрес почты. Обязательность проверяется при отправке "
-        "заявки. Файлы полей PHOTO / FILE загружаются через `POST .../fields/{field_id}/files`."
+        "PHONE — +998XXXXXXXXX, EMAIL — адрес почты, SELECT / RADIO — id варианта, "
+        "CHECKBOX — список id вариантов. Обязательность проверяется при отправке заявки. "
+        "Файлы полей PHOTO / FILE загружаются через `POST .../fields/{field_id}/files`. "
+        "Возвращает всю анкету (`form`): ответ на поле с вариантами может показать или скрыть "
+        "другие поля и этапы (`visible_when`); ответы скрывшихся полей удаляются сразу. "
+        "Скрытому этапу — 400 `stage_hidden`, скрытому полю — ошибка в `errors`."
     ),
     dependencies=[update_dep],
     responses={
-        200: success_example(FORM_STAGE_EXAMPLE, "Stage saved."),
+        200: success_example([FORM_STAGE_EXAMPLE], "Stage saved."),
         **COMMON_ERRORS,
-        **draft_errors(FieldValueInvalidException),
+        **draft_errors(FieldValueInvalidException, StageHiddenException),
         404: error_examples(ApplicationNotFoundException, ProductStageNotFoundException),
     },
 )
 async def save_stage(
     application_id: int, stage_id: int, data: StageValuesDTO, db: DBDep, user: CurrentUserDep
 ):
-    stage = await ApplicationService(db).save_stage(application_id, user, stage_id, data)
-    return ResponseBuilder.success(data=stage, message="Stage saved.")
+    form = await ApplicationService(db).save_stage(application_id, user, stage_id, data)
+    return ResponseBuilder.success(data=form, message="Stage saved.")
 
 
 @router.post(
@@ -312,7 +326,7 @@ async def save_stage(
     summary="Загрузить файл в поле PHOTO или FILE",
     description=(
         "PHOTO — JPG/PNG/WEBP до 5 МБ, FILE — PDF/DOCX до 10 МБ. "
-        "Не больше `max_files` файлов на поле."
+        "Не больше `max_files` файлов на поле. В скрытое условием поле — 400 `field_hidden`."
     ),
     dependencies=[update_dep],
     responses={
@@ -320,6 +334,7 @@ async def save_stage(
         **COMMON_ERRORS,
         **draft_errors(
             FileFieldException,
+            FieldHiddenException,
             FieldFileLimitExceededException,
             InvalidPhotoException,
             PhotoTooLargeException,
@@ -386,7 +401,7 @@ async def get_field_file(
         200: success_example(
             {
                 "is_ready": False,
-                "missing": ["bank_id", "fields.12"],
+                "missing": ["bank_id", "fields.12", "fields.13"],
                 "product": PRODUCT_BRIEF_EXAMPLE,
                 "product_available": True,
                 "subject_type": "YATT",
@@ -398,6 +413,8 @@ async def get_field_file(
                         "fields": [
                             FORM_STAGE_EXAMPLE["fields"][0],
                             {**FORM_STAGE_EXAMPLE["fields"][1], "files": []},
+                            FORM_STAGE_EXAMPLE["fields"][2],
+                            {**FORM_STAGE_EXAMPLE["fields"][3], "value": None},
                         ],
                     }
                 ],

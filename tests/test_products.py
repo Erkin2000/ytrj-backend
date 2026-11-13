@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from tests.conftest import data, tr
+from tests.conftest import by_ru, data, tr
 
 
 @pytest.fixture
@@ -195,9 +195,10 @@ def test_applicant_fills_product_form(api, fund, bank_pair, applicant, photo_upl
         json={"values": {str(number["id"]): "1 500,50", str(comment["id"]): " hi "}},
     )
     assert r.status_code == 200, r.text
-    values = {f["id"]: f["value"] for f in data(r)["fields"]}
+    saved = data(r)[0]  # ответ — вся видимая анкета
+    values = {f["id"]: f["value"] for f in saved["fields"]}
     assert values[number["id"]] == "1500.5" and values[comment["id"]] == "hi"
-    assert not data(r)["is_complete"]
+    assert not saved["is_complete"]
 
     files_url = f"/api/v1/applications/{app_id}/fields"
     r = c.post(f"{files_url}/{number['id']}/files", headers=applicant, files=photo_upload())
@@ -300,12 +301,28 @@ def test_field_types_catalog(api, fund, applicant, role_ids, bank_pair):
     r = c.get("/api/v1/products/field-types", headers=fund)
     assert r.status_code == 200
     items = {item["type"]: item for item in data(r)}
-    assert list(items) == ["STRING", "NUMBER", "DATE", "PHONE", "EMAIL", "PHOTO", "FILE"]
+    assert list(items) == [
+        "STRING",
+        "NUMBER",
+        "DATE",
+        "PHONE",
+        "EMAIL",
+        "PHOTO",
+        "FILE",
+        "SELECT",
+        "RADIO",
+        "CHECKBOX",
+    ]
     assert [t["language"] for t in items["PHONE"]["translations"]] == ["ru", "uz", "en"]
     assert items["PHONE"]["pattern"] and not items["PHONE"]["is_file"]
     assert items["PHOTO"]["is_file"] and items["PHOTO"]["max_files_limit"] == 10
     assert "application/pdf" in items["FILE"]["allowed_content_types"]
     assert items["STRING"]["max_length"] == 2000
+    for choice in ("SELECT", "RADIO", "CHECKBOX"):
+        assert items[choice]["has_options"] and not items[choice]["is_file"]
+        assert items[choice]["min_options"] == 2 and items[choice]["max_options"] == 50
+    assert items["CHECKBOX"]["multiple"] and not items["SELECT"]["multiple"]
+    assert not items["STRING"]["has_options"]
 
     assert c.get("/api/v1/products/field-types", headers=applicant).status_code == 200
     bank_h, _ = api.staff(role_id=role_ids["BANK_EMPLOYEE"], bank_id=bank_pair[0]["id"])
@@ -397,3 +414,325 @@ def test_public_catalog_endpoints(api, fund, banks):
     assert c.patch(f"/api/v1/fund/products/{product['id']}", json={}).status_code == 401
     assert c.post(f"/api/v1/fund/products/{product['id']}/publish").status_code == 401
     assert c.get("/api/v1/products").status_code == 401
+
+
+# ---------- поля с вариантами и условный показ ----------
+
+
+def test_choice_fields_require_options_and_validate_rules(api, fund, bank_pair):
+    c = api.client
+    bank, _ = bank_pair
+    product = api.product(fund, [bank["id"]], publish=False)
+    pid = product["id"]
+    base = f"/api/v1/fund/products/{pid}"
+    stage1 = product["stages"][0]
+    number = stage1["fields"][0]
+
+    # options только для полей с выбором и обязательны для них
+    r = c.post(
+        f"{base}/stages/{stage1['id']}/fields",
+        headers=fund,
+        json={"field_type": "SELECT", "translations": tr("Цвет", "Rang", "Colour")},
+    )
+    assert r.status_code == 422, r.text
+    r = c.post(
+        f"{base}/stages/{stage1['id']}/fields",
+        headers=fund,
+        json={
+            "field_type": "STRING",
+            "translations": tr("Текст", "Matn", "Text"),
+            "options": [{"translations": tr("А", "A", "A")}, {"translations": tr("Б", "B", "B")}],
+        },
+    )
+    assert r.status_code == 422, r.text
+    r = c.post(
+        f"{base}/fields/{number['id']}/options",
+        headers=fund,
+        json={"translations": tr("Лишний", "Ortiqcha", "Extra")},
+    )
+    assert r.status_code == 400 and r.json()["code"] == "field_options"
+
+    r = c.post(
+        f"{base}/stages/{stage1['id']}/fields",
+        headers=fund,
+        json={
+            "field_type": "RADIO",
+            "translations": tr("Цвет", "Rang", "Colour"),
+            "sort_order": 5,
+            "options": [
+                {"translations": tr("Красный", "Qizil", "Red")},
+                {"translations": tr("Синий", "Koʻk", "Blue")},
+            ],
+        },
+    )
+    assert r.status_code == 201, r.text
+    colour = by_ru(data(r)["stages"][0]["fields"])["Цвет"]
+    red, blue = (o["id"] for o in colour["options"])
+    assert colour["field_type"] == "RADIO" and colour["visible_when"] is None
+
+    # условие: не то поле / чужой вариант / управляющее поле ниже цели
+    def add_field(body):
+        return c.post(f"{base}/stages/{stage1['id']}/fields", headers=fund, json=body)
+
+    for visible_when in (
+        {"field_id": number["id"], "option_ids": [red]},
+        {"field_id": colour["id"], "option_ids": [999999999]},
+        {"field_id": 999999999, "option_ids": [red]},
+    ):
+        r = add_field(
+            {
+                "field_type": "STRING",
+                "translations": tr("Фрукт", "Meva", "Fruit"),
+                "sort_order": 6,
+                "visible_when": visible_when,
+            }
+        )
+        assert r.status_code == 400 and r.json()["code"] == "field_condition", r.text
+        assert r.json()["errors"][0]["field"].endswith(".visible_when")
+    r = add_field(
+        {
+            "field_type": "STRING",
+            "translations": tr("Фрукт", "Meva", "Fruit"),
+            "sort_order": 4,  # выше управляющего поля (sort_order 5)
+            "visible_when": {"field_id": colour["id"], "option_ids": [red]},
+        }
+    )
+    assert r.status_code == 400 and r.json()["code"] == "field_condition"
+    r = add_field(
+        {
+            "field_type": "STRING",
+            "translations": tr("Фрукт", "Meva", "Fruit"),
+            "sort_order": 6,
+            "visible_when": {"field_id": colour["id"], "option_ids": [red, red]},
+        }
+    )
+    assert r.status_code == 201, r.text
+    fruit = by_ru(data(r)["stages"][0]["fields"])["Фрукт"]
+    assert fruit["visible_when"] == {"field_id": colour["id"], "option_ids": [red]}
+
+    # этап-цель должен быть позже управляющего поля
+    r = c.post(
+        f"{base}/stages",
+        headers=fund,
+        json={
+            "number": 2,
+            "translations": tr("Синее", "Koʻk", "Blue"),
+            "visible_when": {"field_id": colour["id"], "option_ids": [blue]},
+        },
+    )
+    assert r.status_code == 201, r.text
+    stage2 = by_ru(data(r)["stages"])["Синее"]
+    assert stage2["visible_when"] == {"field_id": colour["id"], "option_ids": [blue]}
+    # перенумерация, ломающая условие, отклоняется целиком
+    r = c.patch(f"{base}/stages/{stage1['id']}", headers=fund, json={"number": 3})
+    assert r.status_code == 400 and r.json()["code"] == "field_condition"
+    assert r.json()["errors"][0]["field"] == "stages.2.visible_when"
+    # перестановка поля выше управляющего тоже
+    r = c.patch(f"{base}/fields/{fruit['id']}", headers=fund, json={"sort_order": 1})
+    assert r.status_code == 400 and r.json()["code"] == "field_condition"
+
+    # зависимые есть — удалять поле, вариант и менять тип на невыборный нельзя
+    for method, path in (
+        ("delete", f"{base}/fields/{colour['id']}"),
+        ("delete", f"{base}/options/{red}"),
+        ("delete", f"{base}/stages/{stage1['id']}"),
+    ):
+        r = getattr(c, method)(path, headers=fund)
+        assert r.status_code == 409 and r.json()["code"] == "field_in_use_by_condition", path
+    r = c.patch(f"{base}/fields/{colour['id']}", headers=fund, json={"field_type": "STRING"})
+    assert r.status_code == 409 and r.json()["code"] == "field_in_use_by_condition"
+    # смена RADIO → SELECT сохраняет варианты
+    r = c.patch(f"{base}/fields/{colour['id']}", headers=fund, json={"field_type": "SELECT"})
+    assert r.status_code == 200, r.text
+    colour = by_ru(data(r)["stages"][0]["fields"])["Цвет"]
+    assert colour["field_type"] == "SELECT" and len(colour["options"]) == 2
+
+    # варианты: изменение, снятие условия, удаление
+    r = c.patch(
+        f"{base}/options/{blue}",
+        headers=fund,
+        json={"translations": tr("Голубой", "Havorang", "Light blue"), "sort_order": 9},
+    )
+    assert r.status_code == 200, r.text
+    assert by_ru(by_ru(data(r)["stages"][0]["fields"])["Цвет"]["options"])["Голубой"]["id"] == blue
+    r = c.patch(f"{base}/stages/{stage2['id']}", headers=fund, json={"visible_when": None})
+    assert r.status_code == 200 and by_ru(data(r)["stages"])["Синее"]["visible_when"] is None
+    r = c.delete(f"{base}/options/{blue}", headers=fund)
+    assert r.status_code == 200, r.text
+    assert len(by_ru(data(r)["stages"][0]["fields"])["Цвет"]["options"]) == 1
+
+    # публикация требует минимум два варианта
+    r = c.post(
+        f"{base}/stages/{stage2['id']}/fields",
+        headers=fund,
+        json={"field_type": "STRING", "translations": tr("Оттенок", "Tus", "Shade")},
+    )
+    assert r.status_code == 201
+    r = c.post(f"{base}/publish", headers=fund)
+    assert r.status_code == 400 and r.json()["code"] == "product_not_ready"
+    assert [e["field"] for e in r.json()["errors"]] == [f"stages.1.fields.{colour['id']}.options"]
+    r = c.post(
+        f"{base}/fields/{colour['id']}/options",
+        headers=fund,
+        json={"translations": tr("Зелёный", "Yashil", "Green")},
+    )
+    assert r.status_code == 201
+    r = c.post(f"{base}/publish", headers=fund)
+    assert r.status_code == 200, r.text
+
+
+def test_conditional_form_flow(api, fund, bank_pair, applicant, photo_upload):
+    c = api.client
+    bank, _ = bank_pair
+    product = api.conditional_product(fund, [bank["id"]])
+    stages = by_ru(product["stages"])
+    s1, s2, s3 = stages["Основное"], stages["Синее"], stages["Сок"]
+    f1 = by_ru(s1["fields"])
+    amount, colour, fruit, extras = f1["Сумма"], f1["Цвет"], f1["Фрукт"], f1["Дополнительно"]
+    red, blue = (by_ru(colour["options"])[n]["id"] for n in ("Красный", "Синий"))
+    jam, juice = (by_ru(extras["options"])[n]["id"] for n in ("Джем", "Сок"))
+    shade, photo = (by_ru(s2["fields"])[n] for n in ("Оттенок", "Фото"))
+    flavour = by_ru(s3["fields"])["Вкус"]
+
+    # заявителю в каталоге видна полная структура с условиями
+    r = c.get(f"/api/v1/products/{product['id']}", headers=applicant)
+    assert r.status_code == 200
+    assert by_ru(data(r)["stages"])["Синее"]["visible_when"] == {
+        "field_id": colour["id"],
+        "option_ids": [blue],
+    }
+
+    r = create_application(api, applicant, product["id"], bank_id=bank["id"])
+    assert r.status_code == 201, r.text
+    app_id = data(r)["id"]
+    app_url = f"/api/v1/applications/{app_id}"
+
+    def form():
+        return by_ru(data(c.get(app_url, headers=applicant))["form"])
+
+    def save(stage, values):
+        return c.put(f"{app_url}/stages/{stage['id']}", headers=applicant, json={"values": values})
+
+    def missing():
+        return set(data(c.get(f"{app_url}/submission-check", headers=applicant))["missing"])
+
+    # до выбора: только этап 1 без «Фрукт»; скрытые обязательные не требуются
+    visible = form()
+    assert list(visible) == ["Основное"]
+    assert set(by_ru(visible["Основное"]["fields"])) == {"Сумма", "Цвет", "Дополнительно"}
+    assert missing() == {f"fields.{amount['id']}", f"fields.{colour['id']}"}
+    assert data(c.get(app_url, headers=applicant))["form_progress"]["stages_total"] == 1
+
+    # скрытые этап / поле недоступны
+    r = save(s2, {str(shade["id"]): "тёмный"})
+    assert r.status_code == 400 and r.json()["code"] == "stage_hidden"
+    r = save(s1, {str(fruit["id"]): "яблоко"})
+    assert r.status_code == 400 and r.json()["code"] == "field_value_invalid"
+    assert "hidden" in r.json()["errors"][0]["message"]
+    r = c.post(f"{app_url}/fields/{photo['id']}/files", headers=applicant, files=photo_upload())
+    assert r.status_code == 400 and r.json()["code"] == "field_hidden"
+
+    # неверные варианты
+    r = save(s1, {str(colour["id"]): "999999999"})
+    assert r.status_code == 400 and r.json()["code"] == "field_value_invalid"
+    r = save(s1, {str(colour["id"]): [red, blue]})
+    assert r.status_code == 400 and "one option" in r.json()["errors"][0]["message"]
+    r = save(s1, {str(extras["id"]): [jam, 999999999]})
+    assert r.status_code == 400
+
+    # красный → появляется «Фрукт» (обязательное)
+    r = save(s1, {str(colour["id"]): str(red), str(amount["id"]): "10"})
+    assert r.status_code == 200, r.text
+    assert [s["number"] for s in data(r)] == [1]
+    colour_field = by_ru(data(r)[0]["fields"])["Цвет"]
+    assert colour_field["value"] == str(red)
+    assert [o["id"] for o in colour_field["selected_options"]] == [red]
+    assert "Фрукт" in by_ru(data(r)[0]["fields"])
+    assert missing() == {f"fields.{fruit['id']}"}
+    r = save(s1, {str(fruit["id"]): "яблоко"})
+    assert r.status_code == 200 and missing() == set()
+
+    # синий → «Фрукт» скрыт и его ответ удалён, появился этап 2
+    r = save(s1, {str(colour["id"]): blue})  # число вместо строки тоже принимается
+    assert r.status_code == 200, r.text
+    assert [s["number"] for s in data(r)] == [1, 2]
+    assert "Фрукт" not in by_ru(data(r)[0]["fields"])
+    assert missing() == {f"fields.{shade['id']}"}
+    r = save(s1, {str(colour["id"]): str(red)})
+    assert "Фрукт" in by_ru(data(r)[0]["fields"])
+    assert by_ru(data(r)[0]["fields"])["Фрукт"]["value"] is None  # ответ не вернулся
+    r = save(s1, {str(colour["id"]): str(blue)})
+    assert r.status_code == 200
+
+    # этап 2 заполняем, включая фото
+    r = save(s2, {str(shade["id"]): "тёмный"})
+    assert r.status_code == 200, r.text
+    r = c.post(f"{app_url}/fields/{photo['id']}/files", headers=applicant, files=photo_upload())
+    assert r.status_code == 201, r.text
+    file_url = data(r)["url"]
+    assert c.get(file_url, headers=applicant).status_code == 200
+    progress = data(c.get(app_url, headers=applicant))["form_progress"]
+    assert progress == {"stages_total": 2, "stages_complete": 2, "is_complete": True}
+
+    # CHECKBOX: джем + сок → этап 3; убрали сок → этап 3 и его ответ исчезли
+    r = save(s1, {str(extras["id"]): [juice, jam, jam]})
+    assert r.status_code == 200, r.text
+    assert [s["number"] for s in data(r)] == [1, 2, 3]
+    extras_field = by_ru(data(r)[0]["fields"])["Дополнительно"]
+    assert extras_field["value"] == ",".join(map(str, sorted((jam, juice))))
+    assert {o["id"] for o in extras_field["selected_options"]} == {jam, juice}
+    r = save(s3, {str(flavour["id"]): "вишня"})
+    assert r.status_code == 200 and missing() == set()
+    r = save(s1, {str(extras["id"]): f"{jam}"})  # строка с id тоже принимается
+    assert r.status_code == 200 and [s["number"] for s in data(r)] == [1, 2]
+    r = save(s1, {str(extras["id"]): [juice]})
+    assert r.status_code == 200
+    assert by_ru(by_ru(data(r))["Сок"]["fields"])["Вкус"]["value"] is None
+    r = save(s1, {str(extras["id"]): []})
+    assert r.status_code == 200 and [s["number"] for s in data(r)] == [1, 2]
+
+    # обратно на красный: файл этапа 2 удалён с диска и из заявки
+    r = save(s1, {str(colour["id"]): str(red), str(fruit["id"]): "груша"})
+    assert r.status_code == 400  # «Фрукт» ещё скрыт в момент запроса
+    r = save(s1, {str(colour["id"]): str(red)})
+    assert r.status_code == 200 and [s["number"] for s in data(r)] == [1]
+    assert c.get(file_url, headers=applicant).status_code == 404
+    r = save(s1, {str(fruit["id"]): "груша"})
+    assert r.status_code == 200
+
+    # отправка: только видимые обязательные
+    assert missing() == set()
+    r = c.post(f"{app_url}/submit", headers=applicant)
+    assert r.status_code == 200, r.text
+    detail = data(c.get(app_url, headers=applicant))
+    assert [s["number"] for s in detail["form"]] == [1]
+    fields = by_ru(detail["form"][0]["fields"])
+    assert fields["Цвет"]["selected_options"][0]["translations"][0]["name"] == "Красный"
+    assert fields["Фрукт"]["value"] == "груша"
+
+
+def test_copy_remaps_conditions(api, fund, bank_pair):
+    c = api.client
+    bank, _ = bank_pair
+    product = api.conditional_product(fund, [bank["id"]], publish=False)
+    r = c.post(f"/api/v1/fund/products/{product['id']}/copy", headers=fund)
+    assert r.status_code == 201, r.text
+    copy = data(r)
+    api.product_ids.append(copy["id"])
+    assert copy["copied_from_id"] == product["id"]
+
+    old_ids = {f["id"] for s in product["stages"] for f in s["fields"]}
+    old_options = {o["id"] for s in product["stages"] for f in s["fields"] for o in f["options"]}
+    new_fields = by_ru(by_ru(copy["stages"])["Основное"]["fields"])
+    colour, extras = new_fields["Цвет"], new_fields["Дополнительно"]
+    assert colour["id"] not in old_ids and len(colour["options"]) == 2
+    assert not {o["id"] for o in colour["options"]} & old_options
+    red = by_ru(colour["options"])["Красный"]["id"]
+    juice = by_ru(extras["options"])["Сок"]["id"]
+    assert new_fields["Фрукт"]["visible_when"] == {"field_id": colour["id"], "option_ids": [red]}
+    assert by_ru(copy["stages"])["Сок"]["visible_when"] == {
+        "field_id": extras["id"],
+        "option_ids": [juice],
+    }
+    r = c.post(f"/api/v1/fund/products/{copy['id']}/publish", headers=fund)
+    assert r.status_code == 200, r.text

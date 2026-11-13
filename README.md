@@ -169,9 +169,15 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 2. `POST /fund/products/{id}/stages` — этап: `number` (уникален в продукте) и `translations`.
 3. `POST /fund/products/{id}/stages/{stage_id}/fields` — поле: `field_type`, `translations`, `is_required`,
    `sort_order`, для PHOTO / FILE — `max_files` (1–10). Типы: `STRING`, `NUMBER`, `DATE` (ГГГГ-ММ-ДД),
-   `PHONE` (+998XXXXXXXXX), `EMAIL`, `PHOTO` (JPG/PNG/WEBP, `PHOTO_MAX_SIZE_MB`), `FILE` (PDF/DOCX, `DOCUMENT_MAX_SIZE_MB`).
-4. `POST /fund/products/{id}/publish` → `PUBLISHED`: нужны активный банк, этап и хотя бы одно поле в каждом этапе
-   (иначе 400 `product_not_ready` со списком `bank_ids`, `stages`, `stages.<номер>.fields`).
+   `PHONE` (+998XXXXXXXXX), `EMAIL`, `PHOTO` (JPG/PNG/WEBP, `PHOTO_MAX_SIZE_MB`), `FILE` (PDF/DOCX, `DOCUMENT_MAX_SIZE_MB`),
+   `SELECT` / `RADIO` (один вариант из списка; выпадающий список или радиокнопки), `CHECKBOX` (несколько вариантов).
+   Для SELECT / RADIO / CHECKBOX обязательны `options` — 2–50 вариантов с названиями на трёх языках
+   (`[{"translations": [...], "sort_order": 0}, ...]`); позже варианты меняются отдельно:
+   `POST /fund/products/{id}/fields/{field_id}/options`, `PATCH` / `DELETE /fund/products/{id}/options/{option_id}`.
+   Смена типа между SELECT / RADIO / CHECKBOX сохраняет варианты, смена на другой тип удаляет их.
+4. `POST /fund/products/{id}/publish` → `PUBLISHED`: нужны активный банк, этап, хотя бы одно поле в каждом этапе и
+   не меньше двух вариантов у каждого поля с выбором (иначе 400 `product_not_ready` со списком `bank_ids`, `stages`,
+   `stages.<номер>.fields`, `stages.<номер>.fields.<id>.options`).
    `POST .../archive` → `ARCHIVED`: новые заявки не принимаются, черновики не отправляются; повторный `publish` возвращает продукт.
 
 Когда по продукту есть хотя бы одна заявка (включая черновики), этапы и поля менять нельзя (409 `product_locked`),
@@ -179,7 +185,26 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 Чтобы изменить анкету — `POST /fund/products/{id}/copy`: новый черновик с теми же банками, этапами и полями
 (`copied_from_id`). В ответе `GET /fund/products/{id}` — `applications_count` и `is_locked`.
 
-Справочник типов полей — `GET /products/field-types` (Фонд и заявитель): для каждого типа названия на ru/uz/en, `is_file`, формат и пример значения, `pattern` / `max_length` / `max_digits`, для PHOTO и FILE — допустимые форматы, размер файла и предел `max_files`.
+Справочник типов полей — `GET /products/field-types` (Фонд и заявитель): для каждого типа названия на ru/uz/en, `is_file`, формат и пример значения, `pattern` / `max_length` / `max_digits`, для PHOTO и FILE — допустимые форматы, размер файла и предел `max_files`, для SELECT / RADIO / CHECKBOX — `has_options`, `multiple` (только CHECKBOX), `min_options` / `max_options`.
+
+### Условные поля и этапы
+
+Анкета может ветвиться: у этапа и у поля есть необязательное условие показа `visible_when = {"field_id": <id>, "option_ids": [<id>, ...]}`
+(в `POST` / `PATCH` этапов и полей; `null` — показывать всегда, не передано в `PATCH` — не менять).
+Управляющее поле — SELECT / RADIO / CHECKBOX этого же продукта, расположенное **раньше** в анкете: в более раннем этапе,
+а для поля — ещё и в том же этапе выше по `(sort_order, id)`. Этап или поле видны, если управляющее поле само видно
+и среди выбранных в нём вариантов есть хотя бы один из `option_ids`. Цепочки допустимы (поле с выбором само может быть условным).
+
+Проверка выполняется целиком после каждого изменения этапов, полей и вариантов: сломанное условие (не то поле, чужой
+вариант, управляющее поле ниже цели) — 400 `field_condition` с `errors[].field = stages.<номер>.visible_when`
+или `fields.<id>.visible_when`. Поле или вариант, от которого зависят другие, нельзя удалить и нельзя сменить тип поля на
+тип без вариантов — 409 `field_in_use_by_condition`. `POST /fund/products/{id}/copy` переносит варианты и условия на новые id.
+
+Для заявителя: в `form` (карточка заявки, ответ `PUT .../stages/{stage_id}`, `submission-check`) приходят только видимые
+при текущих ответах этапы и поля; `form_progress` считает только их. Сохранить значение в скрытое поле нельзя
+(ошибка в `errors`), в скрытый этап — 400 `stage_hidden`, загрузить файл в скрытое поле — 400 `field_hidden`.
+Когда ответ на поле с выбором скрывает уже заполненные поля, их значения и файлы удаляются сразу — Фонд, Совет и банк
+никогда не видят ответов из невыбранной ветки. Обязательность проверяется только у видимых полей.
 
 Заявитель видит категории `GET /products/categories?subject_type=...` (только активные и только те, где сейчас есть продукты для подачи заявки, с `products_count`) и продукты `GET /products?subject_type=...&category_id=...` — только опубликованные продукты в сроках приёма; в `banks` — только активные банки.
 
@@ -189,7 +214,10 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
    Продукт должен быть доступен для этого типа субъекта, иначе 400 `product_not_available`.
 2. `PUT /applications/{id}/stages/{stage_id}` с `{"values": {"<id поля>": "значение"}}` — меняются только переданные поля,
    `null` или пустая строка очищает. Значения проверяются по типу и хранятся нормализованными (число `1 500,50` → `1500.5`,
-   телефон без пробелов, email в нижнем регистре); ошибки — 400 `field_value_invalid` с `errors[].field = values.<id>`.
+   телефон без пробелов, email в нижнем регистре, SELECT / RADIO — id варианта, CHECKBOX — список id вариантов, хранится
+   как `"3,12"`); ошибки — 400 `field_value_invalid` с `errors[].field = values.<id>`. В ответе — вся видимая анкета
+   (`form`), потому что ответ на поле с выбором может открыть или скрыть другие поля и этапы; у полей с выбором есть
+   `selected_options` с названиями вариантов.
 3. Файлы полей PHOTO / FILE: `POST /applications/{id}/fields/{field_id}/files` (не больше `max_files`),
    `DELETE .../files/{file_id}` — в черновике, `GET .../files/{file_id}` — всем, кто видит заявку.
    Файлы лежат в `MEDIA_PATH/applications/{id}/fields/`.

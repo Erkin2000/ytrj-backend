@@ -1,4 +1,4 @@
-"""Продукты Фонда: создание, этапы, поля анкеты, публикация."""
+"""Продукты Фонда: создание, этапы, поля анкеты, варианты ответа, условия показа, публикация."""
 
 from typing import Annotated
 
@@ -7,9 +7,13 @@ from fastapi import APIRouter, Depends
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.exceptions import (
     BankNotFoundException,
+    FieldConditionException,
+    FieldInUseByConditionException,
+    FieldOptionsException,
     ProductCategoryInactiveException,
     ProductCategoryNotFoundException,
     ProductFieldNotFoundException,
+    ProductFieldOptionNotFoundException,
     ProductInUseException,
     ProductLockedException,
     ProductNotFoundException,
@@ -30,6 +34,8 @@ from src.product.apis.examples import PRODUCT_DETAIL_EXAMPLE, PRODUCT_EXAMPLE
 from src.product.schemas.product_schema import (
     FieldCreateDTO,
     FieldUpdateDTO,
+    OptionCreateDTO,
+    OptionUpdateDTO,
     ProductCreateDTO,
     ProductFilterDTO,
     ProductUpdateDTO,
@@ -53,11 +59,20 @@ DRAFT_EXAMPLE = {**PRODUCT_DETAIL_EXAMPLE, "status": "DRAFT"}
 NOT_FOUND = {404: error_examples(ProductNotFoundException)}
 STAGE_NOT_FOUND = {404: error_examples(ProductNotFoundException, ProductStageNotFoundException)}
 FIELD_NOT_FOUND = {404: error_examples(ProductNotFoundException, ProductFieldNotFoundException)}
+OPTION_NOT_FOUND = {
+    404: error_examples(ProductNotFoundException, ProductFieldOptionNotFoundException)
+}
 LOCKED = {409: error_examples(ProductLockedException)}
+CONDITION = {400: error_examples(FieldConditionException)}
+IN_USE = {409: error_examples(ProductLockedException, FieldInUseByConditionException)}
 
 STRUCTURE_NOTE = (
     "Возвращает продукт целиком. Если по продукту уже есть заявки, этапы и поля менять нельзя "
     "(`product_locked`): скопируйте продукт (`POST /fund/products/{id}/copy`)."
+)
+CONDITION_NOTE = (
+    "`visible_when` — условие показа: поле SELECT / RADIO / CHECKBOX, расположенное раньше в "
+    "анкете, и его варианты; иначе 400 `field_condition`. `null` — показывать всегда."
 )
 
 
@@ -147,7 +162,8 @@ async def delete_product(product_id: int, db: DBDep, user: CurrentUserDep):
     "/{product_id}/publish",
     summary="Опубликовать продукт (DRAFT / ARCHIVED → PUBLISHED)",
     description=(
-        "Нужны хотя бы один активный банк, хотя бы один этап и хотя бы одно поле в каждом этапе. "
+        "Нужны хотя бы один активный банк, хотя бы один этап, хотя бы одно поле в каждом этапе "
+        "и не меньше двух вариантов у каждого поля SELECT / RADIO / CHECKBOX. "
         "Заявители видят продукт в сроках приёма."
     ),
     dependencies=[approve_dep],
@@ -182,7 +198,7 @@ async def archive_product(product_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.post(
     "/{product_id}/copy",
-    summary="Скопировать продукт в новый черновик (с банками, этапами и полями)",
+    summary="Скопировать продукт в новый черновик (с банками, этапами, полями, вариантами и условиями)",
     dependencies=[create_dep],
     responses={
         201: success_example({**DRAFT_EXAMPLE, "copied_from_id": 3, "id": 4}, "Product copied."),
@@ -200,12 +216,13 @@ async def copy_product(product_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.post(
     "/{product_id}/stages",
-    summary="Добавить этап: номер и название на трёх языках",
-    description=STRUCTURE_NOTE,
+    summary="Добавить этап: номер, название на трёх языках, условие показа",
+    description=STRUCTURE_NOTE + " " + CONDITION_NOTE,
     dependencies=[update_dep],
     responses={
         201: success_example(DRAFT_EXAMPLE, "Stage added."),
         **COMMON_ERRORS,
+        **CONDITION,
         **NOT_FOUND,
         409: error_examples(ProductLockedException, StageNumberTakenException),
     },
@@ -217,12 +234,13 @@ async def add_stage(product_id: int, data: StageCreateDTO, db: DBDep, user: Curr
 
 @router.patch(
     "/{product_id}/stages/{stage_id}",
-    summary="Изменить номер или название этапа",
-    description=STRUCTURE_NOTE,
+    summary="Изменить номер, название или условие показа этапа",
+    description=STRUCTURE_NOTE + " " + CONDITION_NOTE,
     dependencies=[update_dep],
     responses={
         200: success_example(DRAFT_EXAMPLE, "Stage updated."),
         **COMMON_ERRORS,
+        **CONDITION,
         **STAGE_NOT_FOUND,
         409: error_examples(ProductLockedException, StageNumberTakenException),
     },
@@ -237,13 +255,16 @@ async def update_stage(
 @router.delete(
     "/{product_id}/stages/{stage_id}",
     summary="Удалить этап вместе с его полями",
-    description=STRUCTURE_NOTE,
+    description=(
+        STRUCTURE_NOTE + " Если поля этапа управляют показом других этапов или полей — "
+        "409 `field_in_use_by_condition`: сначала снимите эти условия."
+    ),
     dependencies=[update_dep],
     responses={
         200: success_example(DRAFT_EXAMPLE, "Stage deleted."),
         **COMMON_ERRORS,
         **STAGE_NOT_FOUND,
-        **LOCKED,
+        **IN_USE,
     },
 )
 async def delete_stage(product_id: int, stage_id: int, db: DBDep, user: CurrentUserDep):
@@ -256,16 +277,19 @@ async def delete_stage(product_id: int, stage_id: int, db: DBDep, user: CurrentU
 
 @router.post(
     "/{product_id}/stages/{stage_id}/fields",
-    summary="Добавить поле в этап: тип, название на трёх языках, обязательность",
+    summary="Добавить поле в этап: тип, название на трёх языках, обязательность, варианты, условие",
     description=(
         "Типы: STRING (текст), NUMBER (число), DATE (дата), PHONE (+998XXXXXXXXX), EMAIL, "
-        "PHOTO (JPG/PNG/WEBP), FILE (PDF/DOCX). `max_files` — только для PHOTO и FILE. "
-        + STRUCTURE_NOTE
+        "PHOTO (JPG/PNG/WEBP), FILE (PDF/DOCX), SELECT / RADIO (один вариант из списка), "
+        "CHECKBOX (несколько вариантов). `max_files` — только для PHOTO и FILE. "
+        "`options` (2–50 вариантов с названиями на трёх языках) — только для SELECT / RADIO / "
+        "CHECKBOX и обязательны для них. " + CONDITION_NOTE + " " + STRUCTURE_NOTE
     ),
     dependencies=[update_dep],
     responses={
         201: success_example(DRAFT_EXAMPLE, "Field added."),
         **COMMON_ERRORS,
+        **CONDITION,
         **STAGE_NOT_FOUND,
         **LOCKED,
     },
@@ -279,14 +303,19 @@ async def add_field(
 
 @router.patch(
     "/{product_id}/fields/{field_id}",
-    summary="Изменить поле: тип, название, обязательность, лимит файлов, порядок",
-    description=STRUCTURE_NOTE,
+    summary="Изменить поле: тип, название, обязательность, лимит файлов, порядок, условие показа",
+    description=(
+        "Смена типа между SELECT / RADIO / CHECKBOX сохраняет варианты. Смена на тип без "
+        "вариантов удаляет их; если поле управляет показом других полей или этапов — "
+        "409 `field_in_use_by_condition`. " + CONDITION_NOTE + " " + STRUCTURE_NOTE
+    ),
     dependencies=[update_dep],
     responses={
         200: success_example(DRAFT_EXAMPLE, "Field updated."),
         **COMMON_ERRORS,
+        **CONDITION,
         **FIELD_NOT_FOUND,
-        **LOCKED,
+        **IN_USE,
     },
 )
 async def update_field(
@@ -299,15 +328,83 @@ async def update_field(
 @router.delete(
     "/{product_id}/fields/{field_id}",
     summary="Удалить поле",
-    description=STRUCTURE_NOTE,
+    description=(
+        STRUCTURE_NOTE + " Если поле управляет показом других полей или этапов — "
+        "409 `field_in_use_by_condition`: сначала снимите эти условия."
+    ),
     dependencies=[update_dep],
     responses={
         200: success_example(DRAFT_EXAMPLE, "Field deleted."),
         **COMMON_ERRORS,
         **FIELD_NOT_FOUND,
-        **LOCKED,
+        **IN_USE,
     },
 )
 async def delete_field(product_id: int, field_id: int, db: DBDep, user: CurrentUserDep):
     product = await ProductService(db).delete_field(user, product_id, field_id)
     return ResponseBuilder.success(data=product, message="Field deleted.")
+
+
+# ---------- варианты ответа ----------
+
+
+@router.post(
+    "/{product_id}/fields/{field_id}/options",
+    summary="Добавить вариант ответа в поле SELECT / RADIO / CHECKBOX",
+    description=(
+        "Название на трёх языках и порядок. Для других типов полей — 400 `field_options`. "
+        + STRUCTURE_NOTE
+    ),
+    dependencies=[update_dep],
+    responses={
+        201: success_example(DRAFT_EXAMPLE, "Option added."),
+        **COMMON_ERRORS,
+        400: error_examples(FieldOptionsException),
+        **FIELD_NOT_FOUND,
+        **LOCKED,
+    },
+)
+async def add_option(
+    product_id: int, field_id: int, data: OptionCreateDTO, db: DBDep, user: CurrentUserDep
+):
+    product = await ProductService(db).add_option(user, product_id, field_id, data)
+    return ResponseBuilder.success(data=product, message="Option added.", status_code=201)
+
+
+@router.patch(
+    "/{product_id}/options/{option_id}",
+    summary="Изменить название или порядок варианта ответа",
+    description=STRUCTURE_NOTE,
+    dependencies=[update_dep],
+    responses={
+        200: success_example(DRAFT_EXAMPLE, "Option updated."),
+        **COMMON_ERRORS,
+        **OPTION_NOT_FOUND,
+        **LOCKED,
+    },
+)
+async def update_option(
+    product_id: int, option_id: int, data: OptionUpdateDTO, db: DBDep, user: CurrentUserDep
+):
+    product = await ProductService(db).update_option(user, product_id, option_id, data)
+    return ResponseBuilder.success(data=product, message="Option updated.")
+
+
+@router.delete(
+    "/{product_id}/options/{option_id}",
+    summary="Удалить вариант ответа",
+    description=(
+        STRUCTURE_NOTE + " Если вариант используется в условии показа — "
+        "409 `field_in_use_by_condition`: сначала снимите это условие."
+    ),
+    dependencies=[update_dep],
+    responses={
+        200: success_example(DRAFT_EXAMPLE, "Option deleted."),
+        **COMMON_ERRORS,
+        **OPTION_NOT_FOUND,
+        **IN_USE,
+    },
+)
+async def delete_option(product_id: int, option_id: int, db: DBDep, user: CurrentUserDep):
+    product = await ProductService(db).delete_option(user, product_id, option_id)
+    return ResponseBuilder.success(data=product, message="Option deleted.")

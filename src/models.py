@@ -18,6 +18,8 @@ from src.application.models.status_history_model import StatusHistoryORM
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.product.models.product_model import (
     ProductCategoryORM,
+    ProductFieldOptionORM,
+    ProductFieldOptionTranslationORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -46,6 +48,8 @@ __all__ = [
     "ProductORM",
     "ProductStageORM",
     "ProductFieldORM",
+    "ProductFieldOptionORM",
+    "ProductFieldOptionTranslationORM",
     "PermissionORM",
     "RoleORM",
     "RolePermissionORM",

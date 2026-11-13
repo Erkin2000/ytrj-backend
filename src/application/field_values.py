@@ -6,17 +6,70 @@ from decimal import Decimal, InvalidOperation
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
-from src.product.enums import FieldType
+from src.product.enums import CHOICE_FIELD_TYPES, MULTI_CHOICE_FIELD_TYPES, FieldType
+from src.product.models.product_model import ProductFieldORM
 
 MAX_STRING_LENGTH = 2000
 MAX_NUMBER_DIGITS = 18
 PHONE_RE = re.compile(r"^\+998\d{9}$")
 _email = TypeAdapter(EmailStr)
 
+RawValue = str | int | list[int] | list[str]
 
-def normalize_value(field_type: FieldType, raw: str) -> str:
-    """Возвращает значение в каноническом виде или бросает ValueError с пояснением."""
-    value = raw.strip()
+
+def chosen_option_ids(field: ProductFieldORM, value: str | None) -> set[int]:
+    """Выбранные варианты по сохранённому значению: SELECT / RADIO — один id,
+    CHECKBOX — id через запятую. Для остальных типов — пусто."""
+    if not value or field.field_type not in CHOICE_FIELD_TYPES:
+        return set()
+    ids = set()
+    for part in value.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.add(int(part))
+    return ids
+
+
+def _option_ids(field: ProductFieldORM, raw: RawValue) -> list[int]:
+    """Список id вариантов из сырого значения: число, строка с id через запятую или список."""
+    parts: list[str | int]
+    if isinstance(raw, list):
+        parts = list(raw)
+    elif isinstance(raw, int):
+        parts = [raw]
+    else:
+        parts = [p for p in raw.split(",") if p.strip()]
+    ids: list[int] = []
+    for part in parts:
+        text = str(part).strip()
+        if not text.isdigit():
+            raise ValueError("Expected option id(s) of this field")
+        ids.append(int(text))
+    known = {option.id for option in field.options}
+    unknown = sorted(set(ids) - known)
+    if unknown:
+        raise ValueError(f"Option does not belong to this field: {', '.join(map(str, unknown))}")
+    return sorted(dict.fromkeys(ids))
+
+
+def normalize_value(field: ProductFieldORM, raw: RawValue) -> str | None:
+    """Возвращает значение в каноническом виде, `None` для пустого значения
+    или бросает ValueError с пояснением."""
+    field_type = field.field_type
+
+    if field_type in CHOICE_FIELD_TYPES:
+        ids = _option_ids(field, raw)
+        if not ids:
+            return None
+        if field_type not in MULTI_CHOICE_FIELD_TYPES and len(ids) > 1:
+            raise ValueError("Only one option can be selected in this field")
+        return ",".join(map(str, ids))
+
+    if isinstance(raw, list):
+        raise ValueError("Expected a single value, not a list")
+    value = str(raw).strip()
+    if not value:
+        return None
 
     if field_type == FieldType.STRING:
         if len(value) > MAX_STRING_LENGTH:
