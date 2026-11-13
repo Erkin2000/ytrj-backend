@@ -31,6 +31,7 @@ from src.application.schemas.bank_schema import BankDTO
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.photo_storage import FieldDocumentStorage, FieldPhotoStorage
 from src.application.services.scoring_service import ScoringService
+from src.application.visibility import visible
 from src.application.workflow import build_progress
 from src.common.responses.exceptions import (
     ApplicantProfileIncompleteException,
@@ -41,11 +42,13 @@ from src.common.responses.exceptions import (
     BankSubjectTypeMismatchException,
     FieldFileLimitExceededException,
     FieldFileNotFoundException,
+    FieldHiddenException,
     FieldValueInvalidException,
     FileFieldException,
     ProductFieldNotFoundException,
     ProductNotAvailableException,
     ProductStageNotFoundException,
+    StageHiddenException,
     UserNotFoundException,
 )
 from src.product.enums import FILE_FIELD_TYPES, FieldType
@@ -223,7 +226,9 @@ class ApplicationService(ApplicationBaseService):
         user: CurrentUserDTO,
         stage_id: int,
         data: StageValuesDTO,
-    ) -> FormStageDTO:
+    ) -> list[FormStageDTO]:
+        """Сохраняет значения полей этапа и возвращает всю видимую анкету: ответ на поле
+        с вариантами может показать или скрыть другие поля и этапы."""
         application = await self._get_editable(application_id, user)
         stage = next(
             (
@@ -235,6 +240,11 @@ class ApplicationService(ApplicationBaseService):
         )
         if stage is None:
             raise ProductStageNotFoundException()
+        shown = visible(
+            application.product, {v.field_id: v.value for v in application.field_values}
+        )
+        if not shown.stage(stage):
+            raise StageHiddenException()
 
         fields = {field.id: field for field in stage.fields}
         errors: list[dict] = []
@@ -248,11 +258,14 @@ class ApplicationService(ApplicationBaseService):
             if field.field_type in FILE_FIELD_TYPES:
                 errors.append({"field": key, "message": FileFieldException.message})
                 continue
-            if raw is None or not raw.strip():
+            if not shown.field(field):
+                errors.append({"field": key, "message": FieldHiddenException.message})
+                continue
+            if raw is None:
                 normalized[field_id] = None
                 continue
             try:
-                normalized[field_id] = normalize_value(field.field_type, raw)
+                normalized[field_id] = normalize_value(field, raw)
             except ValueError as exc:
                 errors.append({"field": key, "message": str(exc)})
         if errors:
@@ -271,9 +284,11 @@ class ApplicationService(ApplicationBaseService):
                     ApplicationFieldValueORM(field_id=field_id, value=value)
                 )
 
+        # Ответы полей, которые скрылись после этого изменения, удаляются сразу.
+        await self._prune_hidden_answers(application)
+
         await self.db.commit()
-        application = await self.reload(application_id)
-        return next(s for s in build_form(application) if s.id == stage_id)
+        return build_form(await self.reload(application_id))
 
     async def add_field_file(
         self, application_id: int, user: CurrentUserDTO, field_id: int, upload: UploadFile
@@ -282,6 +297,11 @@ class ApplicationService(ApplicationBaseService):
         field = self._find_field(application, field_id)
         if field.field_type not in FILE_FIELD_TYPES:
             raise FileFieldException()
+        shown = visible(
+            application.product, {v.field_id: v.value for v in application.field_values}
+        )
+        if not shown.field(field):
+            raise FieldHiddenException()
 
         count = sum(1 for f in application.field_files if f.field_id == field.id)
         if count >= field.max_files:
@@ -359,6 +379,9 @@ class ApplicationService(ApplicationBaseService):
         if missing:
             raise ApplicationValidationException(missing=missing)
 
+        # Страховка: в заявку не должны попасть ответы скрытых полей.
+        await self._prune_hidden_answers(application)
+
         # Заявитель мог дополнить профиль после создания черновика —
         # в снимок попадают актуальные данные на момент отправки.
         for field, value in self._applicant_snapshot(application.applicant).items():
@@ -400,6 +423,24 @@ class ApplicationService(ApplicationBaseService):
             await self.photo_storage.delete(file.storage_path)
         application.field_files.clear()
         application.field_values.clear()
+
+    async def _prune_hidden_answers(self, application: ApplicationORM) -> None:
+        """Удаляет значения и файлы полей, скрытых условиями при текущих ответах.
+        Скрытие одного поля может скрыть зависящие от него — повторяем до устойчивости."""
+        while True:
+            values = {v.field_id: v.value for v in application.field_values}
+            shown = visible(application.product, values)
+            hidden_values = [
+                v for v in application.field_values if v.field_id not in shown.field_ids
+            ]
+            hidden_files = [f for f in application.field_files if f.field_id not in shown.field_ids]
+            if not hidden_values and not hidden_files:
+                return
+            for value in hidden_values:
+                application.field_values.remove(value)
+            for file in hidden_files:
+                await self.photo_storage.delete(file.storage_path)
+                application.field_files.remove(file)
 
     @staticmethod
     def _find_field(application: ApplicationORM, field_id: int) -> ProductFieldORM:

@@ -905,3 +905,20 @@ msgstr "Delete completely"
 
 msgid "Заявка будет удалена целиком: история, решения, ответы анкеты и файлы"
 msgstr "The application will be deleted completely: history, decisions, form answers and files"
+
+# ---- поля с вариантами и условный показ ----
+
+msgid "Выбор из списка"
+msgstr "Dropdown"
+
+msgid "Один вариант"
+msgstr "Radio"
+
+msgid "Несколько вариантов"
+msgstr "Checkboxes"
+
+msgid "Варианты"
+msgstr "Options"
+
+msgid "Показывать, если"
+msgstr "Shown when"

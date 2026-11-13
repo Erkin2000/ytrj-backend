@@ -220,6 +220,45 @@ def test_admin_product_pages(admin_client, product_application):
     assert admin_client.get("/admin/application-field-file/999999999").status_code == 404
 
 
+def test_admin_conditional_product_pages(api, admin_client, role_ids, banks, applicant):
+    bank = next(
+        (
+            b
+            for b in banks
+            if b.get("is_active", True)
+            and "SELF_EMPLOYED" in (b.get("allowed_subject_types") or [])
+        ),
+        None,
+    )
+    if bank is None:
+        pytest.skip("Нет активного банка для SELF_EMPLOYED")
+    fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    product = api.conditional_product(fund, [bank["id"]])
+    stage1 = next(s for s in product["stages"] if s["number"] == 1)
+    colour = next(f for f in stage1["fields"] if f["field_type"] == "SELECT")
+    blue = next(o["id"] for o in colour["options"] if o["sort_order"] == 1)
+
+    page = admin_client.get(f"/admin/product-orm/details/{product['id']}").text
+    assert "Красный" in page and "Показывать, если" in page
+
+    r = api.client.post(
+        "/api/v1/applications",
+        headers=applicant,
+        json={"product_id": product["id"], "subject_type": "SELF_EMPLOYED"},
+    )
+    assert r.status_code == 201, r.text
+    app_id = data(r)["id"]
+    api.application_ids.append(app_id)
+    r = api.client.put(
+        f"/api/v1/applications/{app_id}/stages/{stage1['id']}",
+        headers=applicant,
+        json={"values": {str(colour["id"]): str(blue)}},
+    )
+    assert r.status_code == 200, r.text
+    page = admin_client.get(f"/admin/application-orm/details/{app_id}").text
+    assert "Синий" in page and "Фрукт" not in page and "Оттенок" in page
+
+
 def test_admin_product_edit_validation(api, admin_client, product_application):
     product, _, _ = product_application
     url = f"/admin/product-orm/edit/{product['id']}"

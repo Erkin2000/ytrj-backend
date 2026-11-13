@@ -71,6 +71,14 @@ def tr(ru: str, uz: str, en: str) -> list[dict[str, str]]:
     ]
 
 
+def by_ru(items) -> dict:
+    """Этапы / поля / варианты по русскому названию."""
+    return {
+        next(t["name"] for t in item["translations"] if t["language"] == "ru"): item
+        for item in items
+    }
+
+
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -231,6 +239,127 @@ class Api:
             r = c.post(f"/api/v1/fund/products/{product_id}/publish", headers=headers)
             assert r.status_code == 200, r.text
         return data(r)
+
+    def conditional_product(self, headers, bank_ids, publish=True):
+        """Ветвящаяся анкета для тестов условного показа.
+
+        Этап 1 «Основное»: Сумма (NUMBER), Цвет (SELECT: Красный / Синий),
+          Фрукт (STRING, показывается при Красный), Дополнительно (CHECKBOX: Джем / Сок).
+        Этап 2 «Синее» (при Синий): Оттенок (STRING), Фото (PHOTO, необязательно).
+        Этап 3 «Сок» (при Дополнительно ∋ Сок): Вкус (STRING).
+        """
+        c = self.client
+        base = "/api/v1/fund/products"
+        r = c.post(
+            base,
+            headers=headers,
+            json={
+                "category_id": self.category(headers)["id"],
+                "translations": tr("TEST Ветвление", "TEST Tarmoqlanish", "TEST Branching"),
+                "bank_ids": bank_ids,
+            },
+        )
+        assert r.status_code == 201, r.text
+        product_id = data(r)["id"]
+        self.product_ids.append(product_id)
+
+        def post(path, body):
+            r = c.post(f"{base}/{product_id}{path}", headers=headers, json=body)
+            assert r.status_code == 201, r.text
+            return data(r)
+
+        stage1 = by_ru(
+            post("/stages", {"number": 1, "translations": tr("Основное", "Asosiy", "Main")})[
+                "stages"
+            ]
+        )["Основное"]
+        post(
+            f"/stages/{stage1['id']}/fields",
+            {
+                "field_type": "NUMBER",
+                "translations": tr("Сумма", "Summa", "Amount"),
+                "sort_order": 0,
+            },
+        )
+        product = post(
+            f"/stages/{stage1['id']}/fields",
+            {
+                "field_type": "SELECT",
+                "translations": tr("Цвет", "Rang", "Colour"),
+                "sort_order": 1,
+                "options": [
+                    {"translations": tr("Красный", "Qizil", "Red"), "sort_order": 0},
+                    {"translations": tr("Синий", "Koʻk", "Blue"), "sort_order": 1},
+                ],
+            },
+        )
+        colour = by_ru(by_ru(product["stages"])["Основное"]["fields"])["Цвет"]
+        red, blue = (by_ru(colour["options"])[name]["id"] for name in ("Красный", "Синий"))
+        post(
+            f"/stages/{stage1['id']}/fields",
+            {
+                "field_type": "STRING",
+                "translations": tr("Фрукт", "Meva", "Fruit"),
+                "sort_order": 2,
+                "visible_when": {"field_id": colour["id"], "option_ids": [red]},
+            },
+        )
+        product = post(
+            f"/stages/{stage1['id']}/fields",
+            {
+                "field_type": "CHECKBOX",
+                "translations": tr("Дополнительно", "Qoʻshimcha", "Extras"),
+                "is_required": False,
+                "sort_order": 3,
+                "options": [
+                    {"translations": tr("Джем", "Jem", "Jam")},
+                    {"translations": tr("Сок", "Sharbat", "Juice")},
+                ],
+            },
+        )
+        extras = by_ru(by_ru(product["stages"])["Основное"]["fields"])["Дополнительно"]
+        juice = by_ru(extras["options"])["Сок"]["id"]
+
+        product = post(
+            "/stages",
+            {
+                "number": 2,
+                "translations": tr("Синее", "Koʻk", "Blue details"),
+                "visible_when": {"field_id": colour["id"], "option_ids": [blue]},
+            },
+        )
+        stage2 = by_ru(product["stages"])["Синее"]
+        post(
+            f"/stages/{stage2['id']}/fields",
+            {"field_type": "STRING", "translations": tr("Оттенок", "Tus", "Shade")},
+        )
+        post(
+            f"/stages/{stage2['id']}/fields",
+            {
+                "field_type": "PHOTO",
+                "translations": tr("Фото", "Surat", "Photo"),
+                "is_required": False,
+                "sort_order": 1,
+            },
+        )
+        product = post(
+            "/stages",
+            {
+                "number": 3,
+                "translations": tr("Сок", "Sharbat", "Juice"),
+                "visible_when": {"field_id": extras["id"], "option_ids": [juice]},
+            },
+        )
+        stage3 = by_ru(product["stages"])["Сок"]
+        product = post(
+            f"/stages/{stage3['id']}/fields",
+            {"field_type": "STRING", "translations": tr("Вкус", "Taʼm", "Flavour")},
+        )
+        if publish:
+            r = c.post(f"{base}/{product_id}/publish", headers=headers)
+            assert r.status_code == 200, r.text
+            product = data(r)
+        return product
 
     def cleanup(self) -> None:
         async def run(session):

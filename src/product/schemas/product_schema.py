@@ -5,13 +5,22 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_
 
 from src.application.enums import SubjectType
 from src.application.schemas.bank_schema import BankDTO
-from src.product.enums import FILE_FIELD_TYPES, LANGUAGES, FieldType, Language, ProductStatus
+from src.product.enums import (
+    CHOICE_FIELD_TYPES,
+    FILE_FIELD_TYPES,
+    LANGUAGES,
+    FieldType,
+    Language,
+    ProductStatus,
+)
 
 NameStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=255)]
 DescriptionStr = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
 MAX_FILES_LIMIT = 10
+MIN_OPTIONS = 2
+MAX_OPTIONS = 50
 
 
 # ---------- переводы ----------
@@ -93,6 +102,17 @@ FIELD_TRANSLATIONS_EXAMPLE = [
     {"language": "uz", "name": "Soʻralayotgan summa"},
     {"language": "en", "name": "Requested amount"},
 ]
+OPTION_TRANSLATIONS_EXAMPLE = [
+    {"language": "ru", "name": "Производство"},
+    {"language": "uz", "name": "Ishlab chiqarish"},
+    {"language": "en", "name": "Manufacturing"},
+]
+VISIBLE_WHEN_EXAMPLE = {"field_id": 10, "option_ids": [21]}
+VISIBLE_WHEN_NOTE = (
+    "Условие показа: `field_id` — поле SELECT / RADIO / CHECKBOX, расположенное раньше в анкете "
+    "(более ранний этап или то же поле выше по `sort_order`), `option_ids` — его варианты; "
+    "показывается, если выбран хотя бы один из них. `null` — показывать всегда."
+)
 TRANSLATIONS_NOTE = (
     "Ровно три перевода — `ru`, `uz`, `en`, каждый язык один раз. При изменении передаются все три."
 )
@@ -175,10 +195,46 @@ class ProductUpdateDTO(BaseModel):
     )
 
 
+class VisibleWhenDTO(BaseModel):
+    """Условие показа этапа или поля."""
+
+    field_id: int = Field(
+        description="Поле SELECT / RADIO / CHECKBOX, расположенное раньше в анкете.",
+        examples=[10],
+    )
+    option_ids: list[int] = Field(
+        min_length=1,
+        description="Варианты этого поля; достаточно одного выбранного.",
+        examples=[[21]],
+    )
+
+    @model_validator(mode="after")
+    def _unique_options(self):
+        self.option_ids = list(dict.fromkeys(self.option_ids))
+        return self
+
+
+class OptionCreateDTO(BaseModel):
+    translations: NameTranslations = Field(
+        description=TRANSLATIONS_NOTE, examples=[OPTION_TRANSLATIONS_EXAMPLE]
+    )
+    sort_order: int = Field(default=0, ge=0, description="Порядок варианта в списке.")
+
+
+class OptionUpdateDTO(BaseModel):
+    translations: NameTranslations | None = Field(
+        default=None, description=TRANSLATIONS_NOTE, examples=[OPTION_TRANSLATIONS_EXAMPLE]
+    )
+    sort_order: int | None = Field(default=None, ge=0)
+
+
 class StageCreateDTO(BaseModel):
     number: int = Field(ge=1, le=100, description="Номер этапа (порядок).", examples=[1])
     translations: NameTranslations = Field(
         description=TRANSLATIONS_NOTE, examples=[STAGE_TRANSLATIONS_EXAMPLE]
+    )
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None, description=VISIBLE_WHEN_NOTE, examples=[VISIBLE_WHEN_EXAMPLE]
     )
 
 
@@ -186,6 +242,11 @@ class StageUpdateDTO(BaseModel):
     number: int | None = Field(default=None, ge=1, le=100)
     translations: NameTranslations | None = Field(
         default=None, description=TRANSLATIONS_NOTE, examples=[STAGE_TRANSLATIONS_EXAMPLE]
+    )
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None,
+        description=VISIBLE_WHEN_NOTE + " Не передано — условие не меняется.",
+        examples=[VISIBLE_WHEN_EXAMPLE],
     )
 
 
@@ -202,11 +263,27 @@ class FieldCreateDTO(BaseModel):
         description="Только для PHOTO и FILE: сколько файлов можно загрузить.",
     )
     sort_order: int = Field(default=0, ge=0, description="Порядок поля внутри этапа.")
+    options: list[OptionCreateDTO] | None = Field(
+        default=None,
+        min_length=MIN_OPTIONS,
+        max_length=MAX_OPTIONS,
+        description="Только для SELECT / RADIO / CHECKBOX: варианты ответа (2–50), обязательно.",
+    )
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None, description=VISIBLE_WHEN_NOTE, examples=[VISIBLE_WHEN_EXAMPLE]
+    )
 
     @model_validator(mode="after")
-    def _max_files_only_for_files(self):
+    def _by_field_type(self):
         if self.field_type not in FILE_FIELD_TYPES:
             self.max_files = 1
+        if self.field_type in CHOICE_FIELD_TYPES:
+            if not self.options:
+                raise ValueError("Для SELECT / RADIO / CHECKBOX нужны варианты ответа (options)")
+        elif self.options is not None:
+            raise ValueError(
+                "Варианты ответа (options) задаются только для SELECT / RADIO / CHECKBOX"
+            )
         return self
 
 
@@ -218,6 +295,11 @@ class FieldUpdateDTO(BaseModel):
     is_required: bool | None = None
     max_files: int | None = Field(default=None, ge=1, le=MAX_FILES_LIMIT)
     sort_order: int | None = Field(default=None, ge=0)
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None,
+        description=VISIBLE_WHEN_NOTE + " Не передано — условие не меняется.",
+        examples=[VISIBLE_WHEN_EXAMPLE],
+    )
 
 
 class ProductFilterDTO(BaseModel):
@@ -261,6 +343,12 @@ class CategoryDTO(BaseModel):
     updated_at: datetime
 
 
+class ProductFieldOptionDTO(BaseModel):
+    id: int
+    translations: list[TranslationOutDTO]
+    sort_order: int
+
+
 class ProductFieldDTO(BaseModel):
     id: int
     field_type: FieldType
@@ -268,12 +356,21 @@ class ProductFieldDTO(BaseModel):
     is_required: bool
     max_files: int
     sort_order: int
+    options: list[ProductFieldOptionDTO] = Field(
+        default=[], description="Варианты ответа — только у SELECT / RADIO / CHECKBOX."
+    )
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None, description="Условие показа поля; `null` — показывается всегда."
+    )
 
 
 class ProductStageDTO(BaseModel):
     id: int
     number: int
     translations: list[TranslationOutDTO]
+    visible_when: VisibleWhenDTO | None = Field(
+        default=None, description="Условие показа этапа; `null` — показывается всегда."
+    )
     fields: list[ProductFieldDTO] = []
 
 
@@ -310,6 +407,15 @@ class FieldTypeInfoDTO(BaseModel):
     is_file: bool = Field(
         description="true — PHOTO / FILE: файлы загружаются отдельно, значение не передаётся."
     )
+    has_options: bool = Field(
+        default=False,
+        description="true — SELECT / RADIO / CHECKBOX: у поля есть варианты ответа (`options`).",
+    )
+    multiple: bool = Field(
+        default=False, description="true — CHECKBOX: можно выбрать несколько вариантов."
+    )
+    min_options: int | None = Field(default=None, description="Минимум вариантов у поля.")
+    max_options: int | None = Field(default=None, description="Максимум вариантов у поля.")
     format: str | None = Field(default=None, description="Формат значения для подсказки.")
     example: str | None = None
     pattern: str | None = Field(default=None, description="Регулярное выражение значения.")

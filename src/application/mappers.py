@@ -1,5 +1,6 @@
 from src.account.models.user_model import UserORM
 from src.application.enums import ApplicationStatus
+from src.application.field_values import chosen_option_ids
 from src.application.models.answer_model import ApplicationFieldFileORM
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
@@ -25,8 +26,10 @@ from src.application.schemas.application_schema import (
     StatusHistoryDTO,
 )
 from src.application.schemas.bank_schema import BankDTO
+from src.application.visibility import visible
 from src.config import settings
-from src.product.mappers import field_dto, names, product_brief
+from src.product.mappers import field_dto, names, option_dto, product_brief
+from src.product.mappers import visible_when as visible_when_dto
 from src.utils.base_rep.mappers.base import DataMapper
 
 
@@ -134,14 +137,19 @@ def _is_filled(field, values: dict[int, str], files_by_field: set[int]) -> bool:
 
 
 def form_progress(model: ApplicationORM) -> FormProgressDTO:
-    """Сколько этапов продукта и сколько из них заполнено (без построения всей анкеты)."""
-    stages = model.product.stages if model.product else []
+    """Сколько видимых этапов продукта и сколько из них заполнено (без построения всей анкеты)."""
     values = {v.field_id: v.value for v in model.field_values}
     with_files = {f.field_id for f in model.field_files}
+    shown = visible(model.product, values)
+    stages = [s for s in (model.product.stages if model.product else []) if shown.stage(s)]
     complete = sum(
         1
         for stage in stages
-        if all(not f.is_required or _is_filled(f, values, with_files) for f in stage.fields)
+        if all(
+            not f.is_required or _is_filled(f, values, with_files)
+            for f in stage.fields
+            if shown.field(f)
+        )
     )
     return FormProgressDTO(
         stages_total=len(stages),
@@ -151,29 +159,39 @@ def form_progress(model: ApplicationORM) -> FormProgressDTO:
 
 
 def build_form(model: ApplicationORM) -> list[FormStageDTO]:
-    """Этапы продукта заявки с ответами: значения и файлы по каждому полю."""
+    """Видимые этапы продукта заявки с ответами: значения и файлы по каждому полю."""
     if model.product is None:
         return []
     values = {v.field_id: v.value for v in model.field_values}
     files: dict[int, list[FieldFileDTO]] = {}
     for f in model.field_files:
         files.setdefault(f.field_id, []).append(field_file_dto(f))
+    shown = visible(model.product, values)
 
     stages = []
     for stage in model.product.stages:
-        fields = [
-            FormFieldDTO(
-                **field_dto(field).model_dump(),
-                value=values.get(field.id),
-                files=files.get(field.id, []),
+        if not shown.stage(stage):
+            continue
+        fields = []
+        for field in stage.fields:
+            if not shown.field(field):
+                continue
+            value = values.get(field.id)
+            chosen = chosen_option_ids(field, value)
+            fields.append(
+                FormFieldDTO(
+                    **field_dto(field).model_dump(),
+                    value=value,
+                    selected_options=[option_dto(o) for o in field.options if o.id in chosen],
+                    files=files.get(field.id, []),
+                )
             )
-            for field in stage.fields
-        ]
         stages.append(
             FormStageDTO(
                 id=stage.id,
                 number=stage.number,
                 translations=names(stage.translations),
+                visible_when=visible_when_dto(stage),
                 is_complete=all(not f.is_required or f.value or f.files for f in fields),
                 fields=fields,
             )

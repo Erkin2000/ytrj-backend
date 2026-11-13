@@ -4,6 +4,10 @@
 (уникально в пределах объекта). Заявитель выбирает опубликованный продукт и
 заполняет поля его этапов. Когда по продукту есть заявки, этапы и поля менять
 нельзя — только копировать продукт.
+
+Условный показ: этап или поле может зависеть от ответа на поле с вариантами
+(SELECT / RADIO / CHECKBOX), расположенное раньше в анкете: `condition_field_id`
++ `condition_option_ids` — показывать, если выбран хотя бы один из вариантов.
 """
 
 from datetime import date, datetime
@@ -158,6 +162,11 @@ class ProductStageORM(Base):
         ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
     )
     number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Условие показа этапа: поле с вариантами из более раннего этапа и выбранные варианты.
+    condition_field_id: Mapped[int | None] = mapped_column(
+        ForeignKey("product_fields.id", ondelete="RESTRICT", use_alter=True)
+    )
+    condition_option_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -171,6 +180,7 @@ class ProductStageORM(Base):
     )
     fields: Mapped[list["ProductFieldORM"]] = relationship(
         back_populates="stage",
+        foreign_keys="ProductFieldORM.stage_id",
         cascade="all, delete-orphan",
         order_by="[ProductFieldORM.sort_order, ProductFieldORM.id]",
         lazy="selectin",
@@ -208,15 +218,29 @@ class ProductFieldORM(Base):
     # Для PHOTO / FILE: сколько файлов можно загрузить в поле.
     max_files: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Условие показа поля: поле с вариантами, расположенное раньше, и выбранные варианты.
+    condition_field_id: Mapped[int | None] = mapped_column(
+        ForeignKey("product_fields.id", ondelete="RESTRICT")
+    )
+    condition_option_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    stage: Mapped["ProductStageORM"] = relationship(back_populates="fields")
+    stage: Mapped["ProductStageORM"] = relationship(
+        back_populates="fields", foreign_keys=[stage_id]
+    )
     translations: Mapped[list["ProductFieldTranslationORM"]] = relationship(
         back_populates="field",
         cascade="all, delete-orphan",
         order_by="ProductFieldTranslationORM.language",
+        lazy="selectin",
+    )
+    # Варианты ответа — только у SELECT / RADIO / CHECKBOX.
+    options: Mapped[list["ProductFieldOptionORM"]] = relationship(
+        back_populates="field",
+        cascade="all, delete-orphan",
+        order_by="[ProductFieldOptionORM.sort_order, ProductFieldOptionORM.id]",
         lazy="selectin",
     )
 
@@ -236,3 +260,50 @@ class ProductFieldTranslationORM(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     field: Mapped["ProductFieldORM"] = relationship(back_populates="translations")
+
+
+class ProductFieldOptionORM(Base):
+    """Вариант ответа поля SELECT / RADIO / CHECKBOX."""
+
+    __tablename__ = "product_field_options"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("product_fields.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    field: Mapped["ProductFieldORM"] = relationship(back_populates="options")
+    translations: Mapped[list["ProductFieldOptionTranslationORM"]] = relationship(
+        back_populates="option",
+        cascade="all, delete-orphan",
+        order_by="ProductFieldOptionTranslationORM.language",
+        lazy="selectin",
+    )
+
+    def __str__(self) -> str:
+        return ru_name(self.translations)
+
+
+class ProductFieldOptionTranslationORM(Base):
+    __tablename__ = "product_field_option_translations"
+    __table_args__ = (UniqueConstraint("option_id", "language"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    option_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "product_field_options.id",
+            ondelete="CASCADE",
+            # Имя по конвенции превысило бы лимит PostgreSQL в 63 символа.
+            name="fk_product_field_option_translations_option_id",
+        ),
+        nullable=False,
+        index=True,
+    )
+    language: Mapped[Language] = mapped_column(LanguageType, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    option: Mapped["ProductFieldOptionORM"] = relationship(back_populates="translations")

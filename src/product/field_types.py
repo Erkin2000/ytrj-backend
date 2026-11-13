@@ -3,8 +3,18 @@
 
 from src.application.field_values import MAX_NUMBER_DIGITS, MAX_STRING_LENGTH, PHONE_RE
 from src.config import settings
-from src.product.enums import FILE_FIELD_TYPES, FieldType
-from src.product.schemas.product_schema import MAX_FILES_LIMIT, FieldTypeInfoDTO
+from src.product.enums import (
+    CHOICE_FIELD_TYPES,
+    FILE_FIELD_TYPES,
+    MULTI_CHOICE_FIELD_TYPES,
+    FieldType,
+)
+from src.product.schemas.product_schema import (
+    MAX_FILES_LIMIT,
+    MAX_OPTIONS,
+    MIN_OPTIONS,
+    FieldTypeInfoDTO,
+)
 
 # тип → (ru, uz, en, формат, пример)
 _CATALOG: dict[FieldType, tuple[str, str, str, str | None, str | None]] = {
@@ -15,6 +25,15 @@ _CATALOG: dict[FieldType, tuple[str, str, str, str | None, str | None]] = {
     FieldType.EMAIL: ("Email", "Email", "Email", "name@example.com", "user@example.com"),
     FieldType.PHOTO: ("Фото", "Surat", "Photo", None, None),
     FieldType.FILE: ("Файл", "Fayl", "File", None, None),
+    FieldType.SELECT: ("Выбор из списка", "Roʻyxatdan tanlash", "Dropdown", "<id варианта>", "21"),
+    FieldType.RADIO: ("Один вариант", "Bitta variant", "Radio", "<id варианта>", "21"),
+    FieldType.CHECKBOX: (
+        "Несколько вариантов",
+        "Bir nechta variant",
+        "Checkboxes",
+        "[<id варианта>, ...]",
+        "[21, 22]",
+    ),
 }
 
 
@@ -22,6 +41,7 @@ def field_types() -> list[FieldTypeInfoDTO]:
     items = []
     for field_type, (ru, uz, en, value_format, example) in _CATALOG.items():
         is_file = field_type in FILE_FIELD_TYPES
+        has_options = field_type in CHOICE_FIELD_TYPES
         info = {
             "type": field_type,
             "translations": [
@@ -30,6 +50,10 @@ def field_types() -> list[FieldTypeInfoDTO]:
                 {"language": "en", "name": en},
             ],
             "is_file": is_file,
+            "has_options": has_options,
+            "multiple": field_type in MULTI_CHOICE_FIELD_TYPES,
+            "min_options": MIN_OPTIONS if has_options else None,
+            "max_options": MAX_OPTIONS if has_options else None,
             "format": value_format,
             "example": example,
             "max_files_limit": MAX_FILES_LIMIT if is_file else None,

@@ -1,6 +1,7 @@
 from src.application.schemas.bank_schema import BankDTO
 from src.product.models.product_model import (
     ProductCategoryORM,
+    ProductFieldOptionORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -11,10 +12,12 @@ from src.product.schemas.product_schema import (
     ProductBriefDTO,
     ProductDetailDTO,
     ProductFieldDTO,
+    ProductFieldOptionDTO,
     ProductListItemDTO,
     ProductStageDTO,
     ProductTranslationOutDTO,
     TranslationOutDTO,
+    VisibleWhenDTO,
 )
 from src.utils.base_rep.mappers.base import DataMapper
 
@@ -27,6 +30,20 @@ def product_brief(model: ProductORM) -> ProductBriefDTO:
     return ProductBriefDTO(id=model.id, translations=names(model.translations))
 
 
+def visible_when(model: ProductStageORM | ProductFieldORM) -> VisibleWhenDTO | None:
+    if model.condition_field_id is None or not model.condition_option_ids:
+        return None
+    return VisibleWhenDTO(
+        field_id=model.condition_field_id, option_ids=list(model.condition_option_ids)
+    )
+
+
+def option_dto(model: ProductFieldOptionORM) -> ProductFieldOptionDTO:
+    return ProductFieldOptionDTO(
+        id=model.id, translations=names(model.translations), sort_order=model.sort_order
+    )
+
+
 def field_dto(model: ProductFieldORM) -> ProductFieldDTO:
     return ProductFieldDTO(
         id=model.id,
@@ -35,6 +52,8 @@ def field_dto(model: ProductFieldORM) -> ProductFieldDTO:
         is_required=model.is_required,
         max_files=model.max_files,
         sort_order=model.sort_order,
+        options=[option_dto(o) for o in model.options],
+        visible_when=visible_when(model),
     )
 
 
@@ -43,6 +62,7 @@ def stage_dto(model: ProductStageORM) -> ProductStageDTO:
         id=model.id,
         number=model.number,
         translations=names(model.translations),
+        visible_when=visible_when(model),
         fields=[field_dto(f) for f in model.fields],
     )
 

@@ -61,11 +61,16 @@
 <div class="col-lg-7">
   <div class="card">
     <div class="card-header"><h3 class="card-title">{{ _("Этапы и поля анкеты") }} <span class="badge bg-secondary-lt ms-2">{{ pr.stages | length }}</span></h3></div>
+    {% set field_names = {} %}
+    {% set option_names = {} %}
+    {% for st in pr.stages %}{% for f in st.fields %}{% set _ = field_names.update({f.id: tr_name(f.translations)}) %}{% for o in f.options %}{% set _ = option_names.update({o.id: tr_name(o.translations)}) %}{% endfor %}{% endfor %}{% endfor %}
+    {% macro condition(obj) %}{% if obj.condition_field_id %}<div class="text-muted small"><i class="fa-solid fa-code-branch me-1"></i>{{ _("Показывать, если") }} «{{ field_names.get(obj.condition_field_id, obj.condition_field_id) }}» = {% for oid in obj.condition_option_ids or [] %}<span class="badge bg-azure-lt">{{ option_names.get(oid, oid) }}</span> {% endfor %}</div>{% endif %}{% endmacro %}
     {% for stage in pr.stages %}
     <div class="card-header bg-transparent">
       <h4 class="card-title">{{ stage.number }}. {{ tr_name(stage.translations) }}</h4>
       <div class="card-actions text-muted small">{% for t in stage.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
     </div>
+    {% if stage.condition_field_id %}<div class="card-body py-1">{{ condition(stage) }}</div>{% endif %}
     {% if stage.fields %}
     <div class="table-responsive">
       <table class="table card-table table-vcenter table-sm">
@@ -74,7 +79,9 @@
           {% for f in stage.fields %}
           <tr>
             <td>{{ tr_name(f.translations) }}
-              <div class="text-muted small">{% for t in f.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div></td>
+              <div class="text-muted small">{% for t in f.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+              {% if f.options %}<div class="small mt-1"><span class="text-muted">{{ _("Варианты") }}:</span> {% for o in f.options %}<span class="badge bg-secondary-lt" title="{% for t in o.translations %}{{ t.language.value if t.language.value is defined else t.language }}: {{ t.name }}{% if not loop.last %} · {% endif %}{% endfor %}">{{ tr_name(o.translations) }}</span> {% endfor %}</div>{% endif %}
+              {{ condition(f) }}</td>
             <td>{{ field_type_label(f.field_type) }}</td>
             <td>{% if f.is_required %}<i class="fa fa-check text-success"></i>{% else %}<i class="fa fa-minus text-muted"></i>{% endif %}</td>
             <td>{{ f.max_files if f.field_type.value in ["PHOTO", "FILE"] else "—" }}</td>

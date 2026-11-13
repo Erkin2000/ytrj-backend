@@ -8,6 +8,7 @@ from src.product.enums import ProductStatus
 from src.product.mappers import ProductDataMapper
 from src.product.models.product_model import (
     ProductCategoryORM,
+    ProductFieldOptionORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -35,6 +36,10 @@ class ProductRepository(BaseRepository):
                 selectinload(ProductORM.stages)
                 .selectinload(ProductStageORM.fields)
                 .selectinload(ProductFieldORM.translations),
+                selectinload(ProductORM.stages)
+                .selectinload(ProductStageORM.fields)
+                .selectinload(ProductFieldORM.options)
+                .selectinload(ProductFieldOptionORM.translations),
             )
             .execution_options(populate_existing=True)
         )
@@ -93,6 +98,15 @@ class ProductRepository(BaseRepository):
             select(ProductFieldORM)
             .join(ProductStageORM, ProductStageORM.id == ProductFieldORM.stage_id)
             .where(ProductFieldORM.id == field_id, ProductStageORM.product_id == product_id)
+        )
+        return await self.session.scalar(stmt)
+
+    async def get_option(self, product_id: int, option_id: int) -> ProductFieldOptionORM | None:
+        stmt = (
+            select(ProductFieldOptionORM)
+            .join(ProductFieldORM, ProductFieldORM.id == ProductFieldOptionORM.field_id)
+            .join(ProductStageORM, ProductStageORM.id == ProductFieldORM.stage_id)
+            .where(ProductFieldOptionORM.id == option_id, ProductStageORM.product_id == product_id)
         )
         return await self.session.scalar(stmt)
 

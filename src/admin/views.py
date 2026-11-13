@@ -52,6 +52,7 @@ from src.database import async_session_maker
 from src.product.enums import ProductStatus
 from src.product.models.product_model import (
     ProductCategoryORM,
+    ProductFieldOptionORM,
     ProductFieldORM,
     ProductORM,
     ProductStageORM,
@@ -69,8 +70,6 @@ CATEGORY_APPLICATIONS = _l("Заявки")
 CATEGORY_PRODUCTS = _l("Продукты")
 
 
-
-
 class LocalizedLabelsMixin:
     """``column_labels`` содержит msgid; ``_column_labels`` отдаёт перевод
     для языка текущего запроса. SQLAdmin читает ``_column_labels`` в шаблонах,
@@ -84,7 +83,6 @@ class LocalizedLabelsMixin:
     @_column_labels.setter
     def _column_labels(self, value: dict) -> None:
         self.__dict__["_column_labels_source"] = value
-
 
 
 def _attr_value(model, attribute):
@@ -239,7 +237,6 @@ def fmt_translations(model, attribute) -> Markup | str:
 
 def fmt_language(model, attribute) -> str:
     return language_label(_attr_value(model, attribute))
-
 
 
 PINFL_RE = re.compile(r"\d{14}")
@@ -471,8 +468,6 @@ class RefreshTokenAdmin(LocalizedLabelsMixin, ModelView, model=RefreshTokenORM):
     page_size = 25
 
 
-
-
 class BankAdmin(LocalizedLabelsMixin, ModelView, model=BankORM):
     name = _l("Банк")
     name_plural = _l("Банки")
@@ -509,7 +504,6 @@ class BankAdmin(LocalizedLabelsMixin, ModelView, model=BankORM):
         BankORM.allowed_subject_types: fmt_subject_types,
     }
     form_excluded_columns = [BankORM.created_at, BankORM.updated_at]
-
 
 
 class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
@@ -685,6 +679,11 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
             .selectinload(ProductORM.stages)
             .selectinload(ProductStageORM.fields)
             .selectinload(ProductFieldORM.translations),
+            selectinload(ApplicationORM.product)
+            .selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.fields)
+            .selectinload(ProductFieldORM.options)
+            .selectinload(ProductFieldOptionORM.translations),
             selectinload(ApplicationORM.field_values),
             selectinload(ApplicationORM.field_files),
             selectinload(ApplicationORM.scoring_attempts).selectinload(
@@ -1125,6 +1124,10 @@ class ProductAdmin(LocalizedLabelsMixin, ModelView, model=ProductORM):
             selectinload(ProductORM.stages)
             .selectinload(ProductStageORM.fields)
             .selectinload(ProductFieldORM.translations),
+            selectinload(ProductORM.stages)
+            .selectinload(ProductStageORM.fields)
+            .selectinload(ProductFieldORM.options)
+            .selectinload(ProductFieldOptionORM.translations),
         )
         product = await self._get_object_by_pk(stmt)
         if product is not None:
