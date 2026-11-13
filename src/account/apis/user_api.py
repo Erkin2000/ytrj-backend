@@ -84,6 +84,7 @@ async def get_user(user_id: int, db: DBDep, actor: ReadAdmin):
 
 @router.post(
     "",
+    status_code=201,
     summary="Создание сотрудника (роль + ПИНФЛ для входа через YIA Portal и/или пароль)",
     description=(
         "Сотрудник Фонда, банка или Совета входит через YIA Portal: при входе он "

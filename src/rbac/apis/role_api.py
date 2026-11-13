@@ -44,6 +44,7 @@ async def get_role(role_id: int, db: DBDep):
 
 @router.post(
     "",
+    status_code=201,
     summary="Создание роли",
     dependencies=[Depends(require_permission(Module.ROLES, Action.CREATE))],
     responses={

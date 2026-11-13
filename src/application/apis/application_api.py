@@ -188,6 +188,7 @@ async def get_my_applications(
 
 @router.post(
     "",
+    status_code=201,
     summary="Подать заявку по продукту: создаётся номер и черновик (DRAFT)",
     description=(
         "Продукт берётся из `GET /products`: опубликован, в сроках приёма и рассчитан на "
@@ -323,6 +324,7 @@ async def save_stage(
 
 @router.post(
     "/{application_id}/fields/{field_id}/files",
+    status_code=201,
     summary="Загрузить файл в поле PHOTO или FILE",
     description=(
         "PHOTO — JPG/PNG/WEBP до 5 МБ, FILE — PDF/DOCX до 10 МБ. "

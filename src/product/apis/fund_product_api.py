@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.exceptions import (
@@ -30,7 +30,14 @@ from src.common.swagger.responses import (
     paginated_example,
     success_example,
 )
-from src.product.apis.examples import PRODUCT_DETAIL_EXAMPLE, PRODUCT_EXAMPLE
+from src.product.apis.examples import (
+    FIELD_CREATE_EXAMPLES,
+    FIELD_UPDATE_EXAMPLES,
+    OPTION_CREATE_EXAMPLES,
+    PRODUCT_DETAIL_EXAMPLE,
+    PRODUCT_EXAMPLE,
+    STAGE_CREATE_EXAMPLES,
+)
 from src.product.schemas.product_schema import (
     FieldCreateDTO,
     FieldUpdateDTO,
@@ -48,6 +55,10 @@ from src.rbac.permissions import Action, Module
 router = APIRouter(prefix="/fund/products", tags=["Продукты: управление (Фонд)"])
 
 FilterDep = Annotated[ProductFilterDTO, Depends()]
+StageCreateBody = Annotated[StageCreateDTO, Body(openapi_examples=STAGE_CREATE_EXAMPLES)]
+FieldCreateBody = Annotated[FieldCreateDTO, Body(openapi_examples=FIELD_CREATE_EXAMPLES)]
+FieldUpdateBody = Annotated[FieldUpdateDTO, Body(openapi_examples=FIELD_UPDATE_EXAMPLES)]
+OptionCreateBody = Annotated[OptionCreateDTO, Body(openapi_examples=OPTION_CREATE_EXAMPLES)]
 
 create_dep = Depends(require_permission(Module.PRODUCTS, Action.CREATE))
 read_dep = Depends(require_permission(Module.PRODUCTS, Action.READ))
@@ -89,6 +100,7 @@ async def get_products(db: DBDep, pagination: PaginationDep, filters: FilterDep)
 
 @router.post(
     "",
+    status_code=201,
     summary="Создать продукт (черновик): категория, названия, описания, типы субъекта, сроки, банки",
     description="`category_id` обязателен: активная категория из `GET /fund/product-categories`.",
     dependencies=[create_dep],
@@ -198,6 +210,7 @@ async def archive_product(product_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.post(
     "/{product_id}/copy",
+    status_code=201,
     summary="Скопировать продукт в новый черновик (с банками, этапами, полями, вариантами и условиями)",
     dependencies=[create_dep],
     responses={
@@ -216,6 +229,7 @@ async def copy_product(product_id: int, db: DBDep, user: CurrentUserDep):
 
 @router.post(
     "/{product_id}/stages",
+    status_code=201,
     summary="Добавить этап: номер, название на трёх языках, условие показа",
     description=STRUCTURE_NOTE + " " + CONDITION_NOTE,
     dependencies=[update_dep],
@@ -227,7 +241,7 @@ async def copy_product(product_id: int, db: DBDep, user: CurrentUserDep):
         409: error_examples(ProductLockedException, StageNumberTakenException),
     },
 )
-async def add_stage(product_id: int, data: StageCreateDTO, db: DBDep, user: CurrentUserDep):
+async def add_stage(product_id: int, data: StageCreateBody, db: DBDep, user: CurrentUserDep):
     product = await ProductService(db).add_stage(user, product_id, data)
     return ResponseBuilder.success(data=product, message="Stage added.", status_code=201)
 
@@ -277,13 +291,19 @@ async def delete_stage(product_id: int, stage_id: int, db: DBDep, user: CurrentU
 
 @router.post(
     "/{product_id}/stages/{stage_id}/fields",
+    status_code=201,
     summary="Добавить поле в этап: тип, название на трёх языках, обязательность, варианты, условие",
     description=(
         "Типы: STRING (текст), NUMBER (число), DATE (дата), PHONE (+998XXXXXXXXX), EMAIL, "
         "PHOTO (JPG/PNG/WEBP), FILE (PDF/DOCX), SELECT / RADIO (один вариант из списка), "
         "CHECKBOX (несколько вариантов). `max_files` — только для PHOTO и FILE. "
         "`options` (2–50 вариантов с названиями на трёх языках) — только для SELECT / RADIO / "
-        "CHECKBOX и обязательны для них. " + CONDITION_NOTE + " " + STRUCTURE_NOTE
+        "CHECKBOX и обязательны для них. Справочник типов с их атрибутами (`has_options`, "
+        "`multiple`, `min_options` / `max_options`) — `GET /products/field-types`. "
+        "Готовые тела запросов для каждого типа — в списке примеров. "
+        + CONDITION_NOTE
+        + " "
+        + STRUCTURE_NOTE
     ),
     dependencies=[update_dep],
     responses={
@@ -295,7 +315,7 @@ async def delete_stage(product_id: int, stage_id: int, db: DBDep, user: CurrentU
     },
 )
 async def add_field(
-    product_id: int, stage_id: int, data: FieldCreateDTO, db: DBDep, user: CurrentUserDep
+    product_id: int, stage_id: int, data: FieldCreateBody, db: DBDep, user: CurrentUserDep
 ):
     product = await ProductService(db).add_field(user, product_id, stage_id, data)
     return ResponseBuilder.success(data=product, message="Field added.", status_code=201)
@@ -319,7 +339,7 @@ async def add_field(
     },
 )
 async def update_field(
-    product_id: int, field_id: int, data: FieldUpdateDTO, db: DBDep, user: CurrentUserDep
+    product_id: int, field_id: int, data: FieldUpdateBody, db: DBDep, user: CurrentUserDep
 ):
     product = await ProductService(db).update_field(user, product_id, field_id, data)
     return ResponseBuilder.success(data=product, message="Field updated.")
@@ -350,6 +370,7 @@ async def delete_field(product_id: int, field_id: int, db: DBDep, user: CurrentU
 
 @router.post(
     "/{product_id}/fields/{field_id}/options",
+    status_code=201,
     summary="Добавить вариант ответа в поле SELECT / RADIO / CHECKBOX",
     description=(
         "Название на трёх языках и порядок. Для других типов полей — 400 `field_options`. "
@@ -365,7 +386,7 @@ async def delete_field(product_id: int, field_id: int, db: DBDep, user: CurrentU
     },
 )
 async def add_option(
-    product_id: int, field_id: int, data: OptionCreateDTO, db: DBDep, user: CurrentUserDep
+    product_id: int, field_id: int, data: OptionCreateBody, db: DBDep, user: CurrentUserDep
 ):
     product = await ProductService(db).add_option(user, product_id, field_id, data)
     return ResponseBuilder.success(data=product, message="Option added.", status_code=201)

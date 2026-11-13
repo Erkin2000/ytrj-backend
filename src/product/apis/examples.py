@@ -1,5 +1,6 @@
 """Примеры продуктов для Swagger."""
 
+from src.common.swagger.responses import keep_nulls
 from src.product.schemas.product_schema import (
     CATEGORY_TRANSLATIONS_EXAMPLE,
     FIELD_TRANSLATIONS_EXAMPLE,
@@ -204,3 +205,170 @@ FIELD_TYPES_EXAMPLE = [
         "max_size_mb": None,
     },
 ]
+
+
+# ---------- примеры тел запросов (openapi_examples) ----------
+
+
+def _names(ru: str, uz: str, en: str) -> list[dict]:
+    return [
+        {"language": "ru", "name": ru},
+        {"language": "uz", "name": uz},
+        {"language": "en", "name": en},
+    ]
+
+
+def _option(ru: str, uz: str, en: str, sort_order: int) -> dict:
+    return {"translations": _names(ru, uz, en), "sort_order": sort_order}
+
+
+STAGE_CREATE_EXAMPLES = {
+    "basic": {
+        "summary": "Этап без условия",
+        "value": {"number": 1, "translations": STAGE_TRANSLATIONS_EXAMPLE},
+    },
+    "conditional": {
+        "summary": "Этап с условием показа",
+        "description": "Этап виден, только если в поле 10 выбран вариант 21.",
+        "value": {
+            "number": 2,
+            "translations": _names(
+                "Сведения о производстве", "Ishlab chiqarish haqida maʼlumot", "Production details"
+            ),
+            "visible_when": {"field_id": 10, "option_ids": [21]},
+        },
+    },
+}
+
+FIELD_CREATE_EXAMPLES = {
+    "string": {
+        "summary": "STRING — текст",
+        "value": {
+            "field_type": "STRING",
+            "translations": _names(
+                "Выпускаемая продукция", "Ishlab chiqariladigan mahsulot", "Products manufactured"
+            ),
+            "is_required": True,
+            "sort_order": 0,
+        },
+    },
+    "number": {
+        "summary": "NUMBER — число",
+        "value": {
+            "field_type": "NUMBER",
+            "translations": FIELD_TRANSLATIONS_EXAMPLE,
+            "is_required": True,
+            "sort_order": 1,
+        },
+    },
+    "file": {
+        "summary": "FILE / PHOTO — файлы с лимитом",
+        "description": "`max_files` (1–10) учитывается только для PHOTO и FILE.",
+        "value": {
+            "field_type": "FILE",
+            "translations": _names("Бизнес-план", "Biznes-reja", "Business plan"),
+            "is_required": False,
+            "max_files": 3,
+            "sort_order": 2,
+        },
+    },
+    "select": {
+        "summary": "SELECT — выпадающий список",
+        "description": "Один вариант из списка. `options` — от 2 до 50 вариантов.",
+        "value": {
+            "field_type": "SELECT",
+            "translations": _names(
+                "Направление деятельности", "Faoliyat yoʻnalishi", "Business area"
+            ),
+            "is_required": True,
+            "sort_order": 3,
+            "options": [
+                _option("Производство", "Ishlab chiqarish", "Manufacturing", 0),
+                _option("Услуги", "Xizmatlar", "Services", 1),
+                _option("Торговля", "Savdo", "Trade", 2),
+            ],
+        },
+    },
+    "radio": {
+        "summary": "RADIO — один вариант (радиокнопки)",
+        "description": "Как SELECT, но фронт показывает все варианты сразу; удобно для 2–5 вариантов.",
+        "value": {
+            "field_type": "RADIO",
+            "translations": _names(
+                "Есть ли у вас опыт в бизнесе?",
+                "Biznes tajribangiz bormi?",
+                "Do you have business experience?",
+            ),
+            "is_required": True,
+            "sort_order": 4,
+            "options": [
+                _option("Да", "Ha", "Yes", 0),
+                _option("Нет", "Yoʻq", "No", 1),
+            ],
+        },
+    },
+    "checkbox": {
+        "summary": "CHECKBOX — несколько вариантов",
+        "description": "Заявитель может отметить несколько вариантов.",
+        "value": {
+            "field_type": "CHECKBOX",
+            "translations": _names("Каналы продаж", "Sotuv kanallari", "Sales channels"),
+            "is_required": False,
+            "sort_order": 5,
+            "options": [
+                _option("Офлайн-магазин", "Oflayn doʻkon", "Offline store", 0),
+                _option("Интернет-магазин", "Internet-doʻkon", "Online store", 1),
+                _option("Маркетплейсы", "Marketpleyslar", "Marketplaces", 2),
+            ],
+        },
+    },
+    "conditional": {
+        "summary": "Поле с условием показа",
+        "description": (
+            "Поле видно, только если в поле 10 (SELECT / RADIO / CHECKBOX выше в анкете) "
+            "выбран вариант 21."
+        ),
+        "value": {
+            "field_type": "STRING",
+            "translations": _names(
+                "Выпускаемая продукция", "Ishlab chiqariladigan mahsulot", "Products manufactured"
+            ),
+            "is_required": True,
+            "sort_order": 6,
+            "visible_when": {"field_id": 10, "option_ids": [21]},
+        },
+    },
+}
+
+FIELD_UPDATE_EXAMPLES = {
+    "required": {
+        "summary": "Сделать поле необязательным",
+        "value": {"is_required": False},
+    },
+    "rename": {
+        "summary": "Переименовать поле",
+        "description": "Передаются все три перевода.",
+        "value": {"translations": FIELD_TRANSLATIONS_EXAMPLE},
+    },
+    "to_radio": {
+        "summary": "Сменить SELECT на RADIO",
+        "description": "Между SELECT / RADIO / CHECKBOX варианты сохраняются.",
+        "value": {"field_type": "RADIO"},
+    },
+    "set_condition": {
+        "summary": "Задать условие показа",
+        "value": {"visible_when": {"field_id": 10, "option_ids": [21, 22]}},
+    },
+    "clear_condition": {
+        "summary": "Снять условие показа",
+        "description": "`null` — показывать всегда.",
+        "value": keep_nulls({"visible_when": None}),
+    },
+}
+
+OPTION_CREATE_EXAMPLES = {
+    "option": {
+        "summary": "Новый вариант ответа",
+        "value": _option("Сельское хозяйство", "Qishloq xoʻjaligi", "Agriculture", 3),
+    },
+}

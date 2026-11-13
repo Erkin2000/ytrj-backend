@@ -57,6 +57,7 @@ async def get_bank(bank_id: int, db: DBDep):
 
 @router.post(
     "",
+    status_code=201,
     summary="Добавление банка в каталог",
     dependencies=[Depends(require_permission(Module.BANKS, Action.CREATE))],
     responses={

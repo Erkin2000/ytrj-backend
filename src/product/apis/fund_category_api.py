@@ -37,6 +37,7 @@ async def get_categories(db: DBDep):
 
 @router.post(
     "",
+    status_code=201,
     summary="Создать категорию: название (и описание) на ru / uz / en",
     dependencies=[Depends(require_permission(Module.PRODUCTS, Action.CREATE))],
     responses={
