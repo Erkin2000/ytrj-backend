@@ -71,8 +71,9 @@ def test_full_application_lifecycle(api, role_ids, bank, product, applicant, sub
 
     fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
     bank_h, _ = api.staff(role_id=role_ids["BANK_EMPLOYEE"], bank_id=bank["id"])
-    council_h, council_me = api.staff(role_id=role_ids["COUNCIL_MEMBER"])
+    council_h, council_me = api.staff(eimzo=True, role_id=role_ids["COUNCIL_MEMBER"])
     mute_h, mute_me = api.staff(
+        eimzo=True,
         role_id=role_ids["COUNCIL_MEMBER"],
         permissions=["council_review.read", "applications.read"],
     )
@@ -101,21 +102,22 @@ def test_full_application_lifecycle(api, role_ids, bank, product, applicant, sub
     assert not bank_sees()
     assert c.get(f"/api/v1/applications/{app_id}", headers=bank_h).status_code in (403, 404)
 
-    send = f"/api/v1/fund/applications/{app_id}/send-to-council"
-    assert (
-        c.post(send, headers=fund, json={"council_member_ids": [mute_me["id"]]}).status_code == 404
-    )
-    r = c.post(send, headers=fund, json={"council_member_ids": [council_me["id"]]})
-    assert r.status_code == 200, r.text
+    assert c.post(
+        f"/api/v1/fund/applications/{app_id}/send-to-council", headers=fund
+    ).status_code in (404, 405)
+
+    bulletin = api.bulletin(fund, application_id=app_id)
+    assert bulletin["application"]["id"] == app_id
     assert status(api, app_id, fund) == "COUNCIL_REVIEW"
+    recipients = {s["member"]["id"] for s in bulletin["signature_list"]}
+    assert council_me["id"] in recipients and mute_me["id"] not in recipients
+    if recipients - {council_me["id"]}:
+        pytest.skip("В БД есть другие члены Совета с ПИНФЛ: нужна подпись каждого")
     assert c.get(f"/api/v1/applications/{app_id}", headers=mute_h).status_code in (403, 404)
     assert not bank_sees()
+    assert c.get(f"/api/v1/applications/{app_id}", headers=council_h).status_code == 200
 
-    r = c.post(
-        f"/api/v1/council/applications/{app_id}/decision",
-        headers=council_h,
-        json={"decision": "APPROVED"},
-    )
+    r = api.sign(council_h, bulletin["id"], council_me["pinfl"])
     assert r.status_code == 200, r.text
     assert status(api, app_id, applicant) == "SENT_TO_BANK"
     assert bank_sees()
@@ -159,6 +161,7 @@ def test_full_application_lifecycle(api, role_ids, bank, product, applicant, sub
         ("/api/v1/fund/applications/counters", fund),
         ("/api/v1/bank/applications/counters", bank_h),
         ("/api/v1/council/applications/counters", council_h),
+        ("/api/v1/council/bulletins/counters", council_h),
         ("/api/v1/applications", applicant),
     ]:
         assert c.get(path, headers=headers).status_code == 200, path
@@ -178,26 +181,20 @@ def test_fund_rejects_before_council(api, role_ids, applicant, submitted_applica
     detail = data(c.get(f"/api/v1/applications/{app_id}", headers=applicant))
     assert detail["rejection_reason"] == "Не подходит под программу"
 
-    r = c.post(f"/api/v1/fund/applications/{app_id}/send-to-council", headers=fund, json={})
-    assert r.status_code == 400
+    r = api.create_bulletin(fund, application_id=app_id)
+    assert r.status_code == 400 and r.json()["code"] == "bulletin_application", r.text
 
 
 def test_bank_rejects_after_council(api, role_ids, bank, applicant, submitted_application):
     c, app_id = api.client, submitted_application
     fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
     bank_h, _ = api.staff(role_id=role_ids["BANK_EMPLOYEE"], bank_id=bank["id"])
-    council_h, council_me = api.staff(role_id=role_ids["COUNCIL_MEMBER"])
+    council_h, council_me = api.staff(eimzo=True, role_id=role_ids["COUNCIL_MEMBER"])
 
-    c.post(
-        f"/api/v1/fund/applications/{app_id}/send-to-council",
-        headers=fund,
-        json={"council_member_ids": [council_me["id"]]},
-    )
-    c.post(
-        f"/api/v1/council/applications/{app_id}/decision",
-        headers=council_h,
-        json={"decision": "APPROVED"},
-    )
+    bulletin = api.bulletin(fund, application_id=app_id)
+    if {s["member"]["id"] for s in bulletin["signature_list"]} != {council_me["id"]}:
+        pytest.skip("В БД есть другие члены Совета с ПИНФЛ: нужна подпись каждого")
+    assert api.sign(council_h, bulletin["id"], council_me["pinfl"]).status_code == 200
     c.post(f"/api/v1/bank/applications/{app_id}/accept", headers=bank_h)
     r = c.post(
         f"/api/v1/bank/applications/{app_id}/decision",

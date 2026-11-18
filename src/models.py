@@ -16,6 +16,7 @@ from src.application.models.resource_allocation_model import ResourceAllocationO
 from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
 from src.auth.models.refresh_token_model import RefreshTokenORM
+from src.bulletin.models.bulletin_model import BulletinORM, BulletinSignatureORM
 from src.product.models.product_model import (
     ProductCategoryORM,
     ProductFieldOptionORM,
@@ -44,6 +45,8 @@ __all__ = [
     "ScoringAttemptORM",
     "StatusHistoryORM",
     "RefreshTokenORM",
+    "BulletinORM",
+    "BulletinSignatureORM",
     "ProductCategoryORM",
     "ProductORM",
     "ProductStageORM",

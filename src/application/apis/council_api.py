@@ -1,10 +1,11 @@
-"""Рабочее окно члена Совета: только направленные ему заявки."""
+"""Рабочее окно члена Совета: только направленные ему заявки (для просмотра).
+Решение по заявке принимается подписью бюллетеня: /council/bulletins."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from src.application.schemas.application_schema import ApplicationFilterDTO, CouncilDecisionDTO
+from src.application.schemas.application_schema import ApplicationFilterDTO
 from src.application.services.council_service import CouncilService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.response import ResponseBuilder
@@ -59,19 +60,3 @@ async def get_assigned_applications(
 async def get_counters(db: DBDep, user: CurrentUserDep):
     data = await CouncilService(db).get_counters(user)
     return ResponseBuilder.success(data=data, message="Counters retrieved.")
-
-
-@router.post(
-    "/{application_id}/decision",
-    summary="Решение члена Совета: «Согласен» / «Отклоняю» (причина обязательна)",
-    dependencies=[Depends(require_permission(Module.COUNCIL_REVIEW, Action.APPROVE))],
-    responses={
-        200: success_example({**ITEM, "status": "SENT_TO_BANK"}, "Council decision recorded."),
-        **COMMON_ERRORS,
-    },
-)
-async def council_decision(
-    application_id: int, data: CouncilDecisionDTO, db: DBDep, user: CurrentUserDep
-):
-    result = await CouncilService(db).decide(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Council decision recorded.")

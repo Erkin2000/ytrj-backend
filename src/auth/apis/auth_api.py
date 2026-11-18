@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query, Request
 from src.account.schemas.user_schema import UserProfileUpdateDTO
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
+    EimzoLoginDTO,
     LoginDTO,
     RefreshTokenRequestDTO,
     SSOCallbackDTO,
@@ -12,9 +13,15 @@ from src.auth.schemas.auth_schema import (
     SSOSite,
 )
 from src.auth.services.auth_service import AuthService
+from src.auth.services.eimzo_service import EimzoService
 from src.common.dependencies import CurrentUserDep, DBDep
+from src.common.responses.exceptions import (
+    EimzoInvalidCodeException,
+    EimzoLoginNotAllowedException,
+    UserBlockedException,
+)
 from src.common.responses.response import ResponseBuilder
-from src.common.swagger.responses import COMMON_ERRORS, success_example
+from src.common.swagger.responses import COMMON_ERRORS, error_examples, success_example
 from src.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Авторизация и аутентификация"])
@@ -218,3 +225,51 @@ if settings.SSO_MOCK:
     async def sso_mock_login(data: SSOMockLoginDTO, db: DBDep, request: Request):
         tokens = await AuthService(db).sso_mock_login(data, *_client_meta(request))
         return ResponseBuilder.success(data=tokens, message="Logged in via mock YIA SSO.")
+
+
+# ---------- E-IMZO (вход члена Совета) ----------
+
+
+@router.get(
+    "/eimzo/config",
+    summary="E-IMZO: параметры страницы-моста для фронтенда",
+    description=(
+        "Фронтенд открывает `bridge_url?client_id=…&origin=…&state=…` во всплывающем окне "
+        "(`window.open`, без `noopener`), ждёт `postMessage` только от `bridge_origin` и "
+        "передаёт полученный `code` в `POST /auth/eimzo/login` или в подписание бюллетеня. "
+        "При `mock=true` вместо моста используется code `mock-<ПИНФЛ>`."
+    ),
+    responses={
+        200: success_example(
+            {
+                "bridge_url": "https://e-yoshlar.uz/eimzo-bridge",
+                "bridge_origin": "https://e-yoshlar.uz",
+                "client_id": "yoshlarfondi",
+                "mock": False,
+            },
+            message="E-IMZO config retrieved.",
+        ),
+    },
+)
+async def eimzo_config():
+    return ResponseBuilder.success(data=EimzoService.config(), message="E-IMZO config retrieved.")
+
+
+@router.post(
+    "/eimzo/login",
+    summary="E-IMZO: вход члена Совета ключом ЭЦП (обмен code на токены)",
+    description=(
+        "Единственный способ входа для роли «Член Совета»: вход через YIA Portal и по паролю "
+        "для неё закрыт (403 `council_login_via_eimzo`). Пользователь ищется по ПИНФЛ "
+        "сертификата и должен быть заранее заведён Super Admin с ролью «Член Совета»."
+    ),
+    responses={
+        200: LOGIN_EXAMPLE,
+        **COMMON_ERRORS,
+        400: error_examples(EimzoInvalidCodeException),
+        403: error_examples(EimzoLoginNotAllowedException, UserBlockedException),
+    },
+)
+async def eimzo_login(data: EimzoLoginDTO, db: DBDep, request: Request):
+    tokens = await AuthService(db).eimzo_login(data.code, *_client_meta(request))
+    return ResponseBuilder.success(data=tokens, message="Logged in via E-IMZO.")

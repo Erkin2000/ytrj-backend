@@ -6,6 +6,7 @@ import shutil
 import struct
 import zlib
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -134,6 +135,7 @@ class Api:
         self.application_ids: list[int] = []
         self.product_ids: list[int] = []
         self.category_ids: list[int] = []
+        self.bulletin_ids: list[int] = []
 
     @staticmethod
     def fresh_pinfl() -> str:
@@ -170,12 +172,61 @@ class Api:
         self.remember_user(me["id"])
         return {**login, "headers": headers}, me
 
-    def staff(self, **body):
+    def eimzo_login(self, pinfl: str):
+        """Вход члена Совета ключом E-IMZO (EIMZO_MOCK: code = mock-<ПИНФЛ>)."""
+        r = self.client.post("/api/v1/auth/eimzo/login", json={"code": f"mock-{pinfl}"})
+        assert r.status_code == 200, r.text
+        headers = bearer(data(r)["access_token"])
+        me = data(self.client.get("/api/v1/auth/me", headers=headers))
+        return headers, me
+
+    def staff(self, eimzo: bool = False, **body):
+        """Сотрудник, заведённый Super Admin; eimzo=True — член Совета (вход ключом E-IMZO)."""
         pinfl = self.fresh_pinfl()
         r = self.create_user(pinfl=pinfl, **body)
         assert r.status_code == 201, r.text
+        if eimzo:
+            return self.eimzo_login(pinfl)
         login, me = self.sso_login(pinfl)
         return login["headers"], me
+
+    # ---------- бюллетени ----------
+
+    @staticmethod
+    def iso(delta: timedelta) -> str:
+        return (datetime.now(UTC) + delta).isoformat()
+
+    def create_bulletin(self, headers, *, file=None, **fields):
+        form = {
+            "name": "TEST Бюллетень",
+            "description": "TEST описание бюллетеня",
+            "status": "PUBLISHED",
+            "deadline_at": self.iso(timedelta(days=7)),
+        }
+        form.update({key: str(value) for key, value in fields.items() if value is not None})
+        r = self.client.post(
+            "/api/v1/fund/bulletins", headers=headers, data=form, files=file or None
+        )
+        if r.status_code == 201:
+            self.bulletin_ids.append(data(r)["id"])
+        return r
+
+    def bulletin(self, headers, **fields):
+        r = self.create_bulletin(headers, **fields)
+        assert r.status_code == 201, r.text
+        return data(r)
+
+    def sign(self, headers, bulletin_id: int, pinfl: str, decision: str = "AGREE", **extra):
+        """Открыть бюллетень (и файл) и подписать ключом E-IMZO (mock)."""
+        opened = data(self.client.get(f"/api/v1/council/bulletins/{bulletin_id}", headers=headers))
+        if opened["has_file"]:
+            r = self.client.get(f"/api/v1/council/bulletins/{bulletin_id}/file", headers=headers)
+            assert r.status_code == 200, r.text
+        return self.client.post(
+            f"/api/v1/council/bulletins/{bulletin_id}/sign",
+            headers=headers,
+            json={"decision": decision, "code": f"mock-{pinfl}", **extra},
+        )
 
     def category(self, headers, active=True):
         r = self.client.post(
@@ -364,6 +415,16 @@ class Api:
     def cleanup(self) -> None:
         async def run(session):
             if self.application_ids:
+                rows = await session.execute(
+                    text("SELECT id FROM bulletins WHERE application_id = ANY(:ids)"),
+                    {"ids": self.application_ids},
+                )
+                self.bulletin_ids.extend(row[0] for row in rows)
+            if self.bulletin_ids:
+                await session.execute(
+                    text("DELETE FROM bulletins WHERE id = ANY(:ids)"), {"ids": self.bulletin_ids}
+                )
+            if self.application_ids:
                 await session.execute(
                     text("DELETE FROM applications WHERE id = ANY(:ids)"),
                     {"ids": self.application_ids},
@@ -391,6 +452,10 @@ class Api:
         db_run(run)
         for application_id in self.application_ids:
             folder = Path(settings.MEDIA_PATH) / "applications" / str(application_id)
+            if folder.is_dir():
+                shutil.rmtree(folder)
+        for bulletin_id in self.bulletin_ids:
+            folder = Path(settings.MEDIA_PATH) / "bulletins" / str(bulletin_id)
             if folder.is_dir():
                 shutil.rmtree(folder)
 

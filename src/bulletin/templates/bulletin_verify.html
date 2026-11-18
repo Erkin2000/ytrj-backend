@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{{ t.title }}{% if doc and doc.number %} · {{ doc.number }}{% endif %}</title>
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #ffffff; --text: #1b2430; --muted: #5d6b7a; --line: #e3e8ee;
+      --ok: #0f7b3e; --ok-bg: #e3f5ea; --bad: #b3261e; --bad-bg: #fbe7e5;
+      --warn: #8a5a00; --warn-bg: #fdf1d6; --accent: #1f5fbf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11161c; --card: #1a2129; --text: #e6ebf0; --muted: #9aa7b4; --line: #2a333d;
+        --ok: #6fd69a; --ok-bg: #173a27; --bad: #ff8a80; --bad-bg: #3d1d1b;
+        --warn: #f2c464; --warn-bg: #3a2f14; --accent: #7fb0ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    header h1 { font-size: 18px; margin: 0; }
+    header a { color: var(--accent); text-decoration: none; font-size: 14px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 20px; margin-top: 16px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px;
+      border-radius: 10px; font-weight: 600; font-size: 16px;
+    }
+    .badge.ok { color: var(--ok); background: var(--ok-bg); }
+    .badge.bad { color: var(--bad); background: var(--bad-bg); }
+    .type { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+    h2 { font-size: 20px; margin: 6px 0 12px; overflow-wrap: anywhere; }
+    h3 { font-size: 15px; margin: 0 0 12px; }
+    dl { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 8px 16px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    .desc { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+    .hash { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    ul.signers { list-style: none; margin: 0; padding: 0; }
+    ul.signers li {
+      display: flex; justify-content: space-between; gap: 12px; padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+    ul.signers li:first-child { border-top: 0; }
+    .pill { font-size: 13px; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+    .pill.ok { color: var(--ok); background: var(--ok-bg); }
+    .pill.wait { color: var(--warn); background: var(--warn-bg); }
+    .muted { color: var(--muted); }
+    @media (max-width: 480px) { dl { grid-template-columns: 1fr; gap: 2px; } dd { margin-bottom: 8px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>{{ t.title }}</h1>
+    <a href="?lang={{ other_lang }}">{{ "Русский" if other_lang == "ru" else "Oʻzbekcha" }}</a>
+  </header>
+
+  {% if not doc %}
+  <section class="card">
+    <span class="badge bad">✕ {{ t.not_found }}</span>
+    <p class="muted">{{ t.not_found_text }}</p>
+  </section>
+  {% else %}
+  <section class="card">
+    {% if doc.validity == "VALID" %}
+      <span class="badge ok">✓ {{ t.valid }}</span>
+    {% else %}
+      <span class="badge bad">✕ {{ t.cancelled }}</span>
+    {% endif %}
+    <p class="type">{{ t.document_type }}</p>
+    <h2>{{ doc.name }}</h2>
+    <dl>
+      <dt>{{ t.number }}</dt><dd>{{ doc.number }}</dd>
+      <dt>{{ t.date }}</dt><dd>{{ doc.bulletin_date.strftime("%d.%m.%Y") }}</dd>
+      <dt>{{ t.status }}</dt><dd>{{ t.statuses[doc.status] }}</dd>
+      <dt>{{ t.progress }}</dt><dd>{{ doc.signed_count }} / {{ doc.total_count }}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h3>{{ t.description }}</h3>
+    <p class="desc">{{ doc.description }}</p>
+  </section>
+
+  <section class="card">
+    <h3>{{ t.file }}</h3>
+    {% if doc.file %}
+    <dl>
+      <dt>{{ t.file_name }}</dt><dd>{{ doc.file.name }}</dd>
+      <dt>{{ t.file_type }}</dt><dd>{{ "PDF" if doc.file.content_type == "application/pdf" else "DOCX" }}</dd>
+      <dt>{{ t.file_size }}</dt><dd>{{ human_size(doc.file.size) }}</dd>
+      <dt>{{ t.file_hash }}</dt><dd class="hash">{{ doc.file.sha256 }}</dd>
+    </dl>
+    {% else %}
+    <p class="muted">{{ t.no_file }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h3>{{ t.signers }}</h3>
+    {% if doc.signers %}
+    <ul class="signers">
+      {% for signer in doc.signers %}
+      <li>
+        <span>{{ signer.full_name or "—" }}</span>
+        {% if signer.signed %}
+          <span class="pill ok">✓ {{ t.signed }}</span>
+        {% else %}
+          <span class="pill wait">{{ t.not_signed }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">{{ t.no_signers }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</main>
+</body>
+</html>

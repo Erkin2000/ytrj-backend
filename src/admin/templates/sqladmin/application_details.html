@@ -242,6 +242,25 @@
   {% endif %}
 
   <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("Бюллетени Совета") }}</h3></div>
+    {% if a.admin_bulletins %}
+    <div class="list-group list-group-flush">
+      {% for bl in a.admin_bulletins %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('admin:details', identity='bulletin-orm', pk=bl.id) }}">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">{{ bl.number }} · {{ bl.name }}</div>
+          <div>{{ bulletin_status_badge(bl.status) }}</div>
+        </div>
+        <div class="text-muted small">{{ _("Срок подписания") }}: {{ fmt_dt(bl.deadline_at) }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Бюллетеней по заявке нет.") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="card mt-3">
     <div class="card-header"><h3 class="card-title">{{ _("Решения Совета") }}</h3></div>
     {% if a.council_assignments %}
     <div class="list-group list-group-flush">

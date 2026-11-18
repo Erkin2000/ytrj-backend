@@ -81,6 +81,27 @@ class Settings(BaseSettings):
     # Сколько живёт подписанный state между authorize и callback.
     SSO_STATE_TTL_SECONDS: int = 600
 
+    # ---------- E-IMZO (ЭЦП) через мост YIA Portal (eimzo_api.md) ----------
+    # Член Совета входит и подписывает бюллетени только ключом E-IMZO: фронт открывает
+    # EIMZO_BRIDGE_URL во всплывающем окне, получает одноразовый code (60 c) и передаёт
+    # его backend, который меняет code на данные сертификата (ПИНФЛ, Ф.И.О., серийный номер).
+    # EIMZO_MOCK=True — без внешних вызовов: code вида `mock-<ПИНФЛ>`.
+    EIMZO_MOCK: bool = True
+    EIMZO_API_URL: str = ""
+    EIMZO_BRIDGE_URL: str = "https://e-yoshlar.uz/eimzo-bridge"
+    EIMZO_BRIDGE_ORIGIN: str = "https://e-yoshlar.uz"
+    EIMZO_CLIENT_ID: str = ""
+    EIMZO_CLIENT_SECRET: str = ""
+    EIMZO_TIMEOUT_SECONDS: float = 10.0
+
+    # ---------- бюллетени Совета ----------
+    # Адрес страницы проверки, на который ведёт QR-код: <BULLETIN_VERIFY_BASE_URL>/<public_id>.
+    # По умолчанию — встроенная страница backend (GET /bulletins/verify/{public_id}).
+    BULLETIN_VERIFY_BASE_URL: str = "http://127.0.0.1:8000/bulletins/verify"
+    # Фоновая публикация отложенных (PENDING) бюллетеней в дату отправки.
+    BULLETIN_SCHEDULER_ENABLED: bool = True
+    BULLETIN_SCHEDULER_INTERVAL_SECONDS: int = 30
+
     # Режим скоринга KATM, пока нет реальной интеграции:
     #   auto_pass       — каждая отправленная заявка проходит скоринг;
     #   auto_fail       — каждая заявка не проходит;

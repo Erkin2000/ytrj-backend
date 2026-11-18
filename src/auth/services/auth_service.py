@@ -12,6 +12,7 @@ from src.account.schemas.user_schema import (
 )
 from src.auth.schemas.auth_schema import (
     ChangePasswordDTO,
+    EimzoCertificateDTO,
     LoginDTO,
     LoginTokensDTO,
     RefreshTokenCreateDTO,
@@ -22,11 +23,14 @@ from src.auth.schemas.auth_schema import (
     SSOSite,
     TokenPairDTO,
 )
+from src.auth.services.eimzo_service import EimzoService
 from src.auth.services.password_service import hash_password, verify_password
 from src.auth.services.sso_service import YiaSSOService
 from src.auth.services.token_service import TokenService
 from src.common.responses.exceptions import (
     ApplicantLoginViaSSOException,
+    CouncilLoginViaEimzoException,
+    EimzoLoginNotAllowedException,
     ExpiredRefreshTokenException,
     InvalidCredentialsException,
     InvalidCurrentPasswordException,
@@ -48,6 +52,7 @@ logger = logging.getLogger(__name__)
 class AuthService(BaseService):
     token_service = TokenService()
     sso_service = YiaSSOService()
+    eimzo_service = EimzoService()
 
     # ---------- токены ----------
 
@@ -103,6 +108,9 @@ class AuthService(BaseService):
         # Заявители входят только через YIA SSO; пароль — для внутренних ролей.
         if self._is_applicant(user):
             raise ApplicantLoginViaSSOException()
+        # Член Совета входит только ключом E-IMZO.
+        if self._is_council_member(user):
+            raise CouncilLoginViaEimzoException()
 
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
@@ -126,6 +134,10 @@ class AuthService(BaseService):
     @staticmethod
     def _is_applicant(user: UserORM) -> bool:
         return user.role is not None and user.role.code == RoleCode.APPLICANT
+
+    @staticmethod
+    def _is_council_member(user: UserORM) -> bool:
+        return user.role is not None and user.role.code == RoleCode.COUNCIL_MEMBER
 
     async def refresh_tokens(
         self,
@@ -268,10 +280,41 @@ class AuthService(BaseService):
         # сотрудник (Фонд, банк, Совет) заранее заведён Super Admin по ПИНФЛ.
         user = await self._find_or_create_sso_user(profile)
 
+        # Член Совета входит только ключом E-IMZO (POST /auth/eimzo/login).
+        if self._is_council_member(user):
+            await self.db.rollback()
+            raise CouncilLoginViaEimzoException()
+
         if user.status != UserStatus.ACTIVE:
             raise UserBlockedException()
 
         return await self._complete_login(user, user_agent, ip_address)
+
+    # ---------- E-IMZO ----------
+
+    async def eimzo_login(
+        self,
+        code: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> LoginTokensDTO:
+        """Вход члена Совета ключом E-IMZO: code моста меняется на сертификат,
+        пользователь ищется по ПИНФЛ сертификата. Учётную запись заранее заводит
+        Super Admin с ролью «Член Совета» и ПИНФЛ; автоматически никто не создаётся."""
+        certificate = await self.eimzo_service.verify_code(code)
+        user = await self._find_eimzo_user(certificate)
+
+        if user.status != UserStatus.ACTIVE:
+            raise UserBlockedException()
+
+        return await self._complete_login(user, user_agent, ip_address)
+
+    async def _find_eimzo_user(self, certificate: EimzoCertificateDTO) -> UserORM:
+        user = await self.db.user.get_orm_by_pinfl(certificate.pinfl)
+        if user is None or not self._is_council_member(user):
+            logger.info("E-IMZO sign-in refused: no council member with this PINFL")
+            raise EimzoLoginNotAllowedException()
+        return user
 
     async def _find_or_create_sso_user(self, profile: SSOProfileDTO) -> UserORM:
         """Определяет существующий профиль по sub портала, затем по ПИНФЛ

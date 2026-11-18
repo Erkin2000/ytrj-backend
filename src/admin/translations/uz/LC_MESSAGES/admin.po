@@ -1117,3 +1117,164 @@ msgstr "Variantlar"
 
 msgid "Показывать, если"
 msgstr "Koʻrsatish sharti:"
+
+# ===================== Kengash byulletenlari =====================
+
+msgid "Бюллетени Совета"
+msgstr "Kengash byulletenlari"
+
+msgid "просрочен"
+msgstr "muddati oʻtgan"
+
+msgid "Бюллетень"
+msgstr "Byulleten"
+
+msgid "Бюллетени"
+msgstr "Byulletenlar"
+
+msgid "Не выбран бюллетень"
+msgstr "Byulleten tanlanmagan"
+
+msgid "Отправить сейчас"
+msgstr "Hozir yuborish"
+
+msgid "Отправить бюллетень всем активным членам Совета сейчас?"
+msgstr "Byulleten hozir barcha faol Kengash aʼzolariga yuborilsinmi?"
+
+msgid "Аннулировать"
+msgstr "Bekor qilish"
+
+msgid "Аннулировать бюллетень? Подписи сохранятся, страница проверки по QR покажет «Аннулирован», заявка без итогового решения вернётся Фонду."
+msgstr "Byulleten bekor qilinsinmi? Imzolar saqlanadi, QR orqali tekshirish sahifasi «Bekor qilingan» deb koʻrsatadi, yakuniy qarorsiz ariza Jamgʻarmaga qaytadi."
+
+msgid "Подпись бюллетеня"
+msgstr "Byulleten imzosi"
+
+msgid "Подписи членов Совета"
+msgstr "Kengash aʼzolarining imzolari"
+
+msgid "Файл бюллетеня"
+msgstr "Byulleten fayli"
+
+msgid "Срок подписания прошёл"
+msgstr "Imzolash muddati oʻtgan"
+
+msgid "Отправка"
+msgstr "Yuborish"
+
+msgid "Отправлен"
+msgstr "Yuborilgan"
+
+msgid "Срок подписания"
+msgstr "Imzolash muddati"
+
+msgid "Подписан всеми"
+msgstr "Hamma imzolagan"
+
+msgid "Аннулирован"
+msgstr "Bekor qilingan"
+
+msgid "Бюллетени создаёт и редактирует Фонд через API: /api/v1/fund/bulletins."
+msgstr "Byulletenlarni Jamgʻarma API orqali yaratadi va tahrirlaydi: /api/v1/fund/bulletins."
+
+msgid "Согласен"
+msgstr "Roziman"
+
+msgid "Против"
+msgstr "Qarshiman"
+
+msgid "Не подписали"
+msgstr "Imzolamaganlar"
+
+msgid "Подписали"
+msgstr "Imzolaganlar"
+
+msgid "Подписал"
+msgstr "Imzolagan"
+
+msgid "Сертификат"
+msgstr "Sertifikat"
+
+msgid "Открыл"
+msgstr "Ochgan"
+
+msgid "файл"
+msgstr "fayl"
+
+msgid "до"
+msgstr "gacha"
+
+msgid "Получатели определяются при отправке: все активные члены Совета с ПИНФЛ."
+msgstr "Qabul qiluvchilar yuborishda aniqlanadi: JShShIRga ega barcha faol Kengash aʼzolari."
+
+msgid "Не связан с заявкой"
+msgstr "Arizaga bogʻlanmagan"
+
+msgid "QR-код проверки"
+msgstr "Tekshirish QR kodi"
+
+msgid "Скачать QR (SVG)"
+msgstr "QR ni yuklab olish (SVG)"
+
+msgid "Бюллетени ждут подписей"
+msgstr "Imzo kutayotgan byulletenlar"
+
+msgid "Бюллетени с просроченным сроком"
+msgstr "Muddati oʻtgan byulletenlar"
+
+msgid "Бюллетени ожидают отправки"
+msgstr "Yuborilishini kutayotgan byulletenlar"
+
+msgid "Бюллетеней по заявке нет."
+msgstr "Ariza boʻyicha byulletenlar yoʻq."
+
+msgid "Подписи"
+msgstr "Imzolar"
+
+msgid "Направлен"
+msgstr "Yuborilgan"
+
+msgid "Открыл файл"
+msgstr "Faylni ochgan"
+
+msgid "Владелец сертификата"
+msgstr "Sertifikat egasi"
+
+msgid "ПИНФЛ сертификата"
+msgstr "Sertifikatdagi JShShIR"
+
+msgid "Серийный номер сертификата"
+msgstr "Sertifikat seriya raqami"
+
+msgid "Сертификат действует с"
+msgstr "Sertifikat amal qilish boshlanishi"
+
+msgid "Сертификат действует до"
+msgstr "Sertifikat amal qilish muddati"
+
+msgid "ID запроса E-IMZO"
+msgstr "E-IMZO soʻrov ID si"
+
+msgid "SHA-256 подписанного содержимого"
+msgstr "Imzolangan mazmunning SHA-256 xeshi"
+
+msgid "Ожидает отправки"
+msgstr "Yuborilishini kutmoqda"
+
+msgid "Отправлен Совету"
+msgstr "Kengashga yuborilgan"
+
+msgid "Подписан частично"
+msgstr "Qisman imzolangan"
+
+msgid "Не открывал"
+msgstr "Ochmagan"
+
+msgid "Просмотрел"
+msgstr "Koʻrgan"
+
+msgid "Просрочил"
+msgstr "Muddatini oʻtkazgan"
+
+msgid "Возвращена Фонду из Совета"
+msgstr "Kengashdan Jamgʻarmaga qaytarilgan"

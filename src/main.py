@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -18,6 +19,8 @@ from src.application.apis import (
     fund_api,
 )
 from src.auth.apis import auth_api, redirect_api, sso_web_api
+from src.bulletin.apis import council_bulletin_api, fund_bulletin_api, verify_api
+from src.bulletin.services.scheduler import bulletin_scheduler
 from src.common.logging_config import configure_logging
 from src.common.responses.handlers import register_exception_handlers
 from src.common.responses.validation_handler import validation_exception_handler
@@ -32,11 +35,12 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 
 Модульный монолит на FastAPI. Текущие модули:
 
-- **auth** — вход через YIA Portal (SSO) и по паролю, JWT access/refresh с ротацией, сессии;
+- **auth** — вход через YIA Portal (SSO), по паролю и ключом E-IMZO (члены Совета), JWT access/refresh с ротацией, сессии;
 - **rbac** — роли и права по модулям (Create / Read / Update / Delete / Approve), серверная проверка;
 - **account** — пользователи, статусы, scope (банк), последний вход и сессии;
 - **product** — продукты Фонда: названия, банки, сроки приёма, этапы и поля анкеты;
-- **application** — заявки по продуктам: черновик → скоринг KATM → Фонд → Совет → банк → завершение.
+- **application** — заявки по продуктам: черновик → скоринг KATM → Фонд → Совет → банк → завершение;
+- **bulletin** — бюллетени Совета: отправка членам Совета, подпись ЭЦП (E-IMZO), проверка по QR.
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
@@ -47,7 +51,7 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 TAGS_METADATA = [
     {
         "name": "Авторизация и аутентификация",
-        "description": "YIA Portal SSO, логин/пароль, refresh, профиль.",
+        "description": "YIA Portal SSO, E-IMZO (члены Совета), логин/пароль, refresh, профиль.",
     },
     {
         "name": "Пользователи",
@@ -76,7 +80,10 @@ TAGS_METADATA = [
         "name": "Заявки: рабочее окно Фонда",
         "description": "Поиск, скоринг, отказ или направление в Совет.",
     },
-    {"name": "Заявки: рабочее окно Совета", "description": "Решение по направленным заявкам."},
+    {
+        "name": "Заявки: рабочее окно Совета",
+        "description": "Просмотр направленных заявок; решение — подписью бюллетеня.",
+    },
     {
         "name": "Заявки: рабочее окно банка",
         "description": "Приём и результат по утверждённым Советом заявкам своего банка.",
@@ -85,7 +92,27 @@ TAGS_METADATA = [
         "name": "Заявки: Super Admin",
         "description": "Полное удаление заявки со всеми данными и файлами.",
     },
+    {
+        "name": "Бюллетени: рабочее окно Фонда",
+        "description": "Создание, отправка членам Совета, статус подписания, QR-код, аннулирование.",
+    },
+    {
+        "name": "Бюллетени: рабочее окно Совета",
+        "description": "Мои бюллетени, календарь, просмотр и подпись ключом E-IMZO.",
+    },
+    {
+        "name": "Бюллетени: проверка по QR",
+        "description": "Публичная проверка документа по QR-коду.",
+    },
 ]
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Фоновая отправка отложенных бюллетеней в дату отправки.
+    async with bulletin_scheduler():
+        yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -94,6 +121,7 @@ app = FastAPI(
     openapi_tags=TAGS_METADATA,
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -187,9 +215,14 @@ app.include_router(fund_api.router, prefix=API_PREFIX)
 app.include_router(council_api.router, prefix=API_PREFIX)
 app.include_router(admin_application_api.router, prefix=API_PREFIX)
 app.include_router(bank_stage_api.router, prefix=API_PREFIX)
+app.include_router(fund_bulletin_api.router, prefix=API_PREFIX)
+app.include_router(council_bulletin_api.router, prefix=API_PREFIX)
+app.include_router(verify_api.api_router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)
 app.include_router(sso_web_api.router)
+# Страница проверки бюллетеня по QR (вне /api/v1, без OpenAPI)
+app.include_router(verify_api.web_router)
 
 setup_admin(app)
 

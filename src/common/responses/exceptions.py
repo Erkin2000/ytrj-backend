@@ -336,7 +336,10 @@ class CouncilDecisionAlreadyMadeException(BadRequestException):
 
 
 class NoCouncilMembersException(BadRequestException):
-    message = "No active council members to assign"
+    message = (
+        "No active council members with the decision right and a PINFL (needed for E-IMZO) "
+        "to send the bulletin to"
+    )
 
 
 # ---------- продукты ----------
@@ -502,3 +505,84 @@ class ApplicantProfileIncompleteException(BadRequestException):
                 self.missing
             )
         super().__init__(message)
+
+
+# ---------- E-IMZO (ЭЦП) ----------
+
+
+class EimzoException(UnauthorizedException):
+    code = "eimzo_failed"
+    message = "E-IMZO verification failed. Please try again."
+
+
+class EimzoInvalidCodeException(BadRequestException):
+    code = "eimzo_invalid_code"
+    field = "code"
+    message = "E-IMZO code is invalid, expired or already used. Sign with the key again."
+
+
+class EimzoLoginNotAllowedException(ForbiddenException):
+    code = "eimzo_login_not_allowed"
+    message = "E-IMZO sign-in is available only for council members registered by the Super Admin"
+
+
+class CouncilLoginViaEimzoException(ForbiddenException):
+    code = "council_login_via_eimzo"
+    message = "Council members sign in only with an E-IMZO key"
+
+
+class EimzoSignerMismatchException(ForbiddenException):
+    code = "eimzo_signer_mismatch"
+    message = "The E-IMZO key belongs to another person: sign with your own key"
+
+
+# ---------- бюллетени Совета ----------
+
+
+class BulletinNotFoundException(NotFoundException):
+    message = "Bulletin not found"
+
+
+class BulletinFileNotFoundException(NotFoundException):
+    message = "Bulletin has no attached file"
+
+
+class BulletinNotEditableException(BadRequestException):
+    message = (
+        "Only a pending bulletin can be changed; after sending only the signing deadline "
+        "can be extended"
+    )
+
+
+class BulletinStatusException(BadRequestException):
+    message = "This action is not available in the current bulletin status"
+
+
+class BulletinScheduleException(BadRequestException):
+    message = "Invalid bulletin dates"
+    field = "deadline_at"
+
+
+class BulletinApplicationException(BadRequestException):
+    message = "Only an application under Fund review can be attached to a bulletin"
+    field = "application_id"
+
+
+class BulletinNotViewedException(BadRequestException):
+    message = "Open the bulletin before signing"
+
+
+class BulletinFileNotViewedException(BadRequestException):
+    message = "Open the attached file before signing"
+
+
+class BulletinAlreadySignedException(BadRequestException):
+    message = "You have already signed this bulletin"
+
+
+class BulletinDeadlinePassedException(BadRequestException):
+    message = "The signing deadline has passed"
+
+
+class BulletinNotOpenForSigningException(BadRequestException):
+    message = "The bulletin is not open for signing"

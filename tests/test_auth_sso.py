@@ -43,8 +43,8 @@ def test_redirect_from_backend_passes_portal_params(client, monkeypatch):
 
 def test_sso_callback_returns_tokens(api, role_ids, portal):
     pinfl = api.fresh_pinfl()
-    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"]))["id"]
-    portal["profile"] = {"sub": f"sub-{pinfl}", "full_name": "TEST Council", "pinfl": pinfl}
+    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"]))["id"]
+    portal["profile"] = {"sub": f"sub-{pinfl}", "full_name": "TEST Fund", "pinfl": pinfl}
 
     state = data(api.client.get("/api/v1/auth/sso/authorize"))["state"]
     r = api.client.post("/api/v1/auth/sso/callback", json={"code": "CODE1", "state": state})
@@ -72,7 +72,7 @@ def test_sso_callback_rejects_forged_state_and_portal_error(client, portal):
 
 def test_blocked_staff_cannot_sign_in(api, role_ids, portal):
     pinfl = api.fresh_pinfl()
-    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"]))["id"]
+    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"]))["id"]
     api.client.post(
         f"/api/v1/users/{staff_id}/status", headers=api.superadmin, json={"status": "BLOCKED"}
     )
@@ -99,21 +99,21 @@ def test_ticket_exchange_endpoint_removed(client):
 
 def test_staff_created_by_pinfl_signs_in_via_sso(api, role_ids):
     pinfl = api.fresh_pinfl()
-    r = api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"], full_name="TEST Council")
+    r = api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"], full_name="TEST Fund")
     assert r.status_code == 201, r.text
     staff_id = data(r)["id"]
 
     login, me = api.sso_login(pinfl)
     assert set(login) - {"headers"} == TOKEN_FIELDS
     assert me["id"] == staff_id
-    assert me["role"]["code"] == "COUNCIL_MEMBER"
+    assert me["role"]["code"] == "FUND_OPERATOR"
 
     stored = db_all(select(UserORM.sso_sub).where(UserORM.id == staff_id))
     assert stored[0][0] == f"mock-{pinfl}"
 
 
 def test_staff_without_password_cannot_use_password_login(api, role_ids):
-    r = api.create_user(role_id=role_ids["COUNCIL_MEMBER"])
+    r = api.create_user(role_id=role_ids["FUND_OPERATOR"])
     assert r.status_code == 201
     login = api.client.post(
         "/api/v1/auth/login", json={"username": data(r)["username"], "password": "whatever123"}
@@ -123,8 +123,8 @@ def test_staff_without_password_cannot_use_password_login(api, role_ids):
 
 def test_pinfl_must_be_unique(api, role_ids):
     pinfl = api.fresh_pinfl()
-    assert api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"]).status_code == 201
-    dup = api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"])
+    assert api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"]).status_code == 201
+    dup = api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"])
     assert dup.status_code == 409
     assert dup.json()["code"] == "pinfl_already_exists"
 
@@ -133,14 +133,14 @@ def test_staff_needs_pinfl_or_password(api, role_ids):
     r = api.client.post(
         "/api/v1/users",
         headers=api.superadmin,
-        json={"username": api.username(), "role_id": role_ids["COUNCIL_MEMBER"]},
+        json={"username": api.username(), "role_id": role_ids["FUND_OPERATOR"]},
     )
     assert r.status_code == 422
 
 
 def test_pinfl_change_unlinks_sso(api, role_ids):
     pinfl = api.fresh_pinfl()
-    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"]))["id"]
+    staff_id = data(api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"]))["id"]
     api.sso_login(pinfl)
 
     new_pinfl = api.fresh_pinfl()
@@ -252,7 +252,7 @@ def test_redirect_from_backend_returns_to_front_of_site(client, sites):
 
 def test_callback_exchanges_code_with_client_of_site(api, role_ids, sites, portal):
     pinfl = api.fresh_pinfl()
-    api.create_user(pinfl=pinfl, role_id=role_ids["COUNCIL_MEMBER"])
+    api.create_user(pinfl=pinfl, role_id=role_ids["FUND_OPERATOR"])
     portal["profile"] = {"sub": f"sub-{pinfl}", "full_name": "TEST", "pinfl": pinfl}
 
     for site, client_id in (("admin", "admin-client"), ("yoshlarfondi", "main-client")):

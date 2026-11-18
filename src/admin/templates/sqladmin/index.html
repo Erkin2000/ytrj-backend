@@ -81,6 +81,19 @@
         <span><i class="fa-solid fa-paper-plane text-indigo me-2"></i>{{ _("Новые для банков") }}</span>
         <span class="badge bg-indigo">{{ needs_attention.new_for_bank }}</span>
       </a>
+      {% set bulletins_url = url_for('admin:list', identity='bulletin-orm') %}
+      <a class="list-group-item d-flex justify-content-between" href="{{ bulletins_url }}?status=PUBLISHED">
+        <span><i class="fa-solid fa-file-signature text-orange me-2"></i>{{ _("Бюллетени ждут подписей") }}</span>
+        <span class="badge bg-orange">{{ needs_attention.bulletins_signing }}</span>
+      </a>
+      <a class="list-group-item d-flex justify-content-between" href="{{ bulletins_url }}">
+        <span><i class="fa-solid fa-clock text-red me-2"></i>{{ _("Бюллетени с просроченным сроком") }}</span>
+        <span class="badge bg-red">{{ needs_attention.bulletins_overdue }}</span>
+      </a>
+      <a class="list-group-item d-flex justify-content-between" href="{{ bulletins_url }}?status=PENDING">
+        <span><i class="fa-solid fa-hourglass-half text-secondary me-2"></i>{{ _("Бюллетени ожидают отправки") }}</span>
+        <span class="badge bg-secondary">{{ needs_attention.bulletins_pending }}</span>
+      </a>
     </div>
   </div>
 

@@ -922,3 +922,164 @@ msgstr "Options"
 
 msgid "Показывать, если"
 msgstr "Shown when"
+
+# ===================== Council bulletins =====================
+
+msgid "Бюллетени Совета"
+msgstr "Council bulletins"
+
+msgid "просрочен"
+msgstr "overdue"
+
+msgid "Бюллетень"
+msgstr "Bulletin"
+
+msgid "Бюллетени"
+msgstr "Bulletins"
+
+msgid "Не выбран бюллетень"
+msgstr "No bulletin selected"
+
+msgid "Отправить сейчас"
+msgstr "Send now"
+
+msgid "Отправить бюллетень всем активным членам Совета сейчас?"
+msgstr "Send the bulletin to all active council members now?"
+
+msgid "Аннулировать"
+msgstr "Cancel bulletin"
+
+msgid "Аннулировать бюллетень? Подписи сохранятся, страница проверки по QR покажет «Аннулирован», заявка без итогового решения вернётся Фонду."
+msgstr "Cancel the bulletin? Signatures are kept, the QR verification page will show “Cancelled”, and an application without a final decision returns to the Fund."
+
+msgid "Подпись бюллетеня"
+msgstr "Bulletin signature"
+
+msgid "Подписи членов Совета"
+msgstr "Council member signatures"
+
+msgid "Файл бюллетеня"
+msgstr "Bulletin file"
+
+msgid "Срок подписания прошёл"
+msgstr "Signing deadline has passed"
+
+msgid "Отправка"
+msgstr "Send date"
+
+msgid "Отправлен"
+msgstr "Sent"
+
+msgid "Срок подписания"
+msgstr "Signing deadline"
+
+msgid "Подписан всеми"
+msgstr "Signed by all"
+
+msgid "Аннулирован"
+msgstr "Cancelled"
+
+msgid "Бюллетени создаёт и редактирует Фонд через API: /api/v1/fund/bulletins."
+msgstr "Bulletins are created and edited by the Fund via the API: /api/v1/fund/bulletins."
+
+msgid "Согласен"
+msgstr "Agree"
+
+msgid "Против"
+msgstr "Against"
+
+msgid "Не подписали"
+msgstr "Not signed"
+
+msgid "Подписали"
+msgstr "Signed"
+
+msgid "Подписал"
+msgstr "Signed"
+
+msgid "Сертификат"
+msgstr "Certificate"
+
+msgid "Открыл"
+msgstr "Opened"
+
+msgid "файл"
+msgstr "file"
+
+msgid "до"
+msgstr "until"
+
+msgid "Получатели определяются при отправке: все активные члены Совета с ПИНФЛ."
+msgstr "Recipients are fixed when the bulletin is sent: all active council members with a PINFL."
+
+msgid "Не связан с заявкой"
+msgstr "Not linked to an application"
+
+msgid "QR-код проверки"
+msgstr "Verification QR code"
+
+msgid "Скачать QR (SVG)"
+msgstr "Download QR (SVG)"
+
+msgid "Бюллетени ждут подписей"
+msgstr "Bulletins awaiting signatures"
+
+msgid "Бюллетени с просроченным сроком"
+msgstr "Bulletins past the deadline"
+
+msgid "Бюллетени ожидают отправки"
+msgstr "Bulletins waiting to be sent"
+
+msgid "Бюллетеней по заявке нет."
+msgstr "No bulletins for this application."
+
+msgid "Подписи"
+msgstr "Signatures"
+
+msgid "Направлен"
+msgstr "Sent"
+
+msgid "Открыл файл"
+msgstr "Opened file"
+
+msgid "Владелец сертификата"
+msgstr "Certificate holder"
+
+msgid "ПИНФЛ сертификата"
+msgstr "Certificate PINFL"
+
+msgid "Серийный номер сертификата"
+msgstr "Certificate serial number"
+
+msgid "Сертификат действует с"
+msgstr "Certificate valid from"
+
+msgid "Сертификат действует до"
+msgstr "Certificate valid to"
+
+msgid "ID запроса E-IMZO"
+msgstr "E-IMZO request ID"
+
+msgid "SHA-256 подписанного содержимого"
+msgstr "SHA-256 of signed content"
+
+msgid "Ожидает отправки"
+msgstr "Waiting to be sent"
+
+msgid "Отправлен Совету"
+msgstr "Sent to the council"
+
+msgid "Подписан частично"
+msgstr "Partially signed"
+
+msgid "Не открывал"
+msgstr "Not opened"
+
+msgid "Просмотрел"
+msgstr "Viewed"
+
+msgid "Просрочил"
+msgstr "Overdue"
+
+msgid "Возвращена Фонду из Совета"
+msgstr "Returned from the council to the Fund"

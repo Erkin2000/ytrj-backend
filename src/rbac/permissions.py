@@ -21,6 +21,7 @@ class Module(StrEnum):
     BANK_REVIEW = "bank_review"
     COUNCIL_REVIEW = "council_review"
     ALLOCATION = "allocation"
+    BULLETINS = "bulletins"
 
 
 class Action(StrEnum):
@@ -41,6 +42,7 @@ MODULE_NAMES: dict[Module, str] = {
     Module.BANK_REVIEW: "Этап банка",
     Module.COUNCIL_REVIEW: "Этап Совета",
     Module.ALLOCATION: "Выделение ресурсов",
+    Module.BULLETINS: "Бюллетени Совета",
 }
 
 ACTION_NAMES: dict[Action, str] = {
@@ -90,6 +92,11 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "allocation.create": ("Фиксация выделения ресурсов", "Внесение факта выделения ресурсов"),
     "allocation.read": ("Просмотр выделения ресурсов", "Просмотр этапа выделения"),
     "allocation.approve": ("Завершение заявки", "Перевод заявки в COMPLETED"),
+    "bulletins.create": ("Создание бюллетеней", "Новый бюллетень для членов Совета"),
+    "bulletins.read": ("Просмотр бюллетеней", "Все бюллетени и статус подписания"),
+    "bulletins.update": ("Изменение бюллетеней", "Данные, файл и срок подписания бюллетеня"),
+    "bulletins.delete": ("Удаление бюллетеней", "Удаление неотправленного бюллетеня"),
+    "bulletins.approve": ("Отправка бюллетеней", "Отправка членам Совета и аннулирование"),
 }
 
 
@@ -132,6 +139,11 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "allocation.create",
             "allocation.read",
             "allocation.approve",
+            "bulletins.create",
+            "bulletins.read",
+            "bulletins.update",
+            "bulletins.delete",
+            "bulletins.approve",
         ],
     ),
     RoleCode.BANK_EMPLOYEE: (

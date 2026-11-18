@@ -26,6 +26,7 @@ from src.application.models.resource_allocation_model import ResourceAllocationO
 from src.application.models.scoring_model import ScoringAttemptORM  # noqa: E402, F401
 from src.application.models.status_history_model import StatusHistoryORM  # noqa: E402, F401
 from src.auth.models.refresh_token_model import RefreshTokenORM  # noqa: E402, F401
+from src.bulletin.models.bulletin_model import BulletinORM, BulletinSignatureORM  # noqa: E402, F401
 from src.config import settings  # noqa: E402
 from src.database import Base  # noqa: E402
 from src.product.models.product_model import ProductORM  # noqa: E402, F401

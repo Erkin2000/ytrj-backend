@@ -48,6 +48,7 @@ from src.application.services.photo_storage import (
 )
 from src.application.services.purge_service import ApplicationPurgeService
 from src.auth.models.refresh_token_model import RefreshTokenORM
+from src.bulletin.models.bulletin_model import BulletinORM
 from src.database import async_session_maker
 from src.product.enums import ProductStatus
 from src.product.models.product_model import (
@@ -703,7 +704,17 @@ class ApplicationAdmin(LocalizedLabelsMixin, ModelView, model=ApplicationORM):
             selectinload(ApplicationORM.bank_decided_by),
             selectinload(ApplicationORM.sent_to_council_by),
         )
-        return await self._get_object_by_pk(stmt)
+        application = await self._get_object_by_pk(stmt)
+        if application is not None:
+            async with async_session_maker() as session:
+                application.admin_bulletins = list(
+                    await session.scalars(
+                        select(BulletinORM)
+                        .where(BulletinORM.application_id == application.id)
+                        .order_by(BulletinORM.id.desc())
+                    )
+                )
+        return application
 
 
 class StatusHistoryAdmin(LocalizedLabelsMixin, ModelView, model=StatusHistoryORM):

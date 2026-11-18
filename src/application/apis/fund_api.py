@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends
 from src.application.schemas.application_schema import (
     ApplicationFilterDTO,
     FundRejectDTO,
-    SendToCouncilDTO,
 )
 from src.application.services.fund_service import FundService
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
@@ -124,23 +123,7 @@ async def retry_scoring(application_id: int, db: DBDep, user: CurrentUserDep):
     return ResponseBuilder.success(data=data, message="Scoring restarted.")
 
 
-# ---------- Решение Фонда: Совет или отказ ----------
-
-
-@router.post(
-    "/{application_id}/send-to-council",
-    summary="Направить заявку в Совет (FUND_REVIEW → COUNCIL_REVIEW)",
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
-    responses={
-        200: success_example({**ITEM, "status": "COUNCIL_REVIEW"}, "Application sent to council."),
-        **COMMON_ERRORS,
-    },
-)
-async def send_to_council(
-    application_id: int, data: SendToCouncilDTO, db: DBDep, user: CurrentUserDep
-):
-    result = await FundService(db).send_to_council(application_id, user, data)
-    return ResponseBuilder.success(data=result, message="Application sent to council.")
+# ---------- Решение Фонда: отказ (в Совет — через бюллетень) ----------
 
 
 @router.post(

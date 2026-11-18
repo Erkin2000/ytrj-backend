@@ -101,3 +101,42 @@ class SSOMockLoginDTO(BaseModel):
         default=None,
         description="Стабильный идентификатор пользователя портала; по умолчанию mock-<pinfl>",
     )
+
+
+# ---------- E-IMZO (ЭЦП) ----------
+
+
+class EimzoLoginDTO(BaseModel):
+    code: str = Field(
+        min_length=1,
+        max_length=512,
+        description=(
+            "Одноразовый code из сообщения `eimzo:result` страницы-моста E-IMZO "
+            "(живёт 60 секунд). При `EIMZO_MOCK=true` — `mock-<ПИНФЛ>`."
+        ),
+        examples=["q8ZtR0b1Yc3X"],
+    )
+
+
+class EimzoConfigDTO(BaseModel):
+    """Что нужно фронтенду, чтобы открыть страницу-мост E-IMZO во всплывающем окне."""
+
+    bridge_url: str
+    bridge_origin: str
+    client_id: str
+    mock: bool
+
+
+class EimzoCertificateDTO(BaseModel):
+    """Данные сертификата, проверенные YIA Portal (POST /api/v1/eimzo/result)."""
+
+    pinfl: str
+    full_name: str | None = None
+    individual_tin: str | None = None
+    legal_entity_tin: str | None = None
+    organisation_name: str | None = None
+    position: str | None = None
+    serial_number: str | None = None
+    valid_from: str | None = None
+    valid_to: str | None = None
+    request_id: str | None = None

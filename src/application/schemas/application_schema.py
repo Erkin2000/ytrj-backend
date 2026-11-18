@@ -162,19 +162,6 @@ class FundRejectDTO(BaseModel):
     reason: ReasonStr = Field(description="Причина отказа Фонда (видна заявителю).")
 
 
-class SendToCouncilDTO(BaseModel):
-    council_member_ids: list[int] | None = Field(
-        default=None,
-        description="Кому направить. Пусто — всем активным членам Совета.",
-    )
-    comment: str | None = None
-
-
-class CouncilDecisionDTO(BaseModel):
-    decision: CouncilDecision
-    reason: ReasonStr | None = Field(default=None, description="Обязательна при «Отклоняю».")
-
-
 # ---------- ответы ----------
 
 

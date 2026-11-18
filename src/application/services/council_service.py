@@ -1,22 +1,11 @@
-"""Рабочее окно члена Совета: только направленные ему заявки и решение
-«Согласен» / «Отклоняю»."""
+"""Рабочее окно члена Совета: только направленные ему заявки. Решение по заявке
+член Совета выносит в бюллетене, связанном с ней (src/bulletin), — подписью ЭЦП."""
 
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus, CouncilDecision
-from src.application.mappers import ApplicationDataMapper
 from src.application.models.application_model import ApplicationORM
-from src.application.schemas.application_schema import (
-    ApplicationDetailDTO,
-    ApplicationFilterDTO,
-    CouncilDecisionDTO,
-)
+from src.application.schemas.application_schema import ApplicationFilterDTO
 from src.application.services.base import ApplicationBaseService, now
-from src.common.responses.exceptions import (
-    CouncilAssignmentNotFoundException,
-    CouncilDecisionAlreadyMadeException,
-    InvalidStatusTransitionException,
-    RejectReasonRequiredException,
-)
 
 
 class CouncilService(ApplicationBaseService):
@@ -59,63 +48,64 @@ class CouncilService(ApplicationBaseService):
             "rejected": by_status[ApplicationStatus.COUNCIL_REJECTED.value],
         }
 
-    async def decide(
+    async def apply_vote(
         self,
-        application_id: int,
+        application: ApplicationORM,
         user: CurrentUserDTO,
-        data: CouncilDecisionDTO,
-    ) -> ApplicationDetailDTO:
-        application = await self.get_for_user(application_id, user)
+        decision: CouncilDecision,
+        reason: str | None,
+        source: str,
+    ) -> None:
+        """Решение члена Совета по заявке — приходит из подписи бюллетеня, связанного
+        с заявкой (`source` — номер бюллетеня для истории). Коммит делает вызывающий.
 
-        if application.status != ApplicationStatus.COUNCIL_REVIEW:
-            raise InvalidStatusTransitionException("Application is not under council review")
-
+        Голос пишется в назначение члена Совета; если заявка ещё на рассмотрении
+        Совета, применяется правило итога (см. `_finalize_if_ready`)."""
         assignment = await self.db.council_assignment.get_orm_for_member(application.id, user.id)
-        if assignment is None:
-            raise CouncilAssignmentNotFoundException()
-        if assignment.decision is not None:
-            raise CouncilDecisionAlreadyMadeException()
-        if data.decision == CouncilDecision.REJECTED and not data.reason:
-            raise RejectReasonRequiredException()
+        if assignment is None or assignment.decision is not None:
+            return
 
-        assignment.decision = data.decision
-        assignment.reason = data.reason
+        assignment.decision = decision
+        assignment.reason = reason
         assignment.decided_at = now()
         await self.db.flush()
 
+        if application.status != ApplicationStatus.COUNCIL_REVIEW:
+            return
+
+        label = "Согласен" if decision == CouncilDecision.APPROVED else "Против"
         await self.add_history(
             application,
             to_status=application.status,
             event="council_vote",
             actor=user,
-            comment=f"Решение члена Совета: {'Согласен' if data.decision == CouncilDecision.APPROVED else 'Отклоняю'}"
-            + (f". Причина: {data.reason}" if data.reason else ""),
+            comment=f"Решение члена Совета по бюллетеню {source}: «{label}»"
+            + (f". Комментарий: {reason}" if reason else ""),
             from_status=application.status,
         )
 
-        await self._finalize_if_ready(application, user, data)
-
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
+        await self._finalize_if_ready(application, user, decision, reason, source)
 
     async def _finalize_if_ready(
         self,
         application: ApplicationORM,
         user: CurrentUserDTO,
-        data: CouncilDecisionDTO,
+        decision: CouncilDecision,
+        reason: str | None,
+        source: str,
     ) -> None:
         """Правило итога (кворум/большинство ещё не согласованы — см. архитектуру):
-        «Отклоняю» любого члена завершает заявку как COUNCIL_REJECTED;
+        «Против» любого члена завершает заявку как COUNCIL_REJECTED;
         «Согласен» всех назначенных — COUNCIL_APPROVED и отправка в банк заявителя."""
-        if data.decision == CouncilDecision.REJECTED:
+        if decision == CouncilDecision.REJECTED:
             application.council_decided_at = now()
-            application.council_reject_reason = data.reason
+            application.council_reject_reason = reason or f"Совет: «Против» (бюллетень {source})"
             await self.transition(
                 application,
                 ApplicationStatus.COUNCIL_REJECTED,
                 event="council_rejected",
                 actor=user,
-                comment=data.reason,
+                comment=application.council_reject_reason,
             )
             return
 
@@ -129,7 +119,7 @@ class CouncilService(ApplicationBaseService):
             ApplicationStatus.COUNCIL_APPROVED,
             event="council_approved",
             actor=user,
-            comment="Совет: «Согласен»",
+            comment=f"Совет: «Согласен» (бюллетень {source})",
         )
 
         # Утверждённая Советом заявка уходит в банк, выбранный заявителем.

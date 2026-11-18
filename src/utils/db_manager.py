@@ -7,6 +7,7 @@ from src.application.repositories.resource_allocation_rep import ResourceAllocat
 from src.application.repositories.scoring_rep import ScoringAttemptRepository
 from src.application.repositories.status_history_rep import StatusHistoryRepository
 from src.auth.repositories.refresh_token_rep import RefreshTokenRepository
+from src.bulletin.repositories.bulletin_rep import BulletinRepository
 from src.product.repositories.product_rep import ProductRepository
 from src.rbac.repositories.permission_rep import PermissionRepository
 from src.rbac.repositories.role_rep import RoleRepository
@@ -34,6 +35,7 @@ class DBManager:
         self.council_assignment = CouncilAssignmentRepository(self.session)
         self.demand_document = DemandDocumentRepository(self.session)
         self.resource_allocation = ResourceAllocationRepository(self.session)
+        self.bulletin = BulletinRepository(self.session)
 
         return self
 

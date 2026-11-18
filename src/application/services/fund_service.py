@@ -1,23 +1,20 @@
-"""Рабочее окно Фонда: поиск заявок, скоринг, отказ или направление в Совет.
-В банк заявка уходит автоматически после утверждения Советом."""
+"""Рабочее окно Фонда: поиск заявок, скоринг, отказ. В Совет заявка уходит через
+бюллетень (src/bulletin), в банк — автоматически после утверждения Советом."""
 
+from src.account.models.user_model import UserORM
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus
 from src.application.mappers import ApplicationDataMapper
+from src.application.models.application_model import ApplicationORM
 from src.application.schemas.application_schema import (
     ApplicationDetailDTO,
     ApplicationFilterDTO,
     CouncilAssignmentAddDTO,
     FundRejectDTO,
     ScoringAttemptDTO,
-    SendToCouncilDTO,
 )
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.scoring_service import ScoringService
-from src.common.responses.exceptions import (
-    NoCouncilMembersException,
-    UserNotFoundException,
-)
 from src.rbac.access import effective_permissions
 from src.rbac.permissions import RoleCode
 
@@ -109,39 +106,22 @@ class FundService(ApplicationBaseService):
         await self.db.commit()
         return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
 
-    # ---------- Совет ----------
+    # ---------- Совет: через бюллетень (src/bulletin) ----------
+
+    async def eligible_council_members(self) -> list[UserORM]:
+        """Кому уходит бюллетень: все активные члены Совета с правом решения
+        (права выдаются поштучно) и с ПИНФЛ — без ПИНФЛ подписать ключом E-IMZO нельзя."""
+        return [
+            member
+            for member in await self.db.user.get_active_by_role_code(RoleCode.COUNCIL_MEMBER)
+            if member.pinfl and COUNCIL_VOTE in effective_permissions(member)
+        ]
 
     async def send_to_council(
-        self,
-        application_id: int,
-        user: CurrentUserDTO,
-        data: SendToCouncilDTO,
-    ) -> ApplicationDetailDTO:
-        application = await self.get_for_user(application_id, user)
-
-        if data.council_member_ids:
-            members = []
-            for member_id in dict.fromkeys(data.council_member_ids):
-                member = await self.db.user.get_orm_by_id(member_id)
-                if (
-                    member is None
-                    or member.role is None
-                    or member.role.code != RoleCode.COUNCIL_MEMBER
-                    or COUNCIL_VOTE not in effective_permissions(member)
-                ):
-                    raise UserNotFoundException(f"Council member not found: {member_id}")
-                members.append(member)
-        else:
-            # Голосуют только члены Совета с правом решения (права выдаются поштучно).
-            members = [
-                member
-                for member in await self.db.user.get_active_by_role_code(RoleCode.COUNCIL_MEMBER)
-                if COUNCIL_VOTE in effective_permissions(member)
-            ]
-
-        if not members:
-            raise NoCouncilMembersException()
-
+        self, application: ApplicationORM, user: CurrentUserDTO, bulletin_number: str
+    ) -> None:
+        """FUND_REVIEW → COUNCIL_REVIEW при создании бюллетеня, связанного с заявкой.
+        Члены Совета назначаются при отправке бюллетеня (`assign_council`)."""
         application.fund_decided_by_id = user.id
         application.fund_decided_at = now()
         application.sent_to_council_at = now()
@@ -151,17 +131,40 @@ class FundService(ApplicationBaseService):
             ApplicationStatus.COUNCIL_REVIEW,
             event="sent_to_council",
             actor=user,
-            comment=data.comment or f"Направлена в Совет ({len(members)} чл.)",
+            comment=f"Направлена в Совет: бюллетень {bulletin_number}",
         )
 
+    async def assign_council(
+        self, application: ApplicationORM, members: list[UserORM], assigned_by_id: int | None
+    ) -> None:
+        """Назначения членов Совета по заявке — при отправке бюллетеня. Дают членам
+        Совета доступ к заявке и хранят их голоса."""
         for member in members:
+            if await self.db.council_assignment.get_orm_for_member(application.id, member.id):
+                continue
             await self.db.council_assignment.add(
                 CouncilAssignmentAddDTO(
                     application_id=application.id,
                     council_member_id=member.id,
-                    assigned_by_id=user.id,
+                    assigned_by_id=assigned_by_id,
                 )
             )
 
-        await self.db.commit()
-        return ApplicationDataMapper.map_to_detail(await self.reload(application_id))
+    async def return_from_council(
+        self, application: ApplicationORM, user: CurrentUserDTO, comment: str
+    ) -> None:
+        """COUNCIL_REVIEW → FUND_REVIEW: бюллетень по заявке удалён или аннулирован до
+        итогового решения. Назначения и голоса членов Совета снимаются (они остаются
+        в бюллетене и в истории заявки)."""
+        if application.status != ApplicationStatus.COUNCIL_REVIEW:
+            return
+        await self.db.council_assignment.delete(application_id=application.id)
+        application.sent_to_council_at = None
+        application.sent_to_council_by_id = None
+        await self.transition(
+            application,
+            ApplicationStatus.FUND_REVIEW,
+            event="returned_from_council",
+            actor=user,
+            comment=comment,
+        )

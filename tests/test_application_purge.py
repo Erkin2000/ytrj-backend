@@ -38,7 +38,7 @@ def bank(banks):
 def full_application(api, role_ids, bank, applicant, photo_upload):
     c = api.client
     fund, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
-    _, council_me = api.staff(role_id=role_ids["COUNCIL_MEMBER"])
+    api.staff(eimzo=True, role_id=role_ids["COUNCIL_MEMBER"])
     product = api.product(fund, [bank["id"]])
     stage = product["stages"][0]
     number, photo, _ = stage["fields"]
@@ -63,12 +63,7 @@ def full_application(api, role_ids, bank, applicant, photo_upload):
     )
     assert r.status_code == 201, r.text
     assert c.post(f"/api/v1/applications/{app_id}/submit", headers=applicant).status_code == 200
-    r = c.post(
-        f"/api/v1/fund/applications/{app_id}/send-to-council",
-        headers=fund,
-        json={"council_member_ids": [council_me["id"]]},
-    )
-    assert r.status_code == 200, r.text
+    api.bulletin(fund, application_id=app_id)
     return app_id, fund
 
 

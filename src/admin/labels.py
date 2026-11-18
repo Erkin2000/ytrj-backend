@@ -103,6 +103,27 @@ SCORING_RESULT_LABELS: dict[str, tuple[str, str]] = {
     "TECHNICAL_ERROR": ("Техническая ошибка", "orange"),
 }
 
+BULLETIN_STATUS_LABELS: dict[str, tuple[str, str]] = {
+    "PENDING": ("Ожидает отправки", "secondary"),
+    "PUBLISHED": ("Отправлен Совету", "blue"),
+    "PARTIALLY_SIGNED": ("Подписан частично", "orange"),
+    "COMPLETED": ("Подписан всеми", "green"),
+    "CANCELLED": ("Аннулирован", "red"),
+}
+
+BULLETIN_DECISION_LABELS: dict[str, tuple[str, str]] = {
+    "AGREE": ("Согласен", "green"),
+    "AGAINST": ("Против", "red"),
+}
+
+MEMBER_BULLETIN_STATUS_LABELS: dict[str, tuple[str, str]] = {
+    "NEW": ("Не открывал", "secondary"),
+    "VIEWED": ("Просмотрел", "azure"),
+    "SIGNED": ("Подписал", "green"),
+    "OVERDUE": ("Просрочил", "red"),
+    "CANCELLED": ("Аннулирован", "secondary"),
+}
+
 DEMAND_STATUS_LABELS: dict[str, tuple[str, str]] = {
     "CREATED": ("Создан", "secondary"),
     "GENERATED": ("Сформирован", "green"),
@@ -147,6 +168,7 @@ EVENT_LABELS: dict[str, str] = {
     "council_vote": "Голос члена Совета",
     "council_approved": "Совет утвердил",
     "council_rejected": "Совет отказал",
+    "returned_from_council": "Возвращена Фонду из Совета",
     "demand_document_created": "Создан документ «Требование подтверждено»",
     "resources_allocated": "Ресурсы выделены",
     "completed": "Заявка завершена",

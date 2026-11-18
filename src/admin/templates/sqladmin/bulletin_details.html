@@ -1,0 +1,131 @@
+{% extends "sqladmin/details.html" %}
+
+{% block content %}
+{% set b = model %}
+{% set s = b.admin_summary %}
+{% set signing = b.status.value in ["PUBLISHED", "PARTIALLY_SIGNED"] %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body">
+      <div class="row align-items-center g-3">
+        <div class="col">
+          <div class="page-pretitle">{{ _("Бюллетень") }} {{ b.number }} · {{ _("Создан") }} {{ fmt_dt(b.created_at) }}{% if b.created_by %} · {{ b.created_by.full_name or b.created_by.username }}{% endif %}</div>
+          <h2 class="page-title mb-1">{{ b.name }} &nbsp;{{ bulletin_status_badge(b.status) }}
+            {% if b.admin_overdue %}<span class="badge bg-red-lt ms-1"><i class="fa-solid fa-clock me-1"></i>{{ _("Срок подписания прошёл") }}</span>{% endif %}
+          </h2>
+          <div class="text-muted small">
+            {% if b.status.value == "PENDING" %}{{ _("Отправка") }}: {{ fmt_dt(b.send_at) }}{% else %}{{ _("Отправлен") }}: {{ fmt_dt(b.published_at) }}{% endif %}
+            · {{ _("Срок подписания") }}: {{ fmt_dt(b.deadline_at) }}
+            {% if b.completed_at %} · {{ _("Подписан всеми") }}: {{ fmt_dt(b.completed_at) }}{% endif %}
+          </div>
+        </div>
+        <div class="col-auto d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('admin:list', identity='bulletin-orm') }}" class="btn">{{ _("Go Back") }}</a>
+          {% if b.status.value == "PENDING" %}
+          <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-confirmation-publish"><i class="fa-solid fa-paper-plane me-1"></i>{{ _("Отправить сейчас") }}</a>
+          {% endif %}
+          {% if b.status.value != "CANCELLED" %}
+          <a href="#" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modal-confirmation-cancel"><i class="fa-solid fa-ban me-1"></i>{{ _("Аннулировать") }}</a>
+          {% endif %}
+          {% if model_view.can_delete %}
+          <a href="#" class="btn btn-danger" data-name="{{ model_view.name }}" data-pk="{{ get_object_identifier(b) }}"
+             data-url="{{ model_view._url_for_delete(request, b) }}" data-bs-toggle="modal" data-bs-target="#modal-delete"><i class="fa-solid fa-trash me-1"></i>{{ _("Delete") }}</a>
+          {% endif %}
+        </div>
+      </div>
+      {% if b.status.value == "CANCELLED" %}
+      <div class="alert alert-danger mt-3 mb-0">
+        <i class="fa-solid fa-ban me-1"></i>{{ _("Аннулирован") }} {{ fmt_dt(b.cancelled_at) }}{% if b.cancelled_by %} · {{ b.cancelled_by.full_name or b.cancelled_by.username }}{% endif %}{% if b.cancel_reason %}: {{ b.cancel_reason }}{% endif %}
+      </div>
+      {% endif %}
+      <div class="text-muted small mt-3"><i class="fa-solid fa-circle-info me-1"></i>{{ _("Бюллетени создаёт и редактирует Фонд через API: /api/v1/fund/bulletins.") }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="col-lg-7">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("Описание") }}</h3></div>
+    <div class="card-body" style="white-space: pre-line">{{ b.description }}</div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">{{ _("Подписи членов Совета") }}</h3>
+      {% if b.status.value != "PENDING" %}
+      <div class="card-actions">
+        <span class="badge bg-green-lt">{{ _("Согласен") }}: {{ s.agree }}</span>
+        <span class="badge bg-red-lt">{{ _("Против") }}: {{ s.against }}</span>
+        <span class="badge bg-secondary-lt">{{ _("Не подписали") }}: {{ s.pending }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if b.status.value != "PENDING" and s.total %}
+    <div class="card-body pb-0">
+      <div class="progress mb-2"><div class="progress-bar bg-green" style="width: {{ (100 * s.signed / s.total) | round | int }}%"></div></div>
+      <div class="text-muted small mb-2">{{ _("Подписали") }} {{ s.signed }} / {{ s.total }}</div>
+    </div>
+    {% endif %}
+    {% if b.admin_rows %}
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter table-sm">
+        <thead><tr><th>{{ _("Член Совета") }}</th><th>{{ _("Статус") }}</th><th>{{ _("Решение") }}</th><th>{{ _("Подписал") }}</th><th>{{ _("Сертификат") }}</th></tr></thead>
+        <tbody>
+          {% for sig, st in b.admin_rows %}
+          <tr>
+            <td>
+              {% if sig.council_member %}<a href="{{ url_for('admin:details', identity='user-orm', pk=sig.council_member.id) }}">{{ sig.member_full_name or sig.council_member.full_name or sig.council_member.username }}</a>{% else %}{{ sig.member_full_name or "—" }}{% endif %}
+              <div class="text-muted small">{% if sig.viewed_at %}{{ _("Открыл") }} {{ fmt_dt(sig.viewed_at) }}{% endif %}{% if sig.file_viewed_at %} · {{ _("файл") }} {{ fmt_dt(sig.file_viewed_at) }}{% endif %}</div>
+            </td>
+            <td>{{ member_status_badge(st) }}</td>
+            <td>{{ bulletin_decision_badge(sig.decision) }}{% if sig.comment %}<div class="small text-muted mt-1">{{ sig.comment }}</div>{% endif %}</td>
+            <td>{{ fmt_dt(sig.signed_at) }}</td>
+            <td class="small">{% if sig.signed_at %}
+              <a href="{{ url_for('admin:details', identity='bulletin-signature-orm', pk=sig.id) }}">{{ sig.cert_serial_number or "—" }}</a>
+              <div class="text-muted">{{ sig.cert_full_name or "" }}{% if sig.cert_valid_to %} · {{ _("до") }} {{ sig.cert_valid_to }}{% endif %}</div>
+              {% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted">{{ _("Получатели определяются при отправке: все активные члены Совета с ПИНФЛ.") }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="col-lg-5">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _("Реквизиты") }}</h3></div>
+    <div class="card-body">
+      <dl class="jg-kv">
+        <dt>{{ _("Номер") }}</dt><dd>{{ b.number }}</dd>
+        <dt>{{ _("Заявка") }}</dt>
+        <dd>{% if b.application %}<a href="{{ url_for('admin:details', identity='application-orm', pk=b.application.id) }}">{{ b.application.number }}</a> {{ status_badge(b.application.status) }}{% else %}{{ _("Не связан с заявкой") }}{% endif %}</dd>
+        <dt>{{ _("Файл") }}</dt>
+        <dd>{% if b.file_path %}<a href="{{ admin.base_url }}/bulletin-file/{{ b.id }}" target="_blank"><i class="fa-solid fa-file-{{ 'pdf' if b.file_content_type == 'application/pdf' else 'word' }} me-1"></i>{{ b.file_name }}</a>
+          <div class="text-muted small">{{ fmt_size(b.file_size) }}</div>
+          <div class="text-muted small text-break" style="font-family: monospace">SHA-256: {{ b.file_sha256 }}</div>{% else %}—{% endif %}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">{{ _("QR-код проверки") }}</h3></div>
+    <div class="card-body text-center">
+      <img src="{{ admin.base_url }}/bulletin-qr/{{ b.id }}" alt="QR" style="width: 200px; height: 200px; background: #fff; border-radius: 8px">
+      <div class="small mt-2 text-break"><a href="{{ b.admin_verify_url }}" target="_blank">{{ b.admin_verify_url }}</a></div>
+      <a class="btn btn-sm mt-2" href="{{ admin.base_url }}/bulletin-qr/{{ b.id }}?download=1"><i class="fa-solid fa-download me-1"></i>{{ _("Скачать QR (SVG)") }}</a>
+    </div>
+  </div>
+</div>
+
+{% include 'sqladmin/modals/delete.html' %}
+{% for custom_action in ["publish", "cancel"] %}
+{% with confirmation_message = model_view._custom_actions_confirmation[custom_action], custom_action=custom_action,
+url=model_view._url_for_action(request, custom_action) + '?pks=' + (get_object_identifier(b) | string) %}
+{% include 'sqladmin/modals/details_action_confirmation.html' %}
+{% endwith %}
+{% endfor %}
+{% endblock %}

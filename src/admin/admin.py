@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from src.account.models.user_model import UserORM, UserStatus
+from src.admin.bulletin_views import BULLETIN_VIEWS
 from src.admin.i18n import (
     ADMIN_LOCALES,
     DEFAULT_ADMIN_LOCALE,
@@ -22,8 +23,11 @@ from src.admin.i18n import (
     register_locales,
 )
 from src.admin.labels import (
+    BULLETIN_DECISION_LABELS,
+    BULLETIN_STATUS_LABELS,
     DECISION_LABELS,
     DEMAND_STATUS_LABELS,
+    MEMBER_BULLETIN_STATUS_LABELS,
     PIPELINE_GROUPS,
     PRODUCT_STATUS_LABELS,
     SCORING_RESULT_LABELS,
@@ -45,6 +49,8 @@ from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
 from src.application.workflow import build_progress
 from src.auth.services.password_service import verify_password
+from src.bulletin.enums import SIGNING_STATUSES, BulletinStatus
+from src.bulletin.models.bulletin_model import BulletinORM
 from src.config import settings
 from src.database import async_session_maker, engine
 from src.utils.db_manager import DBManager
@@ -165,6 +171,34 @@ class JamgarmaAdmin(Admin):
                 or 0
             )
 
+            bulletins_signing = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(BulletinORM)
+                    .where(BulletinORM.status.in_(SIGNING_STATUSES))
+                )
+                or 0
+            )
+            bulletins_overdue = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(BulletinORM)
+                    .where(
+                        BulletinORM.status.in_(SIGNING_STATUSES),
+                        BulletinORM.deadline_at < datetime.now(TASHKENT_TZ),
+                    )
+                )
+                or 0
+            )
+            bulletins_pending = (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(BulletinORM)
+                    .where(BulletinORM.status == BulletinStatus.PENDING)
+                )
+                or 0
+            )
+
             recent = (
                 await session.scalars(
                     select(ApplicationORM).order_by(ApplicationORM.updated_at.desc()).limit(8)
@@ -198,6 +232,9 @@ class JamgarmaAdmin(Admin):
             "scoring_retry": scoring_retry,
             "fund_review": counts["FUND_REVIEW"],
             "new_for_bank": counts["SENT_TO_BANK"],
+            "bulletins_signing": bulletins_signing,
+            "bulletins_overdue": bulletins_overdue,
+            "bulletins_pending": bulletins_pending,
         }
 
         return await self.templates.TemplateResponse(
@@ -256,6 +293,9 @@ def setup_admin(app: FastAPI) -> Admin:
             "scoring_badge": lambda v: labeled_badge(SCORING_RESULT_LABELS, v),
             "demand_badge": lambda v: labeled_badge(DEMAND_STATUS_LABELS, v),
             "product_status_badge": lambda v: labeled_badge(PRODUCT_STATUS_LABELS, v),
+            "bulletin_status_badge": lambda v: labeled_badge(BULLETIN_STATUS_LABELS, v),
+            "bulletin_decision_badge": lambda v: labeled_badge(BULLETIN_DECISION_LABELS, v),
+            "member_status_badge": lambda v: labeled_badge(MEMBER_BULLETIN_STATUS_LABELS, v),
             "field_type_label": field_type_label,
             "language_label": language_label,
             "tr_name": tr_name,
@@ -267,7 +307,7 @@ def setup_admin(app: FastAPI) -> Admin:
         }
     )
 
-    for view in ALL_VIEWS:
+    for view in ALL_VIEWS + BULLETIN_VIEWS:
         admin.add_view(view)
 
     return admin
