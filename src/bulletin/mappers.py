@@ -232,9 +232,12 @@ class BulletinDataMapper:
                 full_name=s.member_full_name
                 or (s.council_member.full_name if s.council_member else None),
                 signed=s.signed_at is not None,
+                decision=s.decision if s.signed_at is not None else None,
+                signed_at=s.signed_at,
             )
             for s in bulletin.signatures
         ]
+        signed = [s for s in signers if s.signed]
         return BulletinVerifyDTO(
             number=bulletin.number,
             name=bulletin.name,
@@ -244,6 +247,9 @@ class BulletinDataMapper:
             validity="CANCELLED" if bulletin.status == BulletinStatus.CANCELLED else "VALID",
             file=file_dto(bulletin, None),
             signers=signers,
-            signed_count=sum(1 for s in signers if s.signed),
+            signed_count=len(signed),
+            agree_count=sum(1 for s in signed if s.decision == BulletinDecision.AGREE),
+            against_count=sum(1 for s in signed if s.decision == BulletinDecision.AGAINST),
+            not_signed_count=len(signers) - len(signed),
             total_count=len(signers),
         )

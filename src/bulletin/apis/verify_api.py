@@ -15,6 +15,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.templating import Jinja2Templates
 
 from src.bulletin.apis.examples import VERIFY
+from src.bulletin.enums import TASHKENT_TZ
 from src.bulletin.services.bulletin_service import BulletinService
 from src.common.dependencies import DBDep
 from src.common.responses.exceptions import BulletinNotFoundException
@@ -63,6 +64,12 @@ LABELS = {
         "signers": "Kengash aʼzolari",
         "signed": "Imzolagan",
         "not_signed": "Imzolamagan",
+        "agree": "Roziman",
+        "against": "Qarshiman",
+        "agreed_group": "Rozi boʻlganlar",
+        "against_group": "Qarshi boʻlganlar",
+        "not_signed_group": "Hali imzolamaganlar",
+        "nobody": "Yoʻq",
         "no_signers": "Byulleten hali Kengash aʼzolariga yuborilmagan",
         "valid": "Hujjat haqiqiy",
         "cancelled": "Bekor qilingan",
@@ -93,6 +100,12 @@ LABELS = {
         "signers": "Члены Совета",
         "signed": "Подписал",
         "not_signed": "Не подписал",
+        "agree": "Согласен",
+        "against": "Против",
+        "agreed_group": "Согласны",
+        "against_group": "Против",
+        "not_signed_group": "Ещё не подписали",
+        "nobody": "Нет",
         "no_signers": "Бюллетень ещё не отправлен членам Совета",
         "valid": "Документ действителен",
         "cancelled": "Аннулирован",
@@ -108,6 +121,10 @@ LABELS = {
         },
     },
 }
+
+
+def local_time(value) -> str:
+    return value.astimezone(TASHKENT_TZ).strftime("%d.%m.%Y %H:%M") if value else ""
 
 
 def human_size(size: int) -> str:
@@ -136,6 +153,7 @@ async def verify_page(
             "lang": lang,
             "other_lang": "ru" if lang == "uz" else "uz",
             "human_size": human_size,
+            "local_time": local_time,
         },
         status_code=200 if document else 404,
         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},

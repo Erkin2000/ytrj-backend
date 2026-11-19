@@ -162,9 +162,23 @@ VERIFY = {
     "validity": "VALID",
     "file": {**FILE, "url": None},
     "signers": [
-        {"full_name": "Valiyev Ali Karimovich", "signed": True},
-        {"full_name": "Karimova Nodira", "signed": False},
+        {
+            "full_name": "Valiyev Ali Karimovich",
+            "signed": True,
+            "decision": "AGREE",
+            "signed_at": "2026-11-18T10:15:00Z",
+        },
+        {
+            "full_name": "Rahimov Sardor",
+            "signed": True,
+            "decision": "AGAINST",
+            "signed_at": "2026-11-18T11:02:00Z",
+        },
+        {"full_name": "Karimova Nodira", "signed": False, "decision": None, "signed_at": None},
     ],
-    "signed_count": 1,
-    "total_count": 2,
+    "signed_count": 2,
+    "agree_count": 1,
+    "against_count": 1,
+    "not_signed_count": 1,
+    "total_count": 3,
 }

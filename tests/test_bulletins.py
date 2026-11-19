@@ -184,7 +184,9 @@ def test_bulletin_signing_flow(api, fund, council):
     assert check["file"]["sha256"] == bulletin["file"]["sha256"] and check["file"]["url"] is None
     signers = {s["full_name"]: s["signed"] for s in check["signers"]}
     assert signers[a_me["full_name"]] is True and signers[b_me["full_name"]] is False
-    assert "decision" not in str(check["signers"])
+    decisions = {s["full_name"]: s["decision"] for s in check["signers"]}
+    assert decisions[a_me["full_name"]] == "AGREE" and decisions[b_me["full_name"]] is None
+    assert (check["agree_count"], check["against_count"], check["not_signed_count"]) == (1, 0, 1)
 
     page = c.get(f"/bulletins/verify/{public_id}")
     assert page.status_code == 200 and "TEST Kengash №1" in page.text

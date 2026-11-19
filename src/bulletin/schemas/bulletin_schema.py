@@ -242,6 +242,11 @@ class CalendarDayDTO(BaseModel):
 class VerifySignerDTO(BaseModel):
     full_name: str | None = None
     signed: bool
+    decision: BulletinDecision | None = Field(
+        default=None,
+        description="`AGREE` — «Согласен», `AGAINST` — «Против»; `null` — не подписал.",
+    )
+    signed_at: datetime | None = None
 
 
 class BulletinVerifyDTO(BaseModel):
@@ -255,4 +260,7 @@ class BulletinVerifyDTO(BaseModel):
     file: BulletinFileDTO | None = None
     signers: list[VerifySignerDTO]
     signed_count: int
+    agree_count: int = Field(description="Подписали «Согласен».")
+    against_count: int = Field(description="Подписали «Против».")
+    not_signed_count: int = Field(description="Ещё не подписали.")
     total_count: int

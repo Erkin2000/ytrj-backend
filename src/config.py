@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     # ---------- бюллетени Совета ----------
     # Адрес страницы проверки, на который ведёт QR-код: <BULLETIN_VERIFY_BASE_URL>/<public_id>.
     # По умолчанию — встроенная страница backend (GET /bulletins/verify/{public_id}).
-    BULLETIN_VERIFY_BASE_URL: str = "http://127.0.0.1:8000/bulletins/verify"
+    BULLETIN_VERIFY_BASE_URL: str = "https://yoshlarfondi.uz/bulletins/verify"
     # Фоновая публикация отложенных (PENDING) бюллетеней в дату отправки.
     BULLETIN_SCHEDULER_ENABLED: bool = True
     BULLETIN_SCHEDULER_INTERVAL_SECONDS: int = 30
