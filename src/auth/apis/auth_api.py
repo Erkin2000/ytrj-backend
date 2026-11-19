@@ -52,7 +52,7 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
 
 @router.post(
     "/login",
-    summary="Вход по логину и паролю — только внутренние роли (Super Admin, Фонд, банк, Совет)",
+    summary="Вход по логину и паролю — Super Admin, Фонд и банк (не заявитель и не член Совета)",
     responses={200: LOGIN_EXAMPLE, **COMMON_ERRORS},
 )
 async def login(data: LoginDTO, db: DBDep, request: Request):

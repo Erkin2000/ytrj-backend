@@ -48,7 +48,6 @@ from src.common.responses.exceptions import (
     BulletinNotFoundException,
     BulletinScheduleException,
     BulletinStatusException,
-    NoCouncilMembersException,
 )
 from src.utils.base_service import BaseService
 
@@ -181,8 +180,8 @@ class BulletinService(BaseService):
         application = None
         if form.application_id is not None:
             application = await self._application_for_bulletin(form.application_id)
-        if publish_now and not await self.fund.eligible_council_members():
-            raise NoCouncilMembersException()
+        if publish_now:
+            await self.fund.require_council_members()
 
         bulletin = BulletinORM(
             public_id=secrets.token_urlsafe(24),
@@ -397,9 +396,7 @@ class BulletinService(BaseService):
     async def _publish(self, bulletin: BulletinORM, actor_id: int | None) -> None:
         """Рассылка всем активным членам Совета: строка подписи на каждого,
         назначения на связанную заявку. Коммит делает вызывающий."""
-        members = await self.fund.eligible_council_members()
-        if not members:
-            raise NoCouncilMembersException()
+        members = await self.fund.require_council_members()
 
         now = utcnow()
         for member in members:

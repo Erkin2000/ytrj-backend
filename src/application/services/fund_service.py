@@ -1,7 +1,7 @@
 """Рабочее окно Фонда: поиск заявок, скоринг, отказ. В Совет заявка уходит через
 бюллетень (src/bulletin), в банк — автоматически после утверждения Советом."""
 
-from src.account.models.user_model import UserORM
+from src.account.models.user_model import UserORM, UserStatus
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus
 from src.application.mappers import ApplicationDataMapper
@@ -15,7 +15,8 @@ from src.application.schemas.application_schema import (
 )
 from src.application.services.base import ApplicationBaseService, now
 from src.application.services.scoring_service import ScoringService
-from src.rbac.access import effective_permissions
+from src.common.responses.exceptions import NoCouncilMembersException
+from src.rbac.access import effective_permissions, role_ceiling
 from src.rbac.permissions import RoleCode
 
 COUNCIL_VOTE = "council_review.approve"
@@ -116,6 +117,35 @@ class FundService(ApplicationBaseService):
             for member in await self.db.user.get_active_by_role_code(RoleCode.COUNCIL_MEMBER)
             if member.pinfl and COUNCIL_VOTE in effective_permissions(member)
         ]
+
+    async def require_council_members(self) -> list[UserORM]:
+        """Получатели бюллетеня; если их нет — ошибка с причиной по каждому члену Совета,
+        чтобы было видно, что исправить в профиле."""
+        members = await self.eligible_council_members()
+        if members:
+            return members
+        errors = []
+        for member in await self.db.user.get_by_role_code(RoleCode.COUNCIL_MEMBER):
+            reasons = []
+            if member.status != UserStatus.ACTIVE:
+                reasons.append(f"status is {member.status.value}, must be ACTIVE")
+            if not member.pinfl:
+                reasons.append("PINFL is empty (needed for E-IMZO)")
+            if COUNCIL_VOTE not in role_ceiling(member.role):
+                reasons.append(f"role COUNCIL_MEMBER has no permission {COUNCIL_VOTE}")
+            elif COUNCIL_VOTE not in effective_permissions(member):
+                reasons.append(f"personal permission {COUNCIL_VOTE} is not granted")
+            errors.append(
+                {
+                    "field": f"council_member:{member.id}",
+                    "message": f"{member.username}: " + "; ".join(reasons),
+                }
+            )
+        if not errors:
+            errors.append(
+                {"field": "council_member", "message": "no users with role COUNCIL_MEMBER"}
+            )
+        raise NoCouncilMembersException(errors=errors)
 
     async def send_to_council(
         self, application: ApplicationORM, user: CurrentUserDTO, bulletin_number: str

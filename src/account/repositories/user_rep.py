@@ -74,6 +74,15 @@ class UserRepository(BaseRepository):
         result = await self.session.scalars(stmt)
         return list(result.all())
 
+    async def get_by_role_code(self, role_code: str) -> list[UserORM]:
+        stmt = (
+            select(self.model)
+            .join(RoleORM, RoleORM.id == self.model.role_id)
+            .where(RoleORM.code == role_code)
+            .order_by(self.model.id)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def touch_last_login(self, user_id: int) -> None:
         await self.session.execute(
             update(self.model)
