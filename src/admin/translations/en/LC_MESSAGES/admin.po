@@ -1083,3 +1083,14 @@ msgstr "Overdue"
 
 msgid "Возвращена Фонду из Совета"
 msgstr "Returned from the council to the Fund"
+
+# ===================== User password =====================
+
+msgid "Для входа по логину и паролю. При редактировании оставьте пустым, чтобы не менять. Заявителю и члену Совета пароль не задаётся."
+msgstr "For login with username and password. Leave empty when editing to keep it unchanged. Applicants and council members get no password."
+
+msgid "Заявитель входит только через YIA Portal — пароль не задаётся"
+msgstr "Applicants sign in only via YIA Portal — no password is set"
+
+msgid "Член Совета входит только ключом E-IMZO — пароль не задаётся"
+msgstr "Council members sign in only with an E-IMZO key — no password is set"

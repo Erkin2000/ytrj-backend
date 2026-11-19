@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import re
 
 from markupsafe import Markup, escape
 from sqladmin import BaseView, ModelView, expose
 from sqladmin.filters import BooleanFilter, ForeignKeyFilter, StaticValuesFilter
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import FileResponse
+from wtforms import PasswordField, validators
 
 from src.account.models.user_model import UserORM, UserStatus
 from src.admin.i18n import _, _l, fmt_dt, fmt_money, fmt_size
@@ -48,6 +50,7 @@ from src.application.services.photo_storage import (
 )
 from src.application.services.purge_service import ApplicationPurgeService
 from src.auth.models.refresh_token_model import RefreshTokenORM
+from src.auth.services.password_service import hash_password
 from src.bulletin.models.bulletin_model import BulletinORM
 from src.database import async_session_maker
 from src.product.enums import ProductStatus
@@ -63,6 +66,7 @@ from src.product.models.product_model import (
 from src.rbac.access import DIRECTION_ROLES, uses_personal_permissions
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
+from src.rbac.permissions import RoleCode
 from src.utils.db_manager import DBManager
 
 CATEGORY_ACCESS = _l("Пользователи и доступ")
@@ -324,9 +328,29 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
     }
     page_size = 25
 
+    async def scaffold_form(self, rules=None):
+        form = await super().scaffold_form(rules)
+
+        class UserForm(form):  # type: ignore[misc, valid-type]
+            password = PasswordField(
+                _l("Пароль"),
+                validators=[validators.Optional(), validators.Length(min=8, max=128)],
+                description=_l(
+                    "Для входа по логину и паролю. При редактировании оставьте пустым, "
+                    "чтобы не менять. Заявителю и члену Совета пароль не задаётся."
+                ),
+                render_kw={"autocomplete": "new-password"},
+            )
+
+        return UserForm
+
     async def on_model_change(self, data: dict, model, is_created: bool, request: Request) -> None:
+        password = (data.pop("password", None) or "").strip()
         await self._check_direction_admin(data, model)
         await self._default_permissions(data, model, is_created)
+        if password:
+            await self._set_password(data, model, password)
+            request.state.user_password_changed = True
 
         if "pinfl" not in data:
             return
@@ -343,6 +367,30 @@ class UserAdmin(LocalizedLabelsMixin, ModelView, model=UserORM):
 
         if not is_created and pinfl != model.pinfl:
             data["sso_sub"] = None
+
+    async def after_model_change(
+        self, data: dict, model, is_created: bool, request: Request
+    ) -> None:
+        # Новый пароль завершает все сессии пользователя, как в API.
+        if is_created or not getattr(request.state, "user_password_changed", False):
+            return
+        async with async_session_maker() as session:
+            await session.execute(
+                delete(RefreshTokenORM).where(RefreshTokenORM.user_id == model.id)
+            )
+            await session.commit()
+
+    @staticmethod
+    async def _set_password(data: dict, model, password: str) -> None:
+        role = data["role"] if "role" in data else getattr(model, "role", None)
+        if role is not None and not hasattr(role, "code"):
+            async with async_session_maker() as session:
+                role = await session.get(RoleORM, int(role))
+        if role is not None and role.code == RoleCode.APPLICANT:
+            raise ValueError(_("Заявитель входит только через YIA Portal — пароль не задаётся"))
+        if role is not None and role.code == RoleCode.COUNCIL_MEMBER:
+            raise ValueError(_("Член Совета входит только ключом E-IMZO — пароль не задаётся"))
+        data["hashed_password"] = await asyncio.to_thread(hash_password, password)
 
     @staticmethod
     async def _check_direction_admin(data: dict, model) -> None:

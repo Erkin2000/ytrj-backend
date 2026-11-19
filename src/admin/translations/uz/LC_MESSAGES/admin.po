@@ -1278,3 +1278,14 @@ msgstr "Muddatini oʻtkazgan"
 
 msgid "Возвращена Фонду из Совета"
 msgstr "Kengashdan Jamgʻarmaga qaytarilgan"
+
+# ===================== User password =====================
+
+msgid "Для входа по логину и паролю. При редактировании оставьте пустым, чтобы не менять. Заявителю и члену Совета пароль не задаётся."
+msgstr "Login va parol bilan kirish uchun. Tahrirlashda o‘zgartirmaslik uchun bo‘sh qoldiring. Ariza beruvchi va Kengash aʼzosiga parol berilmaydi."
+
+msgid "Заявитель входит только через YIA Portal — пароль не задаётся"
+msgstr "Ariza beruvchi faqat YIA Portal orqali kiradi — parol berilmaydi"
+
+msgid "Член Совета входит только ключом E-IMZO — пароль не задаётся"
+msgstr "Kengash aʼzosi faqat E-IMZO kaliti bilan kiradi — parol berilmaydi"
