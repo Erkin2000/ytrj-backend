@@ -365,6 +365,11 @@ class EventNotFoundException(NotFoundException):
     message = "Event not found"
 
 
+class EventCalendarRangeException(BadRequestException):
+    message = "Invalid calendar range"
+    field = "date_to"
+
+
 class AboutSectionNotFoundException(NotFoundException):
     message = "About section not found"
 
@@ -379,6 +384,10 @@ class LeadershipProfileNotFoundException(NotFoundException):
 
 class PersonPhotoNotFoundException(NotFoundException):
     message = "The card has no photo"
+
+
+class EventPhotoNotFoundException(NotFoundException):
+    message = "The event has no photo"
 
 
 class NewsScheduleException(BadRequestException):

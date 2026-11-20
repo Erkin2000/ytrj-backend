@@ -18,6 +18,15 @@ def title_text(name: str) -> list[dict]:
     ]
 
 
+def event_form(name: str, day: str, **extra) -> dict:
+    body = {"date": day}
+    for lang, text_ in (("ru", "Текст"), ("uz", "Matn"), ("en", "Text")):
+        body[f"title_{lang}"] = f"{name} {lang}"
+        body[f"text_{lang}"] = text_
+    body.update({k: str(v).lower() if isinstance(v, bool) else v for k, v in extra.items()})
+    return body
+
+
 def person_form(name: str, **extra) -> dict:
     body = {
         "full_name_ru": f"{name} Ру",
@@ -47,22 +56,26 @@ def marketing(api, role_ids):
     db_run(run)
     for person_id in created["site_people"]:
         shutil.rmtree(Path(settings.MEDIA_PATH) / "site" / "people" / str(person_id), True)
+    for event_id in created["site_events"]:
+        shutil.rmtree(Path(settings.MEDIA_PATH) / "site" / "events" / str(event_id), True)
 
 
 def test_events_crud(client, marketing):
     headers, created = marketing
-    body = {"translations": title_text("TEST Event"), "date": "2031-05-10"}
-    r = client.post("/api/v1/marketing/events", headers=headers, json=body)
+    r = client.post(
+        "/api/v1/marketing/events", headers=headers, data=event_form("TEST Event", "2031-05-10")
+    )
     assert r.status_code == 201, r.text
     event = data(r)
     created["site_events"].append(event["id"])
     assert event["date"] == "2031-05-10" and event["is_active"] is True
+    assert event["photo"] is None
 
     hidden = data(
         client.post(
             "/api/v1/marketing/events",
             headers=headers,
-            json={**body, "translations": title_text("TEST Hidden"), "is_active": False},
+            data=event_form("TEST Hidden", "2031-05-10", is_active=False),
         )
     )
     created["site_events"].append(hidden["id"])
@@ -78,7 +91,9 @@ def test_events_crud(client, marketing):
         f"/api/v1/marketing/events/{event['id']}", headers=headers, json={"date": "2031-06-01"}
     )
     assert r.status_code == 200 and data(r)["date"] == "2031-06-01"
-    r = client.post("/api/v1/marketing/events", headers=headers, json={**body, "translations": []})
+    r = client.post(
+        "/api/v1/marketing/events", headers=headers, data={"date": "2031-05-10", "title_ru": "Нет"}
+    )
     assert r.status_code == 422
 
     assert (
@@ -86,6 +101,107 @@ def test_events_crud(client, marketing):
     )
     r = client.get(f"/api/v1/marketing/events/{event['id']}", headers=headers)
     assert r.status_code == 404 and r.json()["code"] == "event_not_found"
+
+
+def test_events_calendar_and_day_filter(client, marketing):
+    headers, created = marketing
+
+    def add(day: str, active: bool = True) -> int:
+        body = event_form(f"TEST {day}", day, is_active=active)
+        r = client.post("/api/v1/marketing/events", headers=headers, data=body)
+        assert r.status_code == 201, r.text
+        created["site_events"].append(data(r)["id"])
+        return data(r)["id"]
+
+    a = add("2031-03-05")
+    b = add("2031-03-05")
+    c = add("2031-03-20")
+    hidden = add("2031-03-25", active=False)
+    add("2031-04-02")
+
+    # Точки календаря за март: только дни с активными событиями.
+    days = data(client.get("/api/v1/events/calendar?date_from=2031-03-01&date_to=2031-03-31"))
+    assert days == [{"date": "2031-03-05", "count": 2}, {"date": "2031-03-20", "count": 1}]
+    # В админке видны и неактивные.
+    admin_days = data(
+        client.get(
+            "/api/v1/marketing/events/calendar?date_from=2031-03-01&date_to=2031-03-31",
+            headers=headers,
+        )
+    )
+    assert {"date": "2031-03-25", "count": 1} in admin_days
+
+    # Клик по дню: события этого дня.
+    ids = [e["id"] for e in data(client.get("/api/v1/events?date=2031-03-05"))["items"]]
+    assert sorted(ids) == sorted([a, b])
+    assert c not in ids and hidden not in ids
+
+    # Неверный диапазон.
+    r = client.get("/api/v1/events/calendar?date_from=2031-03-10&date_to=2031-03-01")
+    assert r.status_code == 400 and r.json()["code"] == "event_calendar_range"
+    r = client.get("/api/v1/events/calendar?date_from=2031-01-01&date_to=2031-12-31")
+    assert r.status_code == 400
+    # По умолчанию — текущий месяц.
+    assert client.get("/api/v1/events/calendar").status_code == 200
+
+
+def test_event_photo(client, marketing):
+    headers, created = marketing
+    r = client.post(
+        "/api/v1/marketing/events",
+        headers=headers,
+        data=event_form("TEST Photo", "2031-07-01"),
+        files={"photo": ("e.png", png_bytes(), "image/png")},
+    )
+    assert r.status_code == 201, r.text
+    event = data(r)
+    created["site_events"].append(event["id"])
+    eid = event["id"]
+    assert event["photo"]["url"] == f"/api/v1/marketing/events/{eid}/photo"
+    assert event["photo"]["name"] == "e.png"
+
+    # Сайт: фото по публичной ссылке.
+    card = data(client.get(f"/api/v1/events/{eid}"))
+    assert card["photo"]["url"] == f"/api/v1/events/{eid}/photo"
+    r = client.get(card["photo"]["url"])
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    listed = data(client.get("/api/v1/events?date=2031-07-01"))["items"]
+    assert listed[0]["photo"]["url"] == card["photo"]["url"]
+
+    # Замена, неверный файл, удаление.
+    r = client.put(
+        f"/api/v1/marketing/events/{eid}/photo",
+        headers=headers,
+        files={"photo": ("f.png", png_bytes(), "image/png")},
+    )
+    assert r.status_code == 200 and data(r)["photo"]["name"] == "f.png"
+    r = client.put(
+        f"/api/v1/marketing/events/{eid}/photo",
+        headers=headers,
+        files={"photo": ("x.txt", b"not an image", "text/plain")},
+    )
+    assert r.status_code == 400
+    assert client.get(f"/api/v1/marketing/events/{eid}/photo", headers=headers).status_code == 200
+    r = client.delete(f"/api/v1/marketing/events/{eid}/photo", headers=headers)
+    assert r.status_code == 200 and data(r)["photo"] is None
+    r = client.get(f"/api/v1/events/{eid}/photo")
+    assert r.status_code == 404 and r.json()["code"] == "event_photo_not_found"
+    r = client.delete(f"/api/v1/marketing/events/{eid}/photo", headers=headers)
+    assert r.status_code == 404
+
+    # Неактивное событие: фото на сайте не отдаётся.
+    client.put(
+        f"/api/v1/marketing/events/{eid}/photo",
+        headers=headers,
+        files={"photo": ("g.png", png_bytes(), "image/png")},
+    )
+    client.patch(f"/api/v1/marketing/events/{eid}", headers=headers, json={"is_active": False})
+    assert client.get(f"/api/v1/events/{eid}/photo").status_code == 404
+    assert client.get(f"/api/v1/marketing/events/{eid}/photo", headers=headers).status_code == 200
+
+    # Удаление события удаляет и каталог с фото.
+    assert client.delete(f"/api/v1/marketing/events/{eid}", headers=headers).status_code == 200
+    assert not (Path(settings.MEDIA_PATH) / "site" / "events" / str(eid)).exists()
 
 
 def test_about_crud(client, marketing):

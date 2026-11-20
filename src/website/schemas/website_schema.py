@@ -89,19 +89,44 @@ class AuditDTO(BaseModel):
 # ---------- события ----------
 
 
-class EventCreateDTO(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class PhotoDTO(BaseModel):
+    url: str
+    name: str | None = None
+    content_type: str
+    size: int
 
-    translations: TitleTextTranslations = Field(
-        description=TRANSLATIONS_NOTE, examples=[EVENT_TRANSLATIONS_EXAMPLE]
-    )
+
+class EventCreateForm(BaseModel):
+    """Поля формы (multipart/form-data, фото — полем `photo`)."""
+
+    title_ru: TitleStr = Field(description="Заголовок (ru).")
+    title_uz: TitleStr = Field(description="Заголовок (uz).")
+    title_en: TitleStr = Field(description="Заголовок (en).")
+    text_ru: TextStr = Field(description="Текст (ru).")
+    text_uz: TextStr = Field(description="Текст (uz).")
+    text_en: TextStr = Field(description="Текст (en).")
     date: dt.date = Field(description="Дата события.", examples=["2026-12-05"])
     is_active: bool = Field(
         default=True, description="Неактивное событие не показывается на сайте."
     )
+    photo: UploadFile | None = Field(
+        default=None, description="Фото JPEG / PNG / WEBP, необязательно."
+    )
+
+    def translations(self) -> list[TitleTextDTO]:
+        return [
+            TitleTextDTO(
+                language=lang,
+                title=getattr(self, f"title_{lang.value}"),
+                text=getattr(self, f"text_{lang.value}"),
+            )
+            for lang in (Language.RU, Language.UZ, Language.EN)
+        ]
 
 
 class EventUpdateDTO(BaseModel):
+    """Фото меняется отдельно: `PUT` / `DELETE /{id}/photo`."""
+
     model_config = ConfigDict(extra="forbid")
 
     translations: TitleTextTranslations | None = Field(
@@ -112,14 +137,23 @@ class EventUpdateDTO(BaseModel):
 
 
 class EventFilterDTO(BaseModel):
+    date: dt.date | None = Field(
+        default=None, description="События одного дня — для выбранного дня в календаре."
+    )
     date_from: dt.date | None = Field(default=None, description="События с этой даты.")
     date_to: dt.date | None = Field(default=None, description="События по эту дату.")
+
+
+class EventCalendarDayDTO(BaseModel):
+    date: dt.date
+    count: int = Field(description="Сколько событий в этот день.")
 
 
 class EventPublicDTO(BaseModel):
     id: int
     translations: list[TitleTextOutDTO]
     date: dt.date
+    photo: PhotoDTO | None = None
 
 
 class EventDTO(AuditDTO, EventPublicDTO):
@@ -222,13 +256,6 @@ class PersonTranslationOutDTO(BaseModel):
     language: Language
     full_name: str
     description: str
-
-
-class PhotoDTO(BaseModel):
-    url: str
-    name: str | None = None
-    content_type: str
-    size: int
 
 
 class PersonPublicDTO(BaseModel):

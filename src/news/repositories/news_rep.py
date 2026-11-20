@@ -23,6 +23,24 @@ class NewsRepository(BaseRepository):
         )
         return await self.session.scalar(stmt)
 
+    async def get_by_telegram_message(self, chat_id: int, message_id: int) -> NewsORM | None:
+        return await self.session.scalar(
+            select(NewsORM).where(
+                NewsORM.telegram_chat_id == chat_id, NewsORM.telegram_message_id == message_id
+            )
+        )
+
+    async def get_by_telegram_album(self, chat_id: int, media_group_id: str) -> NewsORM | None:
+        return await self.session.scalar(
+            select(NewsORM)
+            .where(
+                NewsORM.telegram_chat_id == chat_id,
+                NewsORM.telegram_media_group_id == media_group_id,
+            )
+            .order_by(NewsORM.id)
+            .limit(1)
+        )
+
     async def get_visible(self, news_id: int, now: datetime) -> NewsORM | None:
         return await self.session.scalar(select(NewsORM).where(NewsORM.id == news_id, visible(now)))
 
@@ -44,6 +62,8 @@ class NewsRepository(BaseRepository):
             stmt = stmt.where(NewsORM.status == NewsStatus.PUBLISHED, NewsORM.publish_at > now)
         elif filters.state == NewsState.PUBLISHED:
             stmt = stmt.where(visible(now))
+        if filters.source:
+            stmt = stmt.where(NewsORM.source == filters.source)
         if filters.search:
             stmt = stmt.where(
                 exists().where(

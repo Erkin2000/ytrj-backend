@@ -29,6 +29,7 @@ from src.common.swagger.openapi import restore_nulls
 from src.config import settings
 from src.faq.apis import faq_api
 from src.news.apis import news_api
+from src.news.telegram.poller import telegram_poller
 from src.product.apis import fund_category_api, fund_product_api, product_api
 from src.rbac.apis import permission_api, role_api
 from src.website.apis import website_api
@@ -142,8 +143,8 @@ TAGS_METADATA = [
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Фоновая отправка отложенных бюллетеней в дату отправки.
-    async with bulletin_scheduler():
+    # Фоновая отправка отложенных бюллетеней в дату отправки и опрос Telegram-канала.
+    async with bulletin_scheduler(), telegram_poller():
         yield
 
 

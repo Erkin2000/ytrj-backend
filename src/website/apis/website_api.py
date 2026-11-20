@@ -4,16 +4,19 @@
 маркетинга (права events.*, about.*, council_profiles.*, leadership.*).
 """
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 
 from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
 from src.common.responses.exceptions import (
     AboutSectionNotFoundException,
     CouncilProfileNotFoundException,
+    EventCalendarRangeException,
     EventNotFoundException,
+    EventPhotoNotFoundException,
     InvalidPhotoException,
     LeadershipProfileNotFoundException,
     PersonPhotoNotFoundException,
@@ -36,7 +39,7 @@ from src.website.schemas.website_schema import (
     PERSON_TRANSLATIONS_EXAMPLE,
     AboutCreateDTO,
     AboutUpdateDTO,
-    EventCreateDTO,
+    EventCreateForm,
     EventFilterDTO,
     EventUpdateDTO,
     PersonCreateForm,
@@ -58,19 +61,58 @@ def perm(module: Module, action: Action):
 
 # ======================= события =======================
 
-EVENT_PUBLIC = {"id": 3, "translations": EVENT_TRANSLATIONS_EXAMPLE, "date": "2026-12-05"}
-EVENT = {**EVENT_PUBLIC, "is_active": True, **AUDIT}
+PHOTO = {"name": "portrait.jpg", "content_type": "image/jpeg", "size": 120400}
+PHOTO_ERRORS = {400: error_examples(InvalidPhotoException, PhotoTooLargeException)}
+
+EVENT_BASE = {"id": 3, "translations": EVENT_TRANSLATIONS_EXAMPLE, "date": "2026-12-05"}
+EVENT_PUBLIC = {**EVENT_BASE, "photo": {"url": "/api/v1/events/3/photo", **PHOTO}}
+EVENT = {
+    **EVENT_BASE,
+    "photo": {"url": "/api/v1/marketing/events/3/photo", **PHOTO},
+    "is_active": True,
+    **AUDIT,
+}
 EVENT_NOT_FOUND = {404: error_examples(EventNotFoundException)}
+EVENT_PHOTO_NOT_FOUND = {404: error_examples(EventNotFoundException, EventPhotoNotFoundException)}
 
 events_public = APIRouter(prefix="/events", tags=["События: сайт"])
 events = APIRouter(prefix="/marketing/events", tags=["События: управление (маркетинг)"])
 EventFilterDep = Annotated[EventFilterDTO, Depends()]
 
+CALENDAR_EXAMPLE = [{"date": "2026-12-05", "count": 2}, {"date": "2026-12-18", "count": 1}]
+CALENDAR_FROM = Query(None, description="Первый день; по умолчанию — 1-е число текущего месяца.")
+CALENDAR_TO = Query(None, description="Последний день включительно; по умолчанию — конец месяца.")
+CALENDAR_ERRORS = {400: error_examples(EventCalendarRangeException)}
+
+
+@events_public.get(
+    "/calendar",
+    summary="Календарь событий: дни, в которые есть события (точки в календаре)",
+    description=(
+        "Без авторизации. Возвращает только дни с активными событиями и их число; "
+        "дни без событий не приходят. По умолчанию — текущий месяц; диапазон — "
+        "не больше 93 дней. События выбранного дня — `GET /events?date=YYYY-MM-DD`."
+    ),
+    responses={
+        200: success_example(CALENDAR_EXAMPLE, "Calendar retrieved."),
+        **PUBLIC_ERRORS,
+        **CALENDAR_ERRORS,
+    },
+)
+async def get_public_events_calendar(
+    db: DBDep, date_from: date | None = CALENDAR_FROM, date_to: date | None = CALENDAR_TO
+):
+    data = await EventService(db).get_calendar(date_from, date_to, public=True)
+    return ResponseBuilder.success(data=data, message="Calendar retrieved.")
+
 
 @events_public.get(
     "",
     summary="События для сайта (активные), сначала поздние по дате",
-    description="Без авторизации. Фильтр по дате: `date_from`, `date_to`.",
+    description=(
+        "Без авторизации. Фильтр: `date` — события одного дня (клик по дню календаря) "
+        "или диапазон `date_from`, `date_to`."
+    ),
     responses={200: paginated_example(EVENT_PUBLIC, "Events retrieved."), **PUBLIC_ERRORS},
 )
 async def get_public_events(db: DBDep, pagination: PaginationDep, filters: EventFilterDep):
@@ -93,6 +135,24 @@ async def get_public_event(event_id: int, db: DBDep):
     return ResponseBuilder.success(data=data, message="Event found.")
 
 
+@events_public.get(
+    "/{event_id}/photo",
+    summary="Фото события",
+    description="Без авторизации.",
+    response_class=FileResponse,
+    responses=EVENT_PHOTO_NOT_FOUND,
+)
+async def get_public_event_photo(event_id: int, db: DBDep):
+    path, content_type, name = await EventService(db).public_photo(event_id)
+    return FileResponse(
+        path,
+        media_type=content_type,
+        filename=name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @events.get(
     "",
     summary="Все события, включая неактивные",
@@ -104,15 +164,42 @@ async def get_events(db: DBDep, pagination: PaginationDep, filters: EventFilterD
     return ResponseBuilder.success(data=data, message="Events retrieved.")
 
 
+@events.get(
+    "/calendar",
+    summary="Календарь событий для админки: дни с событиями, включая неактивные",
+    description="По умолчанию — текущий месяц; диапазон — не больше 93 дней.",
+    dependencies=[perm(Module.EVENTS, Action.READ)],
+    responses={
+        200: success_example(CALENDAR_EXAMPLE, "Calendar retrieved."),
+        **COMMON_ERRORS,
+        **CALENDAR_ERRORS,
+    },
+)
+async def get_events_calendar(
+    db: DBDep, date_from: date | None = CALENDAR_FROM, date_to: date | None = CALENDAR_TO
+):
+    data = await EventService(db).get_calendar(date_from, date_to, public=False)
+    return ResponseBuilder.success(data=data, message="Calendar retrieved.")
+
+
 @events.post(
     "",
     status_code=201,
-    summary="Создать событие: заголовок и текст на ru / uz / en, дата",
+    summary="Создать событие (multipart/form-data)",
+    description=(
+        "Заголовок и текст — на трёх языках: `title_ru`, `title_uz`, `title_en`, "
+        "`text_ru`, `text_uz`, `text_en`; `date` — дата события. Необязательно: "
+        "`is_active`, `photo` (JPEG / PNG / WEBP)."
+    ),
     dependencies=[perm(Module.EVENTS, Action.CREATE)],
-    responses={201: success_example(EVENT, "Event created."), **COMMON_ERRORS},
+    responses={201: success_example(EVENT, "Event created."), **COMMON_ERRORS, **PHOTO_ERRORS},
 )
-async def create_event(data: EventCreateDTO, db: DBDep, user: CurrentUserDep):
-    event = await EventService(db).create(user, data)
+async def create_event(
+    db: DBDep,
+    user: CurrentUserDep,
+    form: Annotated[EventCreateForm, Form(media_type="multipart/form-data")],
+):
+    event = await EventService(db).create(user, form)
     return ResponseBuilder.success(data=event, message="Event created.", status_code=201)
 
 
@@ -130,6 +217,7 @@ async def get_event(event_id: int, db: DBDep):
 @events.patch(
     "/{event_id}",
     summary="Изменить переводы, дату или активность события",
+    description="Фото — `PUT` / `DELETE /{event_id}/photo`.",
     dependencies=[perm(Module.EVENTS, Action.UPDATE)],
     responses={200: success_example(EVENT, "Event updated."), **COMMON_ERRORS, **EVENT_NOT_FOUND},
 )
@@ -138,9 +226,59 @@ async def update_event(event_id: int, data: EventUpdateDTO, db: DBDep, user: Cur
     return ResponseBuilder.success(data=event, message="Event updated.")
 
 
+@events.get(
+    "/{event_id}/photo",
+    summary="Фото события (в том числе неактивного)",
+    dependencies=[perm(Module.EVENTS, Action.READ)],
+    response_class=FileResponse,
+    responses={**COMMON_ERRORS, **EVENT_PHOTO_NOT_FOUND},
+)
+async def get_event_photo(event_id: int, db: DBDep):
+    path, content_type, name = await EventService(db).photo(event_id)
+    return FileResponse(
+        path, media_type=content_type, filename=name, content_disposition_type="inline"
+    )
+
+
+@events.put(
+    "/{event_id}/photo",
+    summary="Загрузить или заменить фото события",
+    dependencies=[perm(Module.EVENTS, Action.UPDATE)],
+    responses={
+        200: success_example(EVENT, "Photo uploaded."),
+        **COMMON_ERRORS,
+        **EVENT_NOT_FOUND,
+        **PHOTO_ERRORS,
+    },
+)
+async def set_event_photo(
+    event_id: int,
+    db: DBDep,
+    user: CurrentUserDep,
+    photo: Annotated[UploadFile, File(description="JPEG / PNG / WEBP.")],
+):
+    data = await EventService(db).set_photo(user, event_id, photo)
+    return ResponseBuilder.success(data=data, message="Photo uploaded.")
+
+
+@events.delete(
+    "/{event_id}/photo",
+    summary="Удалить фото события",
+    dependencies=[perm(Module.EVENTS, Action.UPDATE)],
+    responses={
+        200: success_example({**EVENT, "photo": None}, "Photo deleted."),
+        **COMMON_ERRORS,
+        **EVENT_PHOTO_NOT_FOUND,
+    },
+)
+async def delete_event_photo(event_id: int, db: DBDep, user: CurrentUserDep):
+    data = await EventService(db).delete_photo(user, event_id)
+    return ResponseBuilder.success(data=data, message="Photo deleted.")
+
+
 @events.delete(
     "/{event_id}",
-    summary="Удалить событие",
+    summary="Удалить событие вместе с фото",
     dependencies=[perm(Module.EVENTS, Action.DELETE)],
     responses={200: success_example(None, "Event deleted."), **COMMON_ERRORS, **EVENT_NOT_FOUND},
 )
@@ -239,9 +377,6 @@ async def delete_about(section_id: int, db: DBDep):
 
 
 # ======================= члены Совета и руководство =======================
-
-PHOTO = {"name": "portrait.jpg", "content_type": "image/jpeg", "size": 120400}
-PHOTO_ERRORS = {400: error_examples(InvalidPhotoException, PhotoTooLargeException)}
 
 SECTIONS = {
     PersonKind.COUNCIL: {

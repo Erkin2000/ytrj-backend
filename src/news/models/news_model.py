@@ -7,11 +7,21 @@
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base, TimestampMixin
-from src.news.enums import NewsStatus
+from src.news.enums import NewsSource, NewsStatus
 from src.product.enums import Language
 from src.product.models.product_model import LanguageType
 
@@ -24,8 +34,14 @@ NewsStatusType = Enum(
 )
 
 
+NewsSourceType = Enum(
+    NewsSource, name="news_source", values_callable=lambda e: [m.value for m in e]
+)
+
+
 class NewsORM(TimestampMixin, Base):
     __tablename__ = "news"
+    __table_args__ = (UniqueConstraint("telegram_chat_id", "telegram_message_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[NewsStatus] = mapped_column(
@@ -40,6 +56,15 @@ class NewsORM(TimestampMixin, Base):
     photo_name: Mapped[str | None] = mapped_column(String(255))
     photo_content_type: Mapped[str | None] = mapped_column(String(100))
     photo_size: Mapped[int | None] = mapped_column(Integer)
+
+    source: Mapped[NewsSource] = mapped_column(
+        NewsSourceType, default=NewsSource.MARKETING, server_default="MARKETING", nullable=False
+    )
+    # Пост канала, из которого бот создал новость (повторный пост не создаёт дубль).
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    telegram_media_group_id: Mapped[str | None] = mapped_column(String(64))
+    telegram_url: Mapped[str | None] = mapped_column(String(255))
 
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

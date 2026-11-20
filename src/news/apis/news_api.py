@@ -45,6 +45,8 @@ NEWS_EXAMPLE = {
     "state": "SCHEDULED",
     "publish_at": "2026-11-25T05:00:00Z",
     "photo": {"url": "/api/v1/marketing/news/7/photo", **PHOTO},
+    "source": "MARKETING",
+    "telegram_url": None,
     "created_by": {"id": 12, "full_name": "Marketing Operator", "username": "marketing1"},
     "updated_by": {"id": 12, "full_name": "Marketing Operator", "username": "marketing1"},
     "created_at": "2026-11-20T09:00:00Z",
@@ -120,6 +122,10 @@ delete_dep = Depends(require_permission(Module.NEWS, Action.DELETE))
 @router.get(
     "",
     summary="Все новости: черновики, отложенные и опубликованные",
+    description=(
+        "Фильтры: `state`, `search` (по заголовку), `source` — `MARKETING` (созданы в админке) "
+        "или `TELEGRAM` (посты канала, сохранённые ботом; у них `telegram_url` — ссылка на пост)."
+    ),
     dependencies=[read_dep],
     responses={200: paginated_example(NEWS_EXAMPLE, "News retrieved."), **COMMON_ERRORS},
 )

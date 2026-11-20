@@ -35,8 +35,28 @@ def _title_text(model) -> list[TitleTextOutDTO]:
     ]
 
 
+# Пути событий: публичный и для маркетинга.
+EVENT_PATHS = ("/api/v1/events", "/api/v1/marketing/events")
+
+
+def photo_dto(model, url: str) -> PhotoDTO | None:
+    if not model.photo_path:
+        return None
+    return PhotoDTO(
+        url=url,
+        name=model.photo_name,
+        content_type=model.photo_content_type or "image/jpeg",
+        size=model.photo_size or 0,
+    )
+
+
 def event_public(model: EventORM) -> EventPublicDTO:
-    return EventPublicDTO(id=model.id, translations=_title_text(model), date=model.event_date)
+    return EventPublicDTO(
+        id=model.id,
+        translations=_title_text(model),
+        date=model.event_date,
+        photo=photo_dto(model, f"{EVENT_PATHS[0]}/{model.id}/photo"),
+    )
 
 
 def event_dto(model: EventORM) -> EventDTO:
@@ -44,6 +64,7 @@ def event_dto(model: EventORM) -> EventDTO:
         id=model.id,
         translations=_title_text(model),
         date=model.event_date,
+        photo=photo_dto(model, f"{EVENT_PATHS[1]}/{model.id}/photo"),
         is_active=model.is_active,
         **_audit(model),
     )
@@ -64,14 +85,7 @@ def about_dto(model: AboutSectionORM) -> AboutDTO:
 
 
 def _person_fields(model: PersonORM, prefix: str) -> dict:
-    photo = None
-    if model.photo_path:
-        photo = PhotoDTO(
-            url=f"{prefix}/{model.id}/photo",
-            name=model.photo_name,
-            content_type=model.photo_content_type or "image/jpeg",
-            size=model.photo_size or 0,
-        )
+    photo = photo_dto(model, f"{prefix}/{model.id}/photo")
     return {
         "id": model.id,
         "translations": [

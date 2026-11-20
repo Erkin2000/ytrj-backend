@@ -54,6 +54,8 @@ class NewsDataMapper(DataMapper):
             state=news_state(data),
             publish_at=data.publish_at,
             photo=_photo(data, MARKETING_PREFIX),
+            source=data.source,
+            telegram_url=data.telegram_url,
             created_by=actor(data.created_by),
             updated_by=actor(data.updated_by),
             created_at=data.created_at,

@@ -102,6 +102,21 @@ class Settings(BaseSettings):
     BULLETIN_SCHEDULER_ENABLED: bool = True
     BULLETIN_SCHEDULER_INTERVAL_SECONDS: int = 30
 
+    # ---------- Telegram-бот: новости из канала ----------
+    # Бот — администратор канала; каждый новый пост канала сохраняется в news и сразу
+    # публикуется на сайте. Без токена бот выключен.
+    TELEGRAM_BOT_TOKEN: str = ""
+    # Каналы, из которых берутся новости: id (-100…) или @username через запятую.
+    # Посты других каналов игнорируются (их id пишется в лог) — иначе любой, кто добавит
+    # бота в свой канал, сможет публиковать новости на сайте.
+    TELEGRAM_CHANNELS: str = ""
+    TELEGRAM_POLLING_ENABLED: bool = True
+    TELEGRAM_API_URL: str = "https://api.telegram.org"
+
+    @property
+    def telegram_channels(self) -> set[str]:
+        return {c.strip().lower() for c in self.TELEGRAM_CHANNELS.split(",") if c.strip()}
+
     # Режим скоринга KATM, пока нет реальной интеграции:
     #   auto_pass       — каждая отправленная заявка проходит скоринг;
     #   auto_fail       — каждая заявка не проходит;

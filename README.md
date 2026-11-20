@@ -310,6 +310,21 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 - Сайт без токена: `GET /api/v1/news` (постранично, новые сверху), `GET /api/v1/news/{id}`,
   `GET /api/v1/news/{id}/photo`. Черновики и отложенные — 404. Фото — `MEDIA_PATH/news/<id>/`.
 
+#### Новости из Telegram-канала (бот)
+
+- В `.env`: `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHANNELS` (`@username` или id канала через запятую).
+  Бота добавляют в канал администратором. Backend сам опрашивает Telegram (long polling,
+  `src/news/telegram/`); вебхук и публичный адрес не нужны. Опрос — из одного процесса.
+- Новый пост канала → новость `source=TELEGRAM`, сразу `PUBLISHED`, дата — дата поста.
+  Заголовок — первая строка (до 200 символов), текст — остальное. Один текст записывается
+  на ru, uz и en — переводы правит маркетинг в админке.
+- Фото — самое крупное из поста (альбом — одно фото). Пост без текста пропускается.
+  Повторный пост не создаёт дубль; правка поста обновляет текст, пока новость не меняли в админке.
+  Удаление поста Telegram боту не сообщает — такую новость удаляет или скрывает маркетинг.
+- Посты каналов не из списка игнорируются (иначе любой мог бы публиковать на сайте) —
+  id такого канала пишется в лог: так удобно узнать id своего канала.
+- В админке: `GET /marketing/news?source=TELEGRAM`, в ответе `source` и `telegram_url`.
+
 ### События, «О нас», члены Совета и руководство на сайте (маркетинг)
 
 Миграция `a3c5e7f9b1d4`; права `events.*`, `about.*`, `council_profiles.*`, `leadership.*` — роли `MARKETING`.
@@ -317,7 +332,7 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 | Раздел | Сайт (без токена) | Маркетинг |
 |---|---|---|
-| События: заголовок, текст, дата | `GET /events?date_from=&date_to=`, `GET /events/{id}` | `/marketing/events` — CRUD (JSON) |
+| События: заголовок, текст, дата, фото | `GET /events?date=` (один день) или `?date_from=&date_to=`, `GET /events/{id}`, `GET /events/calendar` (дни с событиями — точки в календаре) | `/marketing/events` — CRUD (создание — multipart с необязательным `photo`, изменение — JSON), `PUT`/`DELETE /marketing/events/{id}/photo`, `/marketing/events/calendar`; фото на сайте — `GET /events/{id}/photo` |
 | «О нас»: заголовок, текст, порядок | `GET /about` | `/marketing/about` — CRUD (JSON) |
 | Члены Совета | `GET /council-members`, `/{id}`, `/{id}/photo` | `/marketing/council-members` — CRUD + `/{id}/photo` |
 | Руководство | `GET /leadership`, `/{id}`, `/{id}/photo` | `/marketing/leadership` — CRUD + `/{id}/photo` |

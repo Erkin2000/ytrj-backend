@@ -42,6 +42,11 @@ class EventORM(AuthorMixin, TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Фото необязательно: MEDIA_PATH/site/events/<id>/.
+    photo_path: Mapped[str | None] = mapped_column(String(500))
+    photo_name: Mapped[str | None] = mapped_column(String(255))
+    photo_content_type: Mapped[str | None] = mapped_column(String(100))
+    photo_size: Mapped[int | None] = mapped_column(Integer)
 
     translations: Mapped[list["EventTranslationORM"]] = relationship(
         back_populates="event",

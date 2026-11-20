@@ -14,7 +14,7 @@ from pydantic import (
 
 from src.application.schemas.application_schema import ActorDTO
 from src.bulletin.schemas.bulletin_schema import DATETIME_HINT, as_aware
-from src.news.enums import NewsState
+from src.news.enums import NewsSource, NewsState
 from src.product.enums import Language
 from src.product.schemas.product_schema import check_languages
 
@@ -119,6 +119,9 @@ class NewsUpdateDTO(BaseModel):
 class NewsFilterDTO(BaseModel):
     state: NewsState | None = Field(default=None, description="Черновики, отложенные или на сайте.")
     search: str | None = Field(default=None, max_length=100, description="Поиск по заголовку.")
+    source: NewsSource | None = Field(
+        default=None, description="`MARKETING` — созданы в админке, `TELEGRAM` — из канала."
+    )
 
 
 class NewsTranslationOutDTO(BaseModel):
@@ -151,6 +154,13 @@ class NewsDTO(BaseModel):
     )
     publish_at: datetime | None = None
     photo: NewsPhotoDTO | None = None
+    source: NewsSource = Field(
+        default=NewsSource.MARKETING,
+        description="`MARKETING` — создана в админке, `TELEGRAM` — пост канала (сохранил бот).",
+    )
+    telegram_url: str | None = Field(
+        default=None, description="Ссылка на пост канала (для публичного канала)."
+    )
     created_by: ActorDTO | None = None
     updated_by: ActorDTO | None = None
     created_at: datetime

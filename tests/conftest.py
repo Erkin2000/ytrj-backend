@@ -19,6 +19,9 @@ from src.account.models.user_model import UserORM
 from src.config import settings
 from src.main import app
 
+# Тесты не опрашивают реальный Telegram, даже если токен бота есть в .env.
+settings.TELEGRAM_POLLING_ENABLED = False
+
 ADMIN_USERNAME = os.getenv("TEST_ADMIN_USERNAME", settings.SUPERUSER)
 ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD", "admin12345")
 TEST_PINFL_PREFIX = "99999"

@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from datetime import date
+
+from sqlalchemy import func, select
 
 from src.utils.base_rep.base_rep import BaseRepository
 from src.website.enums import PersonKind
@@ -30,6 +32,8 @@ class WebsiteRepository(BaseRepository):
         stmt = select(EventORM)
         if only_active:
             stmt = stmt.where(EventORM.is_active.is_(True))
+        if filters.date:
+            stmt = stmt.where(EventORM.event_date == filters.date)
         if filters.date_from:
             stmt = stmt.where(EventORM.event_date >= filters.date_from)
         if filters.date_to:
@@ -37,6 +41,19 @@ class WebsiteRepository(BaseRepository):
         stmt = stmt.order_by(EventORM.event_date.desc(), EventORM.id.desc())
         mapper = event_public if only_active else None
         return await self.paginate(stmt, page, per_page, mapper=mapper)
+
+    async def get_event_days(
+        self, date_from: date, date_to: date, only_active: bool
+    ) -> list[tuple[date, int]]:
+        stmt = (
+            select(EventORM.event_date, func.count())
+            .where(EventORM.event_date >= date_from, EventORM.event_date <= date_to)
+            .group_by(EventORM.event_date)
+            .order_by(EventORM.event_date)
+        )
+        if only_active:
+            stmt = stmt.where(EventORM.is_active.is_(True))
+        return [(day, count) for day, count in (await self.session.execute(stmt)).all()]
 
     # ---------- «О нас» ----------
 

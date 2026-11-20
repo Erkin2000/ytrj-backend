@@ -9,6 +9,11 @@ class NewsStatus(StrEnum):
     PUBLISHED = "PUBLISHED"
 
 
+class NewsSource(StrEnum):
+    MARKETING = "MARKETING"  # создана в админке
+    TELEGRAM = "TELEGRAM"  # пост Telegram-канала, сохранён ботом
+
+
 class NewsState(StrEnum):
     """Что видит маркетинг: черновик, ждёт публикации или уже на сайте."""
 

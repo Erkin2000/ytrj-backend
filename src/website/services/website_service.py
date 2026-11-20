@@ -1,14 +1,18 @@
 """Контент сайта: события, «О нас», члены Совета и руководство."""
 
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import UploadFile
 
 from src.account.schemas.user_schema import CurrentUserDTO
+from src.bulletin.enums import TASHKENT_TZ
 from src.common.responses.exceptions import (
     AboutSectionNotFoundException,
     CouncilProfileNotFoundException,
+    EventCalendarRangeException,
     EventNotFoundException,
+    EventPhotoNotFoundException,
     LeadershipProfileNotFoundException,
     PersonPhotoNotFoundException,
 )
@@ -36,7 +40,8 @@ from src.website.schemas.website_schema import (
     AboutDTO,
     AboutPublicDTO,
     AboutUpdateDTO,
-    EventCreateDTO,
+    EventCalendarDayDTO,
+    EventCreateForm,
     EventDTO,
     EventFilterDTO,
     EventPublicDTO,
@@ -46,10 +51,60 @@ from src.website.schemas.website_schema import (
     PersonPublicDTO,
     PersonUpdateDTO,
 )
-from src.website.storage import PersonPhotoStorage
+from src.website.storage import EventPhotoStorage, PersonPhotoStorage, SitePhotoStorage
+
+# Календарь событий: не больше ~квартала за один запрос.
+CALENDAR_MAX_DAYS = 93
+
+
+def month_bounds(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    """Диапазон календаря включительно; по умолчанию — текущий месяц по Ташкенту."""
+    if date_from is None:
+        date_from = datetime.now(TASHKENT_TZ).date().replace(day=1)
+    if date_to is None:
+        next_month = (date_from.replace(day=28) + timedelta(days=4)).replace(day=1)
+        date_to = next_month - timedelta(days=1)
+    if date_to < date_from:
+        raise EventCalendarRangeException("date_to must not be earlier than date_from")
+    if (date_to - date_from).days >= CALENDAR_MAX_DAYS:
+        raise EventCalendarRangeException(
+            f"Calendar range must not exceed {CALENDAR_MAX_DAYS} days"
+        )
+    return date_from, date_to
+
+
+async def store_photo(storage: SitePhotoStorage, model, photo: UploadFile) -> None:
+    path, size, content_type = await storage.save(model.id, photo)
+    model.photo_path = path
+    model.photo_name = (Path(photo.filename or "").name or Path(path).name)[:255]
+    model.photo_content_type = content_type
+    model.photo_size = size
+
+
+def clear_photo(model) -> None:
+    model.photo_path = model.photo_name = model.photo_content_type = None
+    model.photo_size = None
+
+
+def photo_file(storage: SitePhotoStorage, model, not_found) -> tuple[Path, str, str]:
+    if not model.photo_path:
+        raise not_found()
+    path = storage.absolute_path(model.photo_path)
+    if not path.is_file():
+        raise not_found()
+    return path, model.photo_content_type or "image/jpeg", model.photo_name or path.name
 
 
 class EventService(BaseService):
+    storage = EventPhotoStorage()
+
+    async def get_calendar(
+        self, date_from: date | None, date_to: date | None, public: bool
+    ) -> list[EventCalendarDayDTO]:
+        start, end = month_bounds(date_from, date_to)
+        days = await self.db.website.get_event_days(start, end, only_active=public)
+        return [EventCalendarDayDTO(date=day, count=count) for day, count in days]
+
     async def get_page(
         self, filters: EventFilterDTO, page: int | None, per_page: int | None, public: bool
     ) -> dict:
@@ -64,16 +119,24 @@ class EventService(BaseService):
     async def get_detail(self, event_id: int) -> EventDTO:
         return event_dto(await self._get(event_id))
 
-    async def create(self, user: CurrentUserDTO, data: EventCreateDTO) -> EventDTO:
+    async def create(self, user: CurrentUserDTO, form: EventCreateForm) -> EventDTO:
         event = EventORM(
-            event_date=data.date,
-            is_active=data.is_active,
+            event_date=form.date,
+            is_active=form.is_active,
             created_by_id=user.id,
             updated_by_id=user.id,
         )
-        apply_translations(event.translations, data.translations, EventTranslationORM)
+        apply_translations(event.translations, form.translations(), EventTranslationORM)
         self.db.session.add(event)
-        await self.db.commit()
+        await self.db.flush()
+        try:
+            if form.photo is not None:
+                await store_photo(self.storage, event, form.photo)
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            await self.storage.delete_dir(event.id)
+            raise
         return await self.get_detail(event.id)
 
     async def update(self, user: CurrentUserDTO, event_id: int, data: EventUpdateDTO) -> EventDTO:
@@ -91,6 +154,41 @@ class EventService(BaseService):
     async def delete(self, event_id: int) -> None:
         await self.db.session.delete(await self._get(event_id))
         await self.db.commit()
+        await self.storage.delete_dir(event_id)
+
+    async def public_photo(self, event_id: int) -> tuple[Path, str, str]:
+        event = await self._get(event_id)
+        if not event.is_active:
+            raise EventNotFoundException()
+        return photo_file(self.storage, event, EventPhotoNotFoundException)
+
+    async def photo(self, event_id: int) -> tuple[Path, str, str]:
+        return photo_file(self.storage, await self._get(event_id), EventPhotoNotFoundException)
+
+    async def set_photo(self, user: CurrentUserDTO, event_id: int, photo: UploadFile) -> EventDTO:
+        event = await self._get(event_id)
+        old_path = event.photo_path
+        await store_photo(self.storage, event, photo)
+        event.updated_by_id = user.id
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.storage.delete(event.photo_path)
+            raise
+        if old_path:
+            await self.storage.delete(old_path)
+        return await self.get_detail(event_id)
+
+    async def delete_photo(self, user: CurrentUserDTO, event_id: int) -> EventDTO:
+        event = await self._get(event_id)
+        if not event.photo_path:
+            raise EventPhotoNotFoundException()
+        old_path = event.photo_path
+        clear_photo(event)
+        event.updated_by_id = user.id
+        await self.db.commit()
+        await self.storage.delete(old_path)
+        return await self.get_detail(event_id)
 
     async def _get(self, event_id: int) -> EventORM:
         event = await self.db.website.get_event(event_id)
@@ -199,11 +297,11 @@ class PersonService(BaseService):
         self._place(people, person, form.queue_number)
         try:
             if form.photo is not None:
-                await self._store_photo(person, form.photo)
+                await store_photo(self.storage, person, form.photo)
             await self.db.commit()
         except Exception:
             await self.db.rollback()
-            await self.storage.delete_person_dir(person.id)
+            await self.storage.delete_dir(person.id)
             raise
         return await self.get_detail(person.id)
 
@@ -233,12 +331,12 @@ class PersonService(BaseService):
         await self.db.session.delete(person)
         self._renumber([p for p in people if p.id != person.id])
         await self.db.commit()
-        await self.storage.delete_person_dir(person_id)
+        await self.storage.delete_dir(person_id)
 
     async def set_photo(self, user: CurrentUserDTO, person_id: int, photo: UploadFile) -> PersonDTO:
         person = await self._get(person_id)
         old_path = person.photo_path
-        await self._store_photo(person, photo)
+        await store_photo(self.storage, person, photo)
         person.updated_by_id = user.id
         try:
             await self.db.commit()
@@ -254,8 +352,7 @@ class PersonService(BaseService):
         if not person.photo_path:
             raise PersonPhotoNotFoundException()
         old_path = person.photo_path
-        person.photo_path = person.photo_name = person.photo_content_type = None
-        person.photo_size = None
+        clear_photo(person)
         person.updated_by_id = user.id
         await self.db.commit()
         await self.storage.delete(old_path)
@@ -283,17 +380,5 @@ class PersonService(BaseService):
             raise NOT_FOUND[self.kind]()
         return person
 
-    async def _store_photo(self, person: PersonORM, photo: UploadFile) -> None:
-        path, size, content_type = await self.storage.save(person.id, photo)
-        person.photo_path = path
-        person.photo_name = (Path(photo.filename or "").name or Path(path).name)[:255]
-        person.photo_content_type = content_type
-        person.photo_size = size
-
     def _photo_file(self, person: PersonORM) -> tuple[Path, str, str]:
-        if not person.photo_path:
-            raise PersonPhotoNotFoundException()
-        path = self.storage.absolute_path(person.photo_path)
-        if not path.is_file():
-            raise PersonPhotoNotFoundException()
-        return path, person.photo_content_type or "image/jpeg", person.photo_name or path.name
+        return photo_file(self.storage, person, PersonPhotoNotFoundException)
