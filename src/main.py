@@ -27,8 +27,11 @@ from src.common.responses.validation_handler import validation_exception_handler
 from src.common.swagger.i18n import DESCRIPTION_UZ, translate_openapi
 from src.common.swagger.openapi import restore_nulls
 from src.config import settings
+from src.faq.apis import faq_api
+from src.news.apis import news_api
 from src.product.apis import fund_category_api, fund_product_api, product_api
 from src.rbac.apis import permission_api, role_api
+from src.website.apis import website_api
 
 DESCRIPTION = """
 Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
@@ -41,6 +44,9 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 - **product** — продукты Фонда: названия, банки, сроки приёма, этапы и поля анкеты;
 - **application** — заявки по продуктам: черновик → скоринг KATM → Фонд → Совет → банк → завершение;
 - **bulletin** — бюллетени Совета: отправка членам Совета, подпись ЭЦП (E-IMZO), проверка по QR.
+- **faq** — вопросы и ответы для сайта; ведёт отдел маркетинга (роль MARKETING).
+- **news** — новости сайта с фото: публикация сразу или в выбранное время; ведёт маркетинг.
+- **website** — события, «О нас», члены Совета и руководство на сайте; ведёт маркетинг.
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
@@ -103,6 +109,33 @@ TAGS_METADATA = [
     {
         "name": "Бюллетени: проверка по QR",
         "description": "Публичная проверка документа по QR-коду.",
+    },
+    {"name": "FAQ: сайт", "description": "Вопросы и ответы, которые показывает сайт."},
+    {
+        "name": "FAQ: управление (маркетинг)",
+        "description": "Ведение вопросов и ответов отделом маркетинга (права faq.*).",
+    },
+    {"name": "Новости: сайт", "description": "Опубликованные новости для сайта."},
+    {
+        "name": "Новости: управление (маркетинг)",
+        "description": "Новости на трёх языках с фото: черновик, отложенная или сразу на сайте.",
+    },
+    {"name": "События: сайт", "description": "События Фонда для сайта."},
+    {"name": "События: управление (маркетинг)", "description": "Ведение событий (права events.*)."},
+    {"name": "О нас: сайт", "description": "Разделы страницы «О нас»."},
+    {
+        "name": "О нас: управление (маркетинг)",
+        "description": "Ведение разделов страницы «О нас» (права about.*).",
+    },
+    {"name": "Члены Совета: сайт", "description": "Карточки членов Совета Фонда на сайте."},
+    {
+        "name": "Члены Совета: управление (маркетинг)",
+        "description": "Карточки членов Совета: фото, Ф.И.О., описание, контакты, место в списке.",
+    },
+    {"name": "Руководство: сайт", "description": "Карточки руководства Фонда на сайте."},
+    {
+        "name": "Руководство: управление (маркетинг)",
+        "description": "Карточки руководства: фото, Ф.И.О., описание, контакты, место в списке.",
     },
 ]
 
@@ -217,6 +250,12 @@ app.include_router(admin_application_api.router, prefix=API_PREFIX)
 app.include_router(bank_stage_api.router, prefix=API_PREFIX)
 app.include_router(fund_bulletin_api.router, prefix=API_PREFIX)
 app.include_router(council_bulletin_api.router, prefix=API_PREFIX)
+app.include_router(faq_api.public_router, prefix=API_PREFIX)
+app.include_router(faq_api.router, prefix=API_PREFIX)
+app.include_router(news_api.public_router, prefix=API_PREFIX)
+app.include_router(news_api.router, prefix=API_PREFIX)
+for website_router in website_api.ROUTERS:
+    app.include_router(website_router, prefix=API_PREFIX)
 app.include_router(verify_api.api_router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)

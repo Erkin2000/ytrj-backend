@@ -17,6 +17,8 @@ from src.application.models.scoring_model import ScoringAttemptORM
 from src.application.models.status_history_model import StatusHistoryORM
 from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.bulletin.models.bulletin_model import BulletinORM, BulletinSignatureORM
+from src.faq.models.faq_model import FaqORM, FaqTranslationORM
+from src.news.models.news_model import NewsORM, NewsTranslationORM
 from src.product.models.product_model import (
     ProductCategoryORM,
     ProductFieldOptionORM,
@@ -28,6 +30,14 @@ from src.product.models.product_model import (
 from src.rbac.models.permission_model import PermissionORM
 from src.rbac.models.role_model import RoleORM
 from src.rbac.models.role_permission_model import RolePermissionORM
+from src.website.models.website_model import (
+    AboutSectionORM,
+    AboutTranslationORM,
+    EventORM,
+    EventTranslationORM,
+    PersonORM,
+    PersonTranslationORM,
+)
 
 __all__ = [
     "UserORM",
@@ -47,6 +57,16 @@ __all__ = [
     "RefreshTokenORM",
     "BulletinORM",
     "BulletinSignatureORM",
+    "FaqORM",
+    "FaqTranslationORM",
+    "NewsORM",
+    "NewsTranslationORM",
+    "EventORM",
+    "EventTranslationORM",
+    "AboutSectionORM",
+    "AboutTranslationORM",
+    "PersonORM",
+    "PersonTranslationORM",
     "ProductCategoryORM",
     "ProductORM",
     "ProductStageORM",

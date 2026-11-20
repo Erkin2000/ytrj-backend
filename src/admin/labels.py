@@ -145,6 +145,7 @@ ROLE_COLORS: dict[str, str] = {
     "FUND_OPERATOR": "blue",
     "BANK_EMPLOYEE": "indigo",
     "COUNCIL_MEMBER": "orange",
+    "MARKETING": "pink",
     "APPLICANT": "teal",
 }
 

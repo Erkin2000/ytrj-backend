@@ -22,6 +22,12 @@ class Module(StrEnum):
     COUNCIL_REVIEW = "council_review"
     ALLOCATION = "allocation"
     BULLETINS = "bulletins"
+    FAQ = "faq"
+    NEWS = "news"
+    EVENTS = "events"
+    ABOUT = "about"
+    COUNCIL_PROFILES = "council_profiles"
+    LEADERSHIP = "leadership"
 
 
 class Action(StrEnum):
@@ -43,6 +49,12 @@ MODULE_NAMES: dict[Module, str] = {
     Module.COUNCIL_REVIEW: "Этап Совета",
     Module.ALLOCATION: "Выделение ресурсов",
     Module.BULLETINS: "Бюллетени Совета",
+    Module.FAQ: "FAQ сайта",
+    Module.NEWS: "Новости сайта",
+    Module.EVENTS: "События сайта",
+    Module.ABOUT: "Страница «О нас»",
+    Module.COUNCIL_PROFILES: "Члены Совета на сайте",
+    Module.LEADERSHIP: "Руководство на сайте",
 }
 
 ACTION_NAMES: dict[Action, str] = {
@@ -97,6 +109,30 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "bulletins.update": ("Изменение бюллетеней", "Данные, файл и срок подписания бюллетеня"),
     "bulletins.delete": ("Удаление бюллетеней", "Удаление неотправленного бюллетеня"),
     "bulletins.approve": ("Отправка бюллетеней", "Отправка членам Совета и аннулирование"),
+    "faq.create": ("Создание вопросов FAQ", "Новый вопрос и ответ для сайта"),
+    "faq.read": ("Просмотр вопросов FAQ", "Все вопросы, включая скрытые с сайта"),
+    "faq.update": ("Изменение вопросов FAQ", "Текст, порядок и показ на сайте"),
+    "faq.delete": ("Удаление вопросов FAQ", "Удаление вопроса"),
+    "news.create": ("Создание новостей", "Новая новость: сразу, в выбранное время или черновик"),
+    "news.read": ("Просмотр новостей", "Все новости, включая черновики и отложенные"),
+    "news.update": ("Изменение новостей", "Текст, дата, фото и публикация"),
+    "news.delete": ("Удаление новостей", "Удаление новости вместе с фото"),
+    "events.create": ("Создание событий", "Новое событие для сайта"),
+    "events.read": ("Просмотр событий", "Все события, включая скрытые"),
+    "events.update": ("Изменение событий", "Текст, дата и показ на сайте"),
+    "events.delete": ("Удаление событий", "Удаление события"),
+    "about.create": ("Создание разделов «О нас»", "Новый раздел страницы «О нас»"),
+    "about.read": ("Просмотр разделов «О нас»", "Все разделы, включая скрытые"),
+    "about.update": ("Изменение разделов «О нас»", "Текст, порядок и показ на сайте"),
+    "about.delete": ("Удаление разделов «О нас»", "Удаление раздела"),
+    "council_profiles.create": ("Добавление членов Совета на сайт", "Новая карточка члена Совета"),
+    "council_profiles.read": ("Просмотр членов Совета на сайте", "Все карточки, включая скрытые"),
+    "council_profiles.update": ("Изменение членов Совета на сайте", "Данные, фото, место в списке"),
+    "council_profiles.delete": ("Удаление членов Совета с сайта", "Удаление карточки с фото"),
+    "leadership.create": ("Добавление руководства на сайт", "Новая карточка руководителя"),
+    "leadership.read": ("Просмотр руководства на сайте", "Все карточки, включая скрытые"),
+    "leadership.update": ("Изменение руководства на сайте", "Данные, фото, место в списке"),
+    "leadership.delete": ("Удаление руководства с сайта", "Удаление карточки с фото"),
 }
 
 
@@ -105,6 +141,7 @@ class RoleCode(StrEnum):
     FUND_OPERATOR = "FUND_OPERATOR"
     BANK_EMPLOYEE = "BANK_EMPLOYEE"
     COUNCIL_MEMBER = "COUNCIL_MEMBER"
+    MARKETING = "MARKETING"
     APPLICANT = "APPLICANT"
 
 
@@ -166,6 +203,37 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "applications.read",
             "council_review.read",
             "council_review.approve",
+        ],
+    ),
+    RoleCode.MARKETING: (
+        "Маркетинг",
+        "Контент сайта: новости, события, FAQ, «О нас», члены Совета и руководство",
+        False,
+        [
+            "faq.create",
+            "faq.read",
+            "faq.update",
+            "faq.delete",
+            "news.create",
+            "news.read",
+            "news.update",
+            "news.delete",
+            "events.create",
+            "events.read",
+            "events.update",
+            "events.delete",
+            "about.create",
+            "about.read",
+            "about.update",
+            "about.delete",
+            "council_profiles.create",
+            "council_profiles.read",
+            "council_profiles.update",
+            "council_profiles.delete",
+            "leadership.create",
+            "leadership.read",
+            "leadership.update",
+            "leadership.delete",
         ],
     ),
     RoleCode.APPLICANT: (

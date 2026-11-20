@@ -1,0 +1,473 @@
+"""Контент сайта: события, «О нас», члены Совета и руководство.
+
+Публичные ручки — без авторизации, для сайта; ручки `/marketing/...` — для отдела
+маркетинга (права events.*, about.*, council_profiles.*, leadership.*).
+"""
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import FileResponse
+
+from src.common.dependencies import CurrentUserDep, DBDep, PaginationDep, require_permission
+from src.common.responses.exceptions import (
+    AboutSectionNotFoundException,
+    CouncilProfileNotFoundException,
+    EventNotFoundException,
+    InvalidPhotoException,
+    LeadershipProfileNotFoundException,
+    PersonPhotoNotFoundException,
+    PhotoTooLargeException,
+)
+from src.common.responses.response import ResponseBuilder
+from src.common.swagger.responses import (
+    COMMON_ERRORS,
+    PUBLIC_ERRORS,
+    error_examples,
+    paginated_example,
+    success_example,
+)
+from src.rbac.permissions import Action, Module
+from src.website.enums import PersonKind
+from src.website.mappers import PERSON_PATHS
+from src.website.schemas.website_schema import (
+    ABOUT_TRANSLATIONS_EXAMPLE,
+    EVENT_TRANSLATIONS_EXAMPLE,
+    PERSON_TRANSLATIONS_EXAMPLE,
+    AboutCreateDTO,
+    AboutUpdateDTO,
+    EventCreateDTO,
+    EventFilterDTO,
+    EventUpdateDTO,
+    PersonCreateForm,
+    PersonUpdateDTO,
+)
+from src.website.services.website_service import AboutService, EventService, PersonService
+
+AUDIT = {
+    "created_by": {"id": 12, "full_name": "Marketing Operator", "username": "marketing1"},
+    "updated_by": {"id": 12, "full_name": "Marketing Operator", "username": "marketing1"},
+    "created_at": "2026-11-20T09:00:00Z",
+    "updated_at": "2026-11-20T09:00:00Z",
+}
+
+
+def perm(module: Module, action: Action):
+    return Depends(require_permission(module, action))
+
+
+# ======================= события =======================
+
+EVENT_PUBLIC = {"id": 3, "translations": EVENT_TRANSLATIONS_EXAMPLE, "date": "2026-12-05"}
+EVENT = {**EVENT_PUBLIC, "is_active": True, **AUDIT}
+EVENT_NOT_FOUND = {404: error_examples(EventNotFoundException)}
+
+events_public = APIRouter(prefix="/events", tags=["События: сайт"])
+events = APIRouter(prefix="/marketing/events", tags=["События: управление (маркетинг)"])
+EventFilterDep = Annotated[EventFilterDTO, Depends()]
+
+
+@events_public.get(
+    "",
+    summary="События для сайта (активные), сначала поздние по дате",
+    description="Без авторизации. Фильтр по дате: `date_from`, `date_to`.",
+    responses={200: paginated_example(EVENT_PUBLIC, "Events retrieved."), **PUBLIC_ERRORS},
+)
+async def get_public_events(db: DBDep, pagination: PaginationDep, filters: EventFilterDep):
+    data = await EventService(db).get_page(filters, pagination.page, pagination.per_page, True)
+    return ResponseBuilder.success(data=data, message="Events retrieved.")
+
+
+@events_public.get(
+    "/{event_id}",
+    summary="Событие для сайта",
+    description="Без авторизации. Неактивное событие — 404.",
+    responses={
+        200: success_example(EVENT_PUBLIC, "Event found."),
+        **PUBLIC_ERRORS,
+        **EVENT_NOT_FOUND,
+    },
+)
+async def get_public_event(event_id: int, db: DBDep):
+    data = await EventService(db).get_public(event_id)
+    return ResponseBuilder.success(data=data, message="Event found.")
+
+
+@events.get(
+    "",
+    summary="Все события, включая неактивные",
+    dependencies=[perm(Module.EVENTS, Action.READ)],
+    responses={200: paginated_example(EVENT, "Events retrieved."), **COMMON_ERRORS},
+)
+async def get_events(db: DBDep, pagination: PaginationDep, filters: EventFilterDep):
+    data = await EventService(db).get_page(filters, pagination.page, pagination.per_page, False)
+    return ResponseBuilder.success(data=data, message="Events retrieved.")
+
+
+@events.post(
+    "",
+    status_code=201,
+    summary="Создать событие: заголовок и текст на ru / uz / en, дата",
+    dependencies=[perm(Module.EVENTS, Action.CREATE)],
+    responses={201: success_example(EVENT, "Event created."), **COMMON_ERRORS},
+)
+async def create_event(data: EventCreateDTO, db: DBDep, user: CurrentUserDep):
+    event = await EventService(db).create(user, data)
+    return ResponseBuilder.success(data=event, message="Event created.", status_code=201)
+
+
+@events.get(
+    "/{event_id}",
+    summary="Событие по ID",
+    dependencies=[perm(Module.EVENTS, Action.READ)],
+    responses={200: success_example(EVENT, "Event found."), **COMMON_ERRORS, **EVENT_NOT_FOUND},
+)
+async def get_event(event_id: int, db: DBDep):
+    data = await EventService(db).get_detail(event_id)
+    return ResponseBuilder.success(data=data, message="Event found.")
+
+
+@events.patch(
+    "/{event_id}",
+    summary="Изменить переводы, дату или активность события",
+    dependencies=[perm(Module.EVENTS, Action.UPDATE)],
+    responses={200: success_example(EVENT, "Event updated."), **COMMON_ERRORS, **EVENT_NOT_FOUND},
+)
+async def update_event(event_id: int, data: EventUpdateDTO, db: DBDep, user: CurrentUserDep):
+    event = await EventService(db).update(user, event_id, data)
+    return ResponseBuilder.success(data=event, message="Event updated.")
+
+
+@events.delete(
+    "/{event_id}",
+    summary="Удалить событие",
+    dependencies=[perm(Module.EVENTS, Action.DELETE)],
+    responses={200: success_example(None, "Event deleted."), **COMMON_ERRORS, **EVENT_NOT_FOUND},
+)
+async def delete_event(event_id: int, db: DBDep):
+    await EventService(db).delete(event_id)
+    return ResponseBuilder.success(message="Event deleted.")
+
+
+# ======================= «О нас» =======================
+
+ABOUT_PUBLIC = {"id": 1, "translations": ABOUT_TRANSLATIONS_EXAMPLE, "sort_order": 0}
+ABOUT = {**ABOUT_PUBLIC, "is_active": True, **AUDIT}
+ABOUT_NOT_FOUND = {404: error_examples(AboutSectionNotFoundException)}
+
+about_public = APIRouter(prefix="/about", tags=["О нас: сайт"])
+about = APIRouter(prefix="/marketing/about", tags=["О нас: управление (маркетинг)"])
+
+
+@about_public.get(
+    "",
+    summary="Разделы страницы «О нас» (активные), по порядку",
+    description="Без авторизации. Порядок — по `sort_order`, затем по `id`.",
+    responses={200: success_example([ABOUT_PUBLIC], "About retrieved."), **PUBLIC_ERRORS},
+)
+async def get_public_about(db: DBDep):
+    data = await AboutService(db).get_public_list()
+    return ResponseBuilder.success(data=data, message="About retrieved.")
+
+
+@about.get(
+    "",
+    summary="Все разделы «О нас», включая неактивные",
+    dependencies=[perm(Module.ABOUT, Action.READ)],
+    responses={200: success_example([ABOUT], "About retrieved."), **COMMON_ERRORS},
+)
+async def get_about_list(db: DBDep):
+    data = await AboutService(db).get_list()
+    return ResponseBuilder.success(data=data, message="About retrieved.")
+
+
+@about.post(
+    "",
+    status_code=201,
+    summary="Создать раздел «О нас»: заголовок и текст на ru / uz / en",
+    dependencies=[perm(Module.ABOUT, Action.CREATE)],
+    responses={201: success_example(ABOUT, "About section created."), **COMMON_ERRORS},
+)
+async def create_about(data: AboutCreateDTO, db: DBDep, user: CurrentUserDep):
+    section = await AboutService(db).create(user, data)
+    return ResponseBuilder.success(data=section, message="About section created.", status_code=201)
+
+
+@about.get(
+    "/{section_id}",
+    summary="Раздел «О нас» по ID",
+    dependencies=[perm(Module.ABOUT, Action.READ)],
+    responses={
+        200: success_example(ABOUT, "About section found."),
+        **COMMON_ERRORS,
+        **ABOUT_NOT_FOUND,
+    },
+)
+async def get_about(section_id: int, db: DBDep):
+    data = await AboutService(db).get_detail(section_id)
+    return ResponseBuilder.success(data=data, message="About section found.")
+
+
+@about.patch(
+    "/{section_id}",
+    summary="Изменить переводы, порядок или активность раздела «О нас»",
+    dependencies=[perm(Module.ABOUT, Action.UPDATE)],
+    responses={
+        200: success_example(ABOUT, "About section updated."),
+        **COMMON_ERRORS,
+        **ABOUT_NOT_FOUND,
+    },
+)
+async def update_about(section_id: int, data: AboutUpdateDTO, db: DBDep, user: CurrentUserDep):
+    section = await AboutService(db).update(user, section_id, data)
+    return ResponseBuilder.success(data=section, message="About section updated.")
+
+
+@about.delete(
+    "/{section_id}",
+    summary="Удалить раздел «О нас»",
+    dependencies=[perm(Module.ABOUT, Action.DELETE)],
+    responses={
+        200: success_example(None, "About section deleted."),
+        **COMMON_ERRORS,
+        **ABOUT_NOT_FOUND,
+    },
+)
+async def delete_about(section_id: int, db: DBDep):
+    await AboutService(db).delete(section_id)
+    return ResponseBuilder.success(message="About section deleted.")
+
+
+# ======================= члены Совета и руководство =======================
+
+PHOTO = {"name": "portrait.jpg", "content_type": "image/jpeg", "size": 120400}
+PHOTO_ERRORS = {400: error_examples(InvalidPhotoException, PhotoTooLargeException)}
+
+SECTIONS = {
+    PersonKind.COUNCIL: {
+        "module": Module.COUNCIL_PROFILES,
+        "title": "Члены Совета",
+        "one": "члена Совета",
+        "not_found": CouncilProfileNotFoundException,
+        "public_tag": "Члены Совета: сайт",
+        "tag": "Члены Совета: управление (маркетинг)",
+    },
+    PersonKind.LEADERSHIP: {
+        "module": Module.LEADERSHIP,
+        "title": "Руководство",
+        "one": "руководителя",
+        "not_found": LeadershipProfileNotFoundException,
+        "public_tag": "Руководство: сайт",
+        "tag": "Руководство: управление (маркетинг)",
+    },
+}
+
+
+def person_routers(kind: PersonKind) -> tuple[APIRouter, APIRouter]:
+    """Публичный роутер и роутер маркетинга для раздела людей."""
+    cfg = SECTIONS[kind]
+    public_path, marketing_path = PERSON_PATHS[kind]
+    module: Module = cfg["module"]
+    one: str = cfg["one"]
+    not_found = {404: error_examples(cfg["not_found"])}
+    photo_not_found = {404: error_examples(cfg["not_found"], PersonPhotoNotFoundException)}
+
+    base = {
+        "id": 5,
+        "translations": PERSON_TRANSLATIONS_EXAMPLE,
+        "phone_number": "+998901234567",
+        "email": "a.valiyev@yoshlarfondi.uz",
+        "queue_number": 1,
+    }
+    public_example = {**base, "photo": {"url": f"{public_path}/5/photo", **PHOTO}}
+    example = {
+        **base,
+        "photo": {"url": f"{marketing_path}/5/photo", **PHOTO},
+        "is_active": True,
+        **AUDIT,
+    }
+
+    public = APIRouter(prefix=public_path.removeprefix("/api/v1"), tags=[cfg["public_tag"]])
+    router = APIRouter(prefix=marketing_path.removeprefix("/api/v1"), tags=[cfg["tag"]])
+
+    def service(db) -> PersonService:
+        return PersonService(db, kind)
+
+    @public.get(
+        "",
+        summary=f"{cfg['title']} для сайта (активные), по `queue_number`",
+        description="Без авторизации. Фото — по `photo.url`.",
+        responses={200: success_example([public_example], "People retrieved."), **PUBLIC_ERRORS},
+    )
+    async def get_public_people(db: DBDep):
+        data = await service(db).get_public_list()
+        return ResponseBuilder.success(data=data, message="People retrieved.")
+
+    @public.get(
+        "/{person_id}",
+        summary=f"Карточка {one} для сайта",
+        description="Без авторизации. Неактивная карточка — 404.",
+        responses={
+            200: success_example(public_example, "Person found."),
+            **PUBLIC_ERRORS,
+            **not_found,
+        },
+    )
+    async def get_public_person(person_id: int, db: DBDep):
+        data = await service(db).get_public(person_id)
+        return ResponseBuilder.success(data=data, message="Person found.")
+
+    @public.get(
+        "/{person_id}/photo",
+        summary=f"Фото {one}",
+        description="Без авторизации.",
+        response_class=FileResponse,
+        responses=photo_not_found,
+    )
+    async def get_public_photo(person_id: int, db: DBDep):
+        path, content_type, name = await service(db).public_photo(person_id)
+        return FileResponse(
+            path,
+            media_type=content_type,
+            filename=name,
+            content_disposition_type="inline",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    @router.get(
+        "",
+        summary=f"{cfg['title']}: все карточки, включая неактивные, по `queue_number`",
+        dependencies=[perm(module, Action.READ)],
+        responses={200: success_example([example], "People retrieved."), **COMMON_ERRORS},
+    )
+    async def get_people(db: DBDep):
+        data = await service(db).get_list()
+        return ResponseBuilder.success(data=data, message="People retrieved.")
+
+    @router.post(
+        "",
+        status_code=201,
+        summary=f"Добавить {one} (multipart/form-data)",
+        description=(
+            "Ф.И.О. и описание — на трёх языках: `full_name_ru`, `full_name_uz`, `full_name_en`, "
+            "`description_ru`, `description_uz`, `description_en`. Необязательно: "
+            "`phone_number` (+998XXXXXXXXX), `email`, `queue_number` (место в списке; "
+            "не указано — в конец), `photo` (JPEG / PNG / WEBP)."
+        ),
+        dependencies=[perm(module, Action.CREATE)],
+        responses={
+            201: success_example(example, "Person created."),
+            **COMMON_ERRORS,
+            **PHOTO_ERRORS,
+        },
+    )
+    async def create_person(
+        db: DBDep,
+        user: CurrentUserDep,
+        form: Annotated[PersonCreateForm, Form(media_type="multipart/form-data")],
+    ):
+        data = await service(db).create(user, form)
+        return ResponseBuilder.success(data=data, message="Person created.", status_code=201)
+
+    @router.get(
+        "/{person_id}",
+        summary=f"Карточка {one} по ID",
+        dependencies=[perm(module, Action.READ)],
+        responses={200: success_example(example, "Person found."), **COMMON_ERRORS, **not_found},
+    )
+    async def get_person(person_id: int, db: DBDep):
+        data = await service(db).get_detail(person_id)
+        return ResponseBuilder.success(data=data, message="Person found.")
+
+    @router.patch(
+        "/{person_id}",
+        summary=f"Изменить карточку {one}: переводы, контакты, место в списке, активность",
+        description=(
+            "`queue_number` переставляет карточку на это место, остальные сдвигаются. "
+            "Фото — `PUT` / `DELETE /{person_id}/photo`."
+        ),
+        dependencies=[perm(module, Action.UPDATE)],
+        responses={
+            200: success_example(example, "Person updated."),
+            **COMMON_ERRORS,
+            **not_found,
+        },
+    )
+    async def update_person(person_id: int, data: PersonUpdateDTO, db: DBDep, user: CurrentUserDep):
+        person = await service(db).update(user, person_id, data)
+        return ResponseBuilder.success(data=person, message="Person updated.")
+
+    @router.delete(
+        "/{person_id}",
+        summary=f"Удалить карточку {one} вместе с фото",
+        description="Номера остальных карточек сдвигаются, пропусков в списке нет.",
+        dependencies=[perm(module, Action.DELETE)],
+        responses={200: success_example(None, "Person deleted."), **COMMON_ERRORS, **not_found},
+    )
+    async def delete_person(person_id: int, db: DBDep):
+        await service(db).delete(person_id)
+        return ResponseBuilder.success(message="Person deleted.")
+
+    @router.get(
+        "/{person_id}/photo",
+        summary=f"Фото {one} (в том числе неактивной карточки)",
+        dependencies=[perm(module, Action.READ)],
+        response_class=FileResponse,
+        responses={**COMMON_ERRORS, **photo_not_found},
+    )
+    async def get_photo(person_id: int, db: DBDep):
+        path, content_type, name = await service(db).photo(person_id)
+        return FileResponse(
+            path, media_type=content_type, filename=name, content_disposition_type="inline"
+        )
+
+    @router.put(
+        "/{person_id}/photo",
+        summary=f"Загрузить или заменить фото {one}",
+        dependencies=[perm(module, Action.UPDATE)],
+        responses={
+            200: success_example(example, "Photo uploaded."),
+            **COMMON_ERRORS,
+            **not_found,
+            **PHOTO_ERRORS,
+        },
+    )
+    async def set_photo(
+        person_id: int,
+        db: DBDep,
+        user: CurrentUserDep,
+        photo: Annotated[UploadFile, File(description="JPEG / PNG / WEBP.")],
+    ):
+        data = await service(db).set_photo(user, person_id, photo)
+        return ResponseBuilder.success(data=data, message="Photo uploaded.")
+
+    @router.delete(
+        "/{person_id}/photo",
+        summary=f"Удалить фото {one}",
+        dependencies=[perm(module, Action.UPDATE)],
+        responses={
+            200: success_example({**example, "photo": None}, "Photo deleted."),
+            **COMMON_ERRORS,
+            **photo_not_found,
+        },
+    )
+    async def delete_photo(person_id: int, db: DBDep, user: CurrentUserDep):
+        data = await service(db).delete_photo(user, person_id)
+        return ResponseBuilder.success(data=data, message="Photo deleted.")
+
+    return public, router
+
+
+council_public, council = person_routers(PersonKind.COUNCIL)
+leadership_public, leadership = person_routers(PersonKind.LEADERSHIP)
+
+ROUTERS = [
+    events_public,
+    events,
+    about_public,
+    about,
+    council_public,
+    council,
+    leadership_public,
+    leadership,
+]

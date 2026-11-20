@@ -349,6 +349,43 @@ class ProductNotFoundException(NotFoundException):
     message = "Product not found"
 
 
+class FaqNotFoundException(NotFoundException):
+    message = "FAQ item not found"
+
+
+class NewsNotFoundException(NotFoundException):
+    message = "News item not found"
+
+
+class NewsPhotoNotFoundException(NotFoundException):
+    message = "News item has no photo"
+
+
+class EventNotFoundException(NotFoundException):
+    message = "Event not found"
+
+
+class AboutSectionNotFoundException(NotFoundException):
+    message = "About section not found"
+
+
+class CouncilProfileNotFoundException(NotFoundException):
+    message = "Council member card not found"
+
+
+class LeadershipProfileNotFoundException(NotFoundException):
+    message = "Leadership card not found"
+
+
+class PersonPhotoNotFoundException(NotFoundException):
+    message = "The card has no photo"
+
+
+class NewsScheduleException(BadRequestException):
+    message = "Invalid publication time"
+    field = "publish_at"
+
+
 class ProductCategoryNotFoundException(NotFoundException):
     message = "Product category not found"
     field = "category_id"
