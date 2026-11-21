@@ -74,6 +74,10 @@ async def run_poller() -> None:
 @contextlib.asynccontextmanager
 async def telegram_poller():
     enabled = bool(settings.TELEGRAM_BOT_TOKEN) and settings.TELEGRAM_POLLING_ENABLED
+    if not settings.TELEGRAM_BOT_TOKEN:
+        logger.info("Telegram bot is off: TELEGRAM_BOT_TOKEN is empty")
+    elif not settings.TELEGRAM_POLLING_ENABLED:
+        logger.info("Telegram bot is off: TELEGRAM_POLLING_ENABLED=false")
     if enabled and not settings.telegram_channels:
         logger.warning(
             "TELEGRAM_CHANNELS is empty: the bot ignores all posts and logs the channel id "

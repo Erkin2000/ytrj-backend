@@ -3,7 +3,11 @@
 Других команд у бота нет: новости он берёт только из постов канала.
 """
 
+import logging
+
 from src.news.telegram.client import TelegramClient
+
+logger = logging.getLogger(__name__)
 
 WELCOME_TEXT = (
     "🇺🇿 Yoshlar Fondi botiga xush kelibsiz!\n"
@@ -35,4 +39,5 @@ async def handle_message(client: TelegramClient, update: dict) -> bool:
     if command_of((message.get("text") or "").strip()) not in COMMANDS:
         return False
     await client.send_message(int(chat["id"]), WELCOME_TEXT)
+    logger.info("Telegram bot: welcome sent to private chat %s", chat.get("id"))
     return True
