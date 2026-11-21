@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from src.config import settings
+from src.news.telegram.commands import WELCOME_TEXT, command_of, handle_message
 from src.news.telegram.service import TelegramNewsService, split_post
 from src.utils.db_manager import DBManager
 from tests.conftest import data, db_run, png_bytes
@@ -27,6 +28,10 @@ STRANGER = {"id": -1008880000001, "type": "channel", "title": "Чужой кан
 class FakeClient:
     def __init__(self):
         self.downloads: list[str] = []
+        self.sent: list[tuple[int, str]] = []
+
+    async def send_message(self, chat_id: int, text: str) -> None:
+        self.sent.append((chat_id, text))
 
     async def download_file(self, file_id: str) -> bytes:
         self.downloads.append(file_id)
@@ -150,3 +155,23 @@ def test_album_text_only_and_skipped_posts(client, bot):
         handle({"update_id": 207, "message": {"message_id": 207, "chat": group, "text": "x"}})
         is None
     )
+
+
+def test_start_command_replies_with_welcome():
+    client = FakeClient()
+
+    def message(text_: str, chat_type: str = "private") -> dict:
+        chat = {"id": 777, "type": chat_type}
+        return {"update_id": 1, "message": {"message_id": 1, "chat": chat, "text": text_}}
+
+    assert command_of("/start@yoshlar_bot payload") == "/start"
+    assert command_of("привет") is None
+    for text_ in ("/start", "/START", "/start@yoshlar_bot", "/help"):
+        assert asyncio.run(handle_message(client, message(text_))) is True
+    assert client.sent == [(777, WELCOME_TEXT)] * 4
+    assert "Добро пожаловать" in WELCOME_TEXT and "xush kelibsiz" in WELCOME_TEXT
+
+    # Не команда, другая команда или не личный чат — бот молчит.
+    for update in (message("привет"), message("/news"), message("/start", "group")):
+        assert asyncio.run(handle_message(client, update)) is False
+    assert len(client.sent) == 4

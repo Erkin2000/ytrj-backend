@@ -10,7 +10,8 @@ from src.config import settings
 
 # Long polling: Telegram держит запрос открытым до POLL_TIMEOUT секунд.
 POLL_TIMEOUT = 25
-ALLOWED_UPDATES = ["channel_post", "edited_channel_post"]
+# message — личные сообщения боту (/start).
+ALLOWED_UPDATES = ["channel_post", "edited_channel_post", "message"]
 
 
 class TelegramError(Exception):
@@ -50,6 +51,9 @@ class TelegramClient:
         if offset is not None:
             params["offset"] = offset
         return await self.call("getUpdates", **params)
+
+    async def send_message(self, chat_id: int, text: str) -> None:
+        await self.call("sendMessage", chat_id=chat_id, text=text)
 
     async def download_file(self, file_id: str) -> bytes:
         info = await self.call("getFile", file_id=file_id)

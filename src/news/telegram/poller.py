@@ -13,6 +13,7 @@ import logging
 from src.config import settings
 from src.database import async_session_maker
 from src.news.telegram.client import TelegramClient, TelegramError
+from src.news.telegram.commands import handle_message
 from src.news.telegram.service import TelegramNewsService
 from src.utils.db_manager import DBManager
 
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 async def handle(client: TelegramClient, update: dict) -> None:
+    if "message" in update:
+        await handle_message(client, update)
+        return
     async with DBManager(session_factory=async_session_maker) as db:
         await TelegramNewsService(db, client).handle_update(update)
 
