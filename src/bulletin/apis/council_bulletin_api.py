@@ -3,9 +3,10 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from src.bulletin.apis.examples import CALENDAR, COUNCIL_DETAIL, COUNCIL_ITEM
+from src.bulletin.apis.fund_bulletin_api import PDF_RESPONSE, pdf_response
 from src.bulletin.enums import CouncilBulletinTab
 from src.bulletin.schemas.bulletin_schema import BulletinSignDTO
 from src.bulletin.services.council_bulletin_service import CouncilBulletinService
@@ -134,6 +135,19 @@ async def open_bulletin(bulletin_id: int, db: DBDep, user: CurrentUserDep):
 async def open_file(bulletin_id: int, db: DBDep, user: CurrentUserDep):
     path, content_type, file_name = await CouncilBulletinService(db).open_file(bulletin_id, user)
     return FileResponse(path, media_type=content_type, filename=file_name)
+
+
+@router.get(
+    "/{bulletin_id}/pdf",
+    summary="PDF бюллетеня: все сведения, решения членов Совета и QR-код внизу",
+    description="Документ из текущих данных. Просмотр PDF не заменяет просмотр файла для подписи.",
+    dependencies=[read_dep],
+    response_class=Response,
+    responses={**PDF_RESPONSE, **COMMON_ERRORS, 404: error_examples(BulletinNotFoundException)},
+)
+async def get_pdf(bulletin_id: int, db: DBDep, user: CurrentUserDep):
+    content, file_name = await CouncilBulletinService(db).get_pdf(bulletin_id, user)
+    return pdf_response(content, file_name)
 
 
 @router.post(

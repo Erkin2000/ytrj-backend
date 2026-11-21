@@ -108,6 +108,7 @@ BULLETIN_STATUS_LABELS: dict[str, tuple[str, str]] = {
     "PUBLISHED": ("Отправлен Совету", "blue"),
     "PARTIALLY_SIGNED": ("Подписан частично", "orange"),
     "COMPLETED": ("Подписан всеми", "green"),
+    "EXPIRED": ("Срок подписания истёк", "secondary"),
     "CANCELLED": ("Аннулирован", "red"),
 }
 

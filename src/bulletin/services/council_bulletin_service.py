@@ -106,7 +106,7 @@ class CouncilBulletinService(BaseService):
         page: int | None,
         per_page: int | None,
     ) -> dict:
-        await self.bulletins.publish_due()
+        await self.bulletins.refresh_due()
         now = utcnow()
         return await self.db.bulletin.get_member_page(
             user.id,
@@ -120,14 +120,14 @@ class CouncilBulletinService(BaseService):
         )
 
     async def get_counters(self, user: CurrentUserDTO) -> dict[str, int]:
-        await self.bulletins.publish_due()
+        await self.bulletins.refresh_due()
         return await self.db.bulletin.count_member_tabs(user.id, utcnow())
 
     async def get_calendar(
         self, user: CurrentUserDTO, date_from: date | None, date_to: date | None
     ) -> list[CalendarDayDTO]:
         """Мой календарь: в какой день бюллетень пришёл и до какого дня его подписать."""
-        await self.bulletins.publish_due()
+        await self.bulletins.refresh_due()
         date_from, date_to = day_bounds(date_from, date_to)
         start, end = range_utc(date_from, date_to)
         now = utcnow()
@@ -158,11 +158,18 @@ class CouncilBulletinService(BaseService):
 
     async def open(self, bulletin_id: int, user: CurrentUserDTO) -> CouncilBulletinDetailDTO:
         """Открыть бюллетень: первый просмотр фиксируется (нужен для подписи)."""
+        await self.bulletins.refresh_due()
         signature, _ = await self._get_mine(bulletin_id, user)
         if signature.viewed_at is None:
             signature.viewed_at = utcnow()
             await self.db.commit()
         return await self.detail(bulletin_id, user)
+
+    async def get_pdf(self, bulletin_id: int, user: CurrentUserDTO) -> tuple[bytes, str]:
+        await self.bulletins.refresh_due()
+        self.db.session.expire_all()
+        _, bulletin = await self._get_mine(bulletin_id, user)
+        return await BulletinService.pdf(bulletin)
 
     async def open_file(self, bulletin_id: int, user: CurrentUserDTO) -> tuple[Path, str, str]:
         """Скачать / открыть файл бюллетеня: просмотр файла фиксируется."""

@@ -178,6 +178,7 @@ class BulletinDetailDTO(BulletinListItemDTO):
     cancel_reason: str | None = None
     verify_url: str
     qr_url: str
+    pdf_url: str = Field(description="PDF бюллетеня: все сведения, решения и QR-код внизу.")
 
 
 class MySignatureDTO(BaseModel):
@@ -219,6 +220,7 @@ class CouncilBulletinDetailDTO(CouncilBulletinItemDTO):
     created_at: datetime
     my: MySignatureDTO
     verify_url: str
+    pdf_url: str = Field(description="PDF бюллетеня: все сведения и QR-код внизу.")
 
 
 class CalendarEventDTO(BaseModel):

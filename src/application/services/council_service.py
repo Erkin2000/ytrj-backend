@@ -86,10 +86,26 @@ class CouncilService(ApplicationBaseService):
 
         await self._finalize_if_ready(application, user, decision, reason, source)
 
+    async def drop_members(
+        self, application: ApplicationORM, member_ids: set[int], source: str
+    ) -> None:
+        """Член Совета выбыл (заблокирован, удалён, сменил роль или лишился права решения),
+        не проголосовав: его назначение снимается, а итог пересчитывается по оставшимся
+        — «Согласен» всех оставшихся утверждает заявку. Коммит делает вызывающий."""
+        for assignment in await self.db.council_assignment.get_orm_for_application(application.id):
+            if assignment.decision is None and assignment.council_member_id in member_ids:
+                await self.db.session.delete(assignment)
+        await self.db.flush()
+        if application.status != ApplicationStatus.COUNCIL_REVIEW:
+            return
+        assignments = await self.db.council_assignment.get_orm_for_application(application.id)
+        if assignments and all(a.decision == CouncilDecision.APPROVED for a in assignments):
+            await self._finalize_if_ready(application, None, CouncilDecision.APPROVED, None, source)
+
     async def _finalize_if_ready(
         self,
         application: ApplicationORM,
-        user: CurrentUserDTO,
+        user: CurrentUserDTO | None,
         decision: CouncilDecision,
         reason: str | None,
         source: str,

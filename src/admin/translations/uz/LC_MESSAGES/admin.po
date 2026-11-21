@@ -1289,3 +1289,6 @@ msgstr "Ariza beruvchi faqat YIA Portal orqali kiradi — parol berilmaydi"
 
 msgid "Член Совета входит только ключом E-IMZO — пароль не задаётся"
 msgstr "Kengash aʼzosi faqat E-IMZO kaliti bilan kiradi — parol berilmaydi"
+
+msgid "Срок подписания истёк"
+msgstr "Imzolash muddati tugagan"

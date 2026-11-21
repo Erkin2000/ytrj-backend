@@ -85,6 +85,7 @@ DETAIL = {
     "cancel_reason": None,
     "verify_url": "https://yoshlarfondi.uz/bulletins/verify/Jk3s9QwErTy0uIoPaSdFgHjKl1zXcVbN",
     "qr_url": "/api/v1/fund/bulletins/7/qr",
+    "pdf_url": "/api/v1/fund/bulletins/7/pdf",
 }
 
 COUNCIL_ITEM = {
@@ -119,6 +120,7 @@ COUNCIL_DETAIL = {
         "sign_blockers": ["bulletin_file_not_viewed"],
     },
     "verify_url": "https://yoshlarfondi.uz/bulletins/verify/Jk3s9QwErTy0uIoPaSdFgHjKl1zXcVbN",
+    "pdf_url": "/api/v1/council/bulletins/7/pdf",
 }
 
 CALENDAR = [

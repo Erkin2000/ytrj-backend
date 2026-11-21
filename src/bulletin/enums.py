@@ -11,6 +11,7 @@ class BulletinStatus(StrEnum):
     PENDING — создан, ждёт даты отправки (`send_at`) и членам Совета не виден;
     PUBLISHED — отправлен всем активным членам Совета, подписей ещё нет;
     PARTIALLY_SIGNED — подписала часть членов; COMPLETED — подписали все;
+    EXPIRED — срок подписания прошёл, подписали не все (подписи закрыты);
     CANCELLED — аннулирован Фондом (страница QR показывает «Аннулирован»).
     """
 
@@ -18,13 +19,20 @@ class BulletinStatus(StrEnum):
     PUBLISHED = "PUBLISHED"
     PARTIALLY_SIGNED = "PARTIALLY_SIGNED"
     COMPLETED = "COMPLETED"
+    EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
 
 
 # Бюллетень разослан и ждёт подписей.
 SIGNING_STATUSES = {BulletinStatus.PUBLISHED, BulletinStatus.PARTIALLY_SIGNED}
 # Бюллетень виден членам Совета.
-SENT_STATUSES = SIGNING_STATUSES | {BulletinStatus.COMPLETED, BulletinStatus.CANCELLED}
+SENT_STATUSES = SIGNING_STATUSES | {
+    BulletinStatus.COMPLETED,
+    BulletinStatus.EXPIRED,
+    BulletinStatus.CANCELLED,
+}
+# Бюллетень можно аннулировать: завершённый (COMPLETED) — нельзя, его решение уже действует.
+CANCELLABLE_STATUSES = SIGNING_STATUSES | {BulletinStatus.PENDING, BulletinStatus.EXPIRED}
 
 
 class BulletinDecision(StrEnum):

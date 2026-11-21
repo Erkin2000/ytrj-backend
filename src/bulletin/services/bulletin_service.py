@@ -2,13 +2,18 @@
 фоновая отправка отложенных бюллетеней и публичная проверка по QR.
 
 Жизненный цикл: PENDING (ждёт `send_at`) → PUBLISHED (разослан всем активным
-членам Совета) → PARTIALLY_SIGNED → COMPLETED; CANCELLED — аннулирован Фондом.
+членам Совета) → PARTIALLY_SIGNED → COMPLETED; EXPIRED — срок подписания прошёл,
+а подписали не все; CANCELLED — аннулирован Фондом (кроме COMPLETED).
+
+Фоновая задача (`refresh_due`) отправляет отложенные бюллетени, снимает выбывших
+членов Совета, не успевших подписать, и закрывает просроченные бюллетени.
 
 Бюллетень, связанный с заявкой, переводит её FUND_REVIEW → COUNCIL_REVIEW при
 создании; при отправке члены Совета назначаются на заявку, а их подписи
 («Согласен» / «Против») решают её — см. CouncilBulletinService.sign.
 """
 
+import asyncio
 import logging
 import secrets
 from datetime import UTC, date, datetime, time, timedelta
@@ -19,8 +24,10 @@ from fastapi import UploadFile
 from src.account.schemas.user_schema import CurrentUserDTO
 from src.application.enums import ApplicationStatus
 from src.application.services.base import ApplicationBaseService
+from src.application.services.council_service import CouncilService
 from src.application.services.fund_service import FundService
 from src.bulletin.enums import (
+    CANCELLABLE_STATUSES,
     SIGNING_STATUSES,
     TASHKENT_TZ,
     BulletinStatus,
@@ -28,6 +35,7 @@ from src.bulletin.enums import (
 )
 from src.bulletin.mappers import BulletinDataMapper, verify_url
 from src.bulletin.models.bulletin_model import BulletinORM, BulletinSignatureORM
+from src.bulletin.pdf import render_bulletin_pdf
 from src.bulletin.qr import qr_svg
 from src.bulletin.schemas.bulletin_schema import (
     BulletinCancelDTO,
@@ -133,7 +141,7 @@ class BulletinService(BaseService):
         per_page: int | None,
     ) -> dict:
         ApplicationBaseService.assert_global_scope(user)
-        await self.publish_due()
+        await self.refresh_due()
         now = utcnow()
         return await self.db.bulletin.get_all_fund(
             filters,
@@ -144,7 +152,7 @@ class BulletinService(BaseService):
 
     async def get_counters(self, user: CurrentUserDTO) -> dict[str, int]:
         ApplicationBaseService.assert_global_scope(user)
-        await self.publish_due()
+        await self.refresh_due()
         by_status = await self.db.bulletin.count_by_status()
         counters = {status.value.lower(): by_status.get(status, 0) for status in BulletinStatus}
         counters["overdue"] = await self.db.bulletin.count_overdue(utcnow())
@@ -152,6 +160,7 @@ class BulletinService(BaseService):
 
     async def get_detail(self, bulletin_id: int, user: CurrentUserDTO) -> BulletinDetailDTO:
         ApplicationBaseService.assert_global_scope(user)
+        await self.refresh_due()
         await self.get_orm_or_404(bulletin_id)
         return await self.detail(bulletin_id)
 
@@ -300,6 +309,10 @@ class BulletinService(BaseService):
         bulletin = await self.get_orm_or_404(bulletin_id, for_update=True)
         if bulletin.status == BulletinStatus.CANCELLED:
             raise BulletinStatusException("Bulletin is already cancelled")
+        if bulletin.status not in CANCELLABLE_STATUSES:
+            raise BulletinStatusException(
+                "A completed bulletin cannot be cancelled: its decision is already in force"
+            )
 
         bulletin.status = BulletinStatus.CANCELLED
         bulletin.cancelled_at = utcnow()
@@ -364,12 +377,25 @@ class BulletinService(BaseService):
         ApplicationBaseService.assert_global_scope(user)
         return qr_svg(verify_url(await self.get_orm_or_404(bulletin_id)))
 
+    async def get_pdf(self, bulletin_id: int, user: CurrentUserDTO) -> tuple[bytes, str]:
+        ApplicationBaseService.assert_global_scope(user)
+        await self.refresh_due()
+        await self.get_orm_or_404(bulletin_id)
+        return await self.pdf(await self.reload(bulletin_id))
+
+    @staticmethod
+    async def pdf(bulletin: BulletinORM) -> tuple[bytes, str]:
+        """PDF бюллетеня из текущих данных и имя файла. Связи уже загружены (selectin),
+        поэтому сборку можно отдать в поток."""
+        content = await asyncio.to_thread(render_bulletin_pdf, bulletin, utcnow())
+        return content, f"{bulletin.number or f'bulletin-{bulletin.id}'}.pdf"
+
     async def get_calendar(
         self, user: CurrentUserDTO, date_from: date | None, date_to: date | None
     ) -> list[CalendarDayDTO]:
         """Календарь Фонда: даты отправки (в том числе плановые) и сроки подписания."""
         ApplicationBaseService.assert_global_scope(user)
-        await self.publish_due()
+        await self.refresh_due()
         date_from, date_to = day_bounds(date_from, date_to)
         start, end = range_utc(date_from, date_to)
 
@@ -419,10 +445,78 @@ class BulletinService(BaseService):
             bulletin.send_at = now
         await self.db.flush()
 
+    async def refresh_due(self) -> None:
+        """Всё, что зависит от времени и состава Совета. Вызывается фоновой задачей и
+        перед выдачей списков (на случай, если задача не запущена)."""
+        await self.publish_due()
+        await self.drop_ineligible_members()
+        await self.expire_due()
+
+    async def expire_due(self) -> int:
+        """Срок подписания прошёл, а подписали не все → EXPIRED. Подписи больше не
+        принимаются; заявка, которую Совет не успел решить, возвращается Фонду."""
+        now = utcnow()
+        ids = await self.db.bulletin.ids_due_for_expiry(now)
+        for bulletin_id in ids:
+            bulletin = await self.get_orm_or_404(bulletin_id)
+            bulletin.status = BulletinStatus.EXPIRED
+            application = await self._linked_application(bulletin)
+            if application is not None:
+                await self.fund.return_from_council(
+                    application,
+                    None,
+                    f"Срок подписания бюллетеня {bulletin.number} истёк: "
+                    "подписали не все члены Совета",
+                )
+            logger.info("Bulletin %s expired: the signing deadline has passed", bulletin.number)
+        if ids:
+            await self.db.commit()
+        return len(ids)
+
+    async def drop_ineligible_members(self) -> int:
+        """Снимает с открытых бюллетеней членов Совета, которые выбыли, не подписав:
+        заблокирован, удалён, сменил роль, лишился права решения или ПИНФЛ. Иначе
+        бюллетень никогда не станет COMPLETED. Подписавшие остаются. Возвращает число
+        снятых строк."""
+        rows = await self.db.bulletin.open_unsigned_signatures()
+        if not rows:
+            return 0
+        eligible = {m.id for m in await self.fund.eligible_council_members()}
+        stale: dict[int, list[BulletinSignatureORM]] = {}
+        for row in rows:
+            if row.council_member_id is None or row.council_member_id not in eligible:
+                stale.setdefault(row.bulletin_id, []).append(row)
+        if not stale:
+            return 0
+
+        dropped = 0
+        for bulletin_id, signatures in stale.items():
+            if not await self.db.bulletin.lock_skip_locked(bulletin_id):
+                continue  # бюллетень сейчас подписывают — разберёмся в следующий проход
+            bulletin = await self.get_orm_or_404(bulletin_id)
+            member_ids = {s.council_member_id for s in signatures if s.council_member_id}
+            for signature in signatures:
+                bulletin.signatures.remove(signature)
+            dropped += len(signatures)
+            await self.db.flush()
+
+            if bulletin.signatures and all(s.signed_at is not None for s in bulletin.signatures):
+                bulletin.status = BulletinStatus.COMPLETED
+                bulletin.completed_at = max(s.signed_at for s in bulletin.signatures)
+            application = await self._linked_application(bulletin)
+            if application is not None:
+                await CouncilService(self.db).drop_members(application, member_ids, bulletin.number)
+            logger.info(
+                "Bulletin %s: removed %s council member(s) who left before signing",
+                bulletin.number,
+                len(signatures),
+            )
+        await self.db.commit()
+        return dropped
+
     async def publish_due(self) -> int:
         """Отправляет отложенные бюллетени, у которых наступила дата отправки.
-        Вызывается фоновой задачей и перед выдачей списков (на случай, если задача
-        не запущена). Возвращает число отправленных."""
+        Возвращает число отправленных."""
         ids = await self.db.bulletin.ids_due_for_publication(utcnow())
         if not ids:
             return 0

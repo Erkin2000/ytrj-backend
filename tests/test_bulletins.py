@@ -436,3 +436,123 @@ def test_admin_publishes_and_deletes_bulletin_with_application(
     assert r.status_code == 200, r.text
     assert api.client.get(f"/api/v1/fund/bulletins/{bid}", headers=fund_h).status_code == 404
     assert status(api, app_id, applicant) == "FUND_REVIEW"
+
+
+# ---------- PDF, срок, выбывший член Совета ----------
+
+
+def keep_only(bulletin_id: int, application_id: int | None, member_ids: set[int]):
+    """Оставить в бюллетене (и в заявке) только тестовых членов Совета — без чужих данных."""
+
+    async def run(session):
+        await session.execute(
+            text(
+                "DELETE FROM bulletin_signatures WHERE bulletin_id = :b "
+                "AND (council_member_id IS NULL OR NOT (council_member_id = ANY(:m)))"
+            ),
+            {"b": bulletin_id, "m": list(member_ids)},
+        )
+        if application_id is not None:
+            await session.execute(
+                text(
+                    "DELETE FROM application_council_assignments WHERE application_id = :a "
+                    "AND NOT (council_member_id = ANY(:m))"
+                ),
+                {"a": application_id, "m": list(member_ids)},
+            )
+
+    db_run(run)
+
+
+def test_bulletin_pdf(api, fund, council):
+    c = api.client
+    a_h, a_me = council[0]
+    bulletin = api.bulletin(fund, name="TEST PDF бюллетень", file=pdf_upload())
+    bid = bulletin["id"]
+    assert bulletin["pdf_url"] == f"/api/v1/fund/bulletins/{bid}/pdf"
+
+    r = c.get(bulletin["pdf_url"], headers=fund)
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF") and len(r.content) > 5000
+    assert f'filename="{bulletin["number"]}.pdf"' in r.headers["content-disposition"]
+
+    mine = data(c.get(f"/api/v1/council/bulletins/{bid}", headers=a_h))
+    assert mine["pdf_url"] == f"/api/v1/council/bulletins/{bid}/pdf"
+    r = c.get(mine["pdf_url"], headers=a_h)
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    # PDF не засчитывается как просмотр файла.
+    assert data(c.get(f"/api/v1/council/bulletins/{bid}", headers=a_h))["my"]["sign_blockers"] == [
+        "bulletin_file_not_viewed"
+    ]
+
+    assert c.get(f"/api/v1/fund/bulletins/{bid}/pdf", headers=a_h).status_code == 403
+    assert c.get("/api/v1/fund/bulletins/999999999/pdf", headers=fund).status_code == 404
+
+
+def test_expired_bulletin_returns_application(
+    api, role_ids, applicant, submitted_application, council
+):
+    c, app_id = api.client, submitted_application
+    fund_h, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    (a_h, a_me), (b_h, b_me) = council
+
+    bulletin = api.bulletin(fund_h, application_id=app_id)
+    bid = bulletin["id"]
+    assert api.sign(a_h, bid, a_me["pinfl"], "AGREE").status_code == 200
+    assert status(api, app_id, applicant) == "COUNCIL_REVIEW"
+
+    db_run(
+        lambda s: s.execute(
+            text("UPDATE bulletins SET deadline_at = now() - interval '1 minute' WHERE id = :id"),
+            {"id": bid},
+        )
+    )
+    url = f"/api/v1/fund/bulletins/{bid}"
+    detail = data(c.get(url, headers=fund_h))
+    assert detail["status"] == "EXPIRED" and detail["is_overdue"] is False
+    assert status(api, app_id, applicant) == "FUND_REVIEW"
+
+    # У члена Совета — во «Просроченных», подписать нельзя; продлить срок тоже нельзя.
+    assert bid in my_ids(council_list(api, b_h, "overdue"))
+    assert bid not in my_ids(council_list(api, b_h, "to_sign"))
+    r = api.sign(b_h, bid, b_me["pinfl"], "AGREE")
+    assert r.status_code == 400 and r.json()["code"] == "bulletin_not_open_for_signing"
+    r = c.patch(url, headers=fund_h, json={"deadline_at": api.iso(timedelta(days=5))})
+    assert r.status_code == 400 and r.json()["code"] == "bulletin_not_editable"
+
+    public_id = detail["public_id"]
+    assert data(c.get(f"/api/v1/public/bulletins/{public_id}"))["status"] == "EXPIRED"
+    assert "Срок подписания истёк" in c.get(f"/bulletins/verify/{public_id}?lang=ru").text
+    # Просроченный можно аннулировать.
+    r = c.post(f"{url}/cancel", headers=fund_h, json={"reason": "TEST"})
+    assert r.status_code == 200 and data(r)["status"] == "CANCELLED"
+
+
+def test_member_who_left_is_removed_and_completed_cannot_be_cancelled(
+    api, role_ids, applicant, submitted_application, council
+):
+    c, app_id = api.client, submitted_application
+    fund_h, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    (a_h, a_me), (b_h, b_me) = council
+
+    bulletin = api.bulletin(fund_h, application_id=app_id)
+    bid = bulletin["id"]
+    keep_only(bid, app_id, {a_me["id"], b_me["id"]})
+    assert api.sign(a_h, bid, a_me["pinfl"], "AGREE").status_code == 200
+    url = f"/api/v1/fund/bulletins/{bid}"
+    assert data(c.get(url, headers=fund_h))["status"] == "PARTIALLY_SIGNED"
+
+    # Член Совета заблокирован, не подписав: его строка снимается, остальные подписали.
+    r = c.post(
+        f"/api/v1/users/{b_me['id']}/status", headers=api.superadmin, json={"status": "BLOCKED"}
+    )
+    assert r.status_code == 200, r.text
+    detail = data(c.get(url, headers=fund_h))
+    members = {s["member"]["id"] for s in detail["signature_list"] if s["member"]}
+    assert members == {a_me["id"]}
+    assert detail["status"] == "COMPLETED" and detail["completed_at"]
+    assert status(api, app_id, applicant) in ("COUNCIL_APPROVED", "SENT_TO_BANK")
+
+    # Завершённый бюллетень аннулировать нельзя.
+    r = c.post(f"{url}/cancel", headers=fund_h, json={"reason": "TEST"})
+    assert r.status_code == 400 and r.json()["code"] == "bulletin_status"

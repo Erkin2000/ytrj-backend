@@ -80,6 +80,38 @@ class BulletinRepository(BaseRepository):
         )
         return list((await self.session.scalars(stmt)).all())
 
+    async def ids_due_for_expiry(self, now: datetime, limit: int = 50) -> list[int]:
+        """Разосланные бюллетени, у которых прошёл срок подписания (SKIP LOCKED)."""
+        stmt = (
+            select(self.model.id)
+            .where(self.model.status.in_(SIGNING_STATUSES), self.model.deadline_at < now)
+            .order_by(self.model.deadline_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def open_unsigned_signatures(self) -> list[BulletinSignatureORM]:
+        """Неподписанные строки бюллетеней, которые ещё ждут подписей."""
+        stmt = (
+            select(BulletinSignatureORM)
+            .join(BulletinORM, BulletinORM.id == BulletinSignatureORM.bulletin_id)
+            .where(
+                BulletinORM.status.in_(SIGNING_STATUSES),
+                BulletinSignatureORM.signed_at.is_(None),
+            )
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def lock_skip_locked(self, bulletin_id: int) -> bool:
+        """Блокирует бюллетень; False — если его сейчас держит другая транзакция."""
+        stmt = (
+            select(self.model.id)
+            .where(self.model.id == bulletin_id)
+            .with_for_update(skip_locked=True)
+        )
+        return await self.session.scalar(stmt) is not None
+
     async def get_in_range(
         self, start: datetime, end: datetime, statuses: set[BulletinStatus] | None = None
     ) -> list[BulletinORM]:
@@ -122,8 +154,10 @@ class BulletinRepository(BaseRepository):
             return stmt.where(BulletinSignatureORM.signed_at.is_not(None))
         if tab == CouncilBulletinTab.OVERDUE:
             return stmt.where(
-                BulletinORM.status.in_(SIGNING_STATUSES),
-                BulletinORM.deadline_at < now,
+                or_(
+                    and_(BulletinORM.status.in_(SIGNING_STATUSES), BulletinORM.deadline_at < now),
+                    BulletinORM.status == BulletinStatus.EXPIRED,
+                ),
                 BulletinSignatureORM.signed_at.is_(None),
             )
         return stmt

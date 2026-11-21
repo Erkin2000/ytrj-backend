@@ -171,6 +171,7 @@ class BulletinDataMapper:
             cancel_reason=bulletin.cancel_reason,
             verify_url=verify_url(bulletin),
             qr_url=f"{FUND_PREFIX}/{bulletin.id}/qr",
+            pdf_url=f"{FUND_PREFIX}/{bulletin.id}/pdf",
         )
 
     # ---------- член Совета ----------
@@ -221,6 +222,7 @@ class BulletinDataMapper:
                 sign_blockers=blockers,
             ),
             verify_url=verify_url(bulletin),
+            pdf_url=f"{COUNCIL_PREFIX}/{bulletin.id}/pdf",
         )
 
     # ---------- проверка по QR ----------

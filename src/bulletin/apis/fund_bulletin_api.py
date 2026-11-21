@@ -224,6 +224,38 @@ async def get_file(bulletin_id: int, db: DBDep, user: CurrentUserDep):
     return FileResponse(path, media_type=content_type, filename=file_name)
 
 
+PDF_RESPONSE = {200: {"content": {"application/pdf": {}}, "description": "PDF"}}
+
+
+def pdf_response(content: bytes, file_name: str) -> Response:
+    """PDF открывается в браузере; при сохранении — имя по номеру бюллетеня."""
+    return Response(
+        content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{file_name}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get(
+    "/{bulletin_id}/pdf",
+    summary="PDF бюллетеня: все сведения, решения членов Совета и QR-код внизу",
+    description=(
+        "Документ собирается из текущих данных: статус, подписи и срок — на момент "
+        "выгрузки. Доступен сразу после создания (`pdf_url` в ответе). QR внизу ведёт "
+        "на `verify_url`."
+    ),
+    dependencies=[read_dep],
+    response_class=Response,
+    responses={**PDF_RESPONSE, **COMMON_ERRORS, **NOT_FOUND},
+)
+async def get_pdf(bulletin_id: int, db: DBDep, user: CurrentUserDep):
+    content, file_name = await BulletinService(db).get_pdf(bulletin_id, user)
+    return pdf_response(content, file_name)
+
+
 @router.get(
     "/{bulletin_id}/qr",
     summary="QR-код страницы проверки бюллетеня (SVG)",
@@ -269,7 +301,8 @@ async def publish_bulletin(bulletin_id: int, db: DBDep, user: CurrentUserDep):
     summary="Аннулировать бюллетень",
     description=(
         "Подписи сохраняются, страница проверки по QR показывает «Аннулирован». "
-        "Заявка, которую Совет ещё не решил, возвращается Фонду (COUNCIL_REVIEW → FUND_REVIEW)."
+        "Заявка, которую Совет ещё не решил, возвращается Фонду (COUNCIL_REVIEW → FUND_REVIEW). "
+        "Завершённый бюллетень (COMPLETED) аннулировать нельзя — 400 `bulletin_status`."
     ),
     dependencies=[approve_dep],
     responses={

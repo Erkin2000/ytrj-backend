@@ -1094,3 +1094,6 @@ msgstr "Applicants sign in only via YIA Portal — no password is set"
 
 msgid "Член Совета входит только ключом E-IMZO — пароль не задаётся"
 msgstr "Council members sign in only with an E-IMZO key — no password is set"
+
+msgid "Срок подписания истёк"
+msgstr "Signing deadline passed"

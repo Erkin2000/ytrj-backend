@@ -181,11 +181,11 @@ class FundService(ApplicationBaseService):
             )
 
     async def return_from_council(
-        self, application: ApplicationORM, user: CurrentUserDTO, comment: str
+        self, application: ApplicationORM, user: CurrentUserDTO | None, comment: str
     ) -> None:
         """COUNCIL_REVIEW → FUND_REVIEW: бюллетень по заявке удалён или аннулирован до
         итогового решения. Назначения и голоса членов Совета снимаются (они остаются
-        в бюллетене и в истории заявки)."""
+        в бюллетене и в истории заявки). `user=None` — действие системы (срок истёк)."""
         if application.status != ApplicationStatus.COUNCIL_REVIEW:
             return
         await self.db.council_assignment.delete(application_id=application.id)
