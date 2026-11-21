@@ -20,6 +20,11 @@ from src.utils.db_manager import DBManager
 logger = logging.getLogger(__name__)
 
 
+def describe(error: Exception) -> str:
+    """Тип ошибки и текст: у сетевых ошибок httpx текст часто пустой."""
+    return f"{type(error).__name__}: {error}".rstrip(": ")
+
+
 async def handle(client: TelegramClient, update: dict) -> None:
     if "message" in update:
         await handle_message(client, update)
@@ -41,7 +46,11 @@ async def run_poller() -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as error:  # noqa: BLE001
-                logger.warning("Telegram bot is not reachable, retry in 60 s: %s", error)
+                logger.warning(
+                    "Telegram bot is not reachable (%s), retry in 60 s: %s",
+                    settings.TELEGRAM_API_URL,
+                    describe(error),
+                )
                 await asyncio.sleep(60)
 
         while True:
@@ -55,7 +64,7 @@ async def run_poller() -> None:
                 await asyncio.sleep(delay)
                 continue
             except Exception as error:  # noqa: BLE001 — сеть: ждём и пробуем снова
-                logger.warning("Telegram getUpdates error, retry in 5 s: %s", error)
+                logger.warning("Telegram getUpdates error, retry in 5 s: %s", describe(error))
                 await asyncio.sleep(5)
                 continue
 

@@ -315,6 +315,7 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 - В `.env`: `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHANNELS` (`@username` или id канала через запятую).
   Бота добавляют в канал администратором. Backend сам опрашивает Telegram (long polling,
   `src/news/telegram/`); вебхук и публичный адрес не нужны. Опрос — из одного процесса.
+  Если сервер не выходит к `api.telegram.org` напрямую — `TELEGRAM_PROXY=http://host:port`.
 - Новый пост канала → новость `source=TELEGRAM`, сразу `PUBLISHED`, дата — дата поста.
   Заголовок — первая строка (до 200 символов), текст — остальное. Один текст записывается
   на ru, uz и en — переводы правит маркетинг в админке.

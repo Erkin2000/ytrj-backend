@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     TELEGRAM_CHANNELS: str = ""
     TELEGRAM_POLLING_ENABLED: bool = True
     TELEGRAM_API_URL: str = "https://api.telegram.org"
+    # HTTP-прокси для запросов к Telegram, если сервер не выходит к api.telegram.org
+    # напрямую: http://host:port или http://user:pass@host:port.
+    TELEGRAM_PROXY: str = ""
 
     @property
     def telegram_channels(self) -> set[str]:

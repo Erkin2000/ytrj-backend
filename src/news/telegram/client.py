@@ -24,7 +24,10 @@ class TelegramClient:
     def __init__(self, token: str | None = None, api_url: str | None = None):
         self.token = token or settings.TELEGRAM_BOT_TOKEN
         self.api_url = (api_url or settings.TELEGRAM_API_URL).rstrip("/")
-        self._http = httpx.AsyncClient(timeout=httpx.Timeout(POLL_TIMEOUT + 15, connect=10))
+        self._http = httpx.AsyncClient(
+            timeout=httpx.Timeout(POLL_TIMEOUT + 15, connect=10),
+            proxy=settings.TELEGRAM_PROXY or None,
+        )
 
     async def close(self) -> None:
         await self._http.aclose()
