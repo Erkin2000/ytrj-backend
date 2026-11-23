@@ -22,6 +22,8 @@ ReadAdmin = Annotated[CurrentUserDTO, Depends(require_user_admin(Action.READ))]
 CreateAdmin = Annotated[CurrentUserDTO, Depends(require_user_admin(Action.CREATE))]
 UpdateAdmin = Annotated[CurrentUserDTO, Depends(require_user_admin(Action.UPDATE))]
 DeleteAdmin = Annotated[CurrentUserDTO, Depends(require_user_admin(Action.DELETE))]
+# Форма сотрудника: и при создании, и при редактировании.
+FormAdmin = Annotated[CurrentUserDTO, Depends(require_user_admin(Action.CREATE, Action.UPDATE))]
 
 USER_EXAMPLE = {
     "id": 5,
@@ -62,7 +64,8 @@ async def get_users(db: DBDep, pagination: PaginationDep, filters: FilterDep, ac
     description=(
         "Для формы создания/редактирования сотрудника. Админ направления получает права "
         "своей роли, которые есть у него самого (`role_id` можно не передавать). "
-        "Super Admin передаёт `role_id` и получает все права этой роли."
+        "Super Admin передаёт `role_id` и получает все права этой роли. Доступно с "
+        "`users.create` или `users.update` (форма создания и редактирования)."
     ),
     responses={
         200: success_example(
@@ -98,7 +101,7 @@ async def get_users(db: DBDep, pagination: PaginationDep, filters: FilterDep, ac
         **COMMON_ERRORS,
     },
 )
-async def grantable_permissions(db: DBDep, actor: CreateAdmin, role_id: int | None = None):
+async def grantable_permissions(db: DBDep, actor: FormAdmin, role_id: int | None = None):
     data = await UserService(db).get_grantable_permissions(actor, role_id)
     return ResponseBuilder.success(data=data, message="Grantable permissions retrieved.")
 

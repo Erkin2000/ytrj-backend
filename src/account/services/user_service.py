@@ -177,7 +177,7 @@ class UserService(BaseService):
     async def get_grantable_permissions(
         self, actor: CurrentUserDTO, role_id: int | None
     ) -> GrantablePermissionsDTO:
-        if not self._is_global(actor, Action.CREATE):
+        if not (self._is_global(actor, Action.CREATE) or self._is_global(actor, Action.UPDATE)):
             own_role_id, _ = self._direction(actor)
             if role_id not in (None, own_role_id):
                 raise UserOutOfScopeException()

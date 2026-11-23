@@ -7,11 +7,14 @@ from src.common.responses.exceptions import (
 )
 from src.product.enums import Language
 from src.product.services.product_service import apply_translations
+from src.rbac.mappers import RoleDataMapper
 from src.rbac.models.role_model import RoleORM, RoleTranslationORM
+from src.rbac.permissions import RoleCode
 from src.rbac.schemas.role_schema import (
     RoleDTO,
     RoleRequestAddDTO,
     RoleRequestUpdateDTO,
+    RoleShortDTO,
     RoleTranslationDTO,
 )
 from src.rbac.services.permission_service import PermissionService
@@ -29,6 +32,10 @@ class RoleService(BaseService):
 
     async def get_all_roles(self, page: int | None, per_page: int | None) -> dict:
         return await self.db.role.get_all(page=page, per_page=per_page)
+
+    async def get_options(self) -> list[RoleShortDTO]:
+        roles = await self.db.role.get_orm_list()
+        return [RoleDataMapper.map_to_short(r) for r in roles if r.code != RoleCode.APPLICANT]
 
     async def get_role_by_id(self, role_id: int) -> RoleDTO:
         role = await self.db.role.get_one_or_none(id=role_id)

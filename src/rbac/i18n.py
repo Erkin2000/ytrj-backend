@@ -115,6 +115,26 @@ PERMISSION_I18N: dict[str, dict[str, tuple[str, str]]] = {
         "uz": ("Kengashga yoʻnaltirish", "Arizani tayyorlash va Kengashga yuborish"),
         "en": ("Send to the Council", "Prepare and send the application to the Council"),
     },
+    "fund_review.read": {
+        "uz": (
+            "Jamgʻarma ish oynasidagi arizalar",
+            "Jamgʻarma arizalari roʻyxati, hisoblagichlari va kartochkalari (/fund/applications)",
+        ),
+        "en": (
+            "Applications in the Fund workspace",
+            "Fund application list, counters and cards (/fund/applications)",
+        ),
+    },
+    "fund_review.approve": {
+        "uz": (
+            "Jamgʻarmaning ariza boʻyicha rad javobi",
+            "Arizani Kengashgacha sababi bilan rad etish",
+        ),
+        "en": (
+            "Fund rejection of an application",
+            "Reject an application before the Council with a reason",
+        ),
+    },
     "scoring.read": {
         "uz": ("Skoringni koʻrish", "KATM natijasining toʻliq sabablari"),
         "en": ("View scoring", "Full reasons of the KATM result"),
@@ -302,6 +322,32 @@ PERMISSION_I18N: dict[str, dict[str, tuple[str, str]]] = {
         "uz": ("Saytdagi fikrlarni oʻzgartirish", "Matn, rasm, tartib va koʻrsatish"),
         "en": ("Edit testimonials on the website", "Text, photo, order and visibility"),
     },
+    "registry.create": {
+        "uz": ("Loyihalar reestriga qoʻshish", "Yangi dastur yoki qoʻlda loyiha"),
+        "en": ("Add to the project registry", "New programme or a manual project"),
+    },
+    "registry.read": {
+        "uz": ("Reestr va tahlilni koʻrish", "Loyihalar, dasturlar, jami va kesimlar"),
+        "en": ("View registry and analytics", "Projects, programmes, totals and breakdowns"),
+    },
+    "registry.update": {
+        "uz": ("Loyihalar reestrini oʻzgartirish", "Dastur yoki loyiha maʼlumotlari"),
+        "en": ("Edit the project registry", "Programme or project data"),
+    },
+    "registry.delete": {
+        "uz": ("Loyihalar reestridan oʻchirish", "Loyihani yoki boʻsh dasturni oʻchirish"),
+        "en": ("Delete from the project registry", "Delete a project or an empty programme"),
+    },
+    "registry.approve": {
+        "uz": (
+            "Reestrga Excel import qilish",
+            "Boʻlim faylini yuklash, dastur maʼlumotlari almashadi",
+        ),
+        "en": (
+            "Import Excel into the registry",
+            "Upload the department file, replacing programme data",
+        ),
+    },
     "testimonials.delete": {
         "uz": ("Fikrlarni saytdan oʻchirish", "Fikrni rasmi bilan oʻchirish"),
         "en": ("Delete testimonials from the website", "Delete a testimonial with its photo"),
@@ -314,6 +360,10 @@ MODULE_I18N: dict[str, dict[str, str]] = {
     Module.BANKS: {"uz": "Banklar katalogi", "en": "Bank catalog"},
     Module.PRODUCTS: {"uz": "Mahsulotlar", "en": "Products"},
     Module.APPLICATIONS: {"uz": "Arizalar", "en": "Applications"},
+    Module.FUND_REVIEW: {
+        "uz": "Jamgʻarma ish oynasi (arizalar)",
+        "en": "Fund workspace (applications)",
+    },
     Module.SCORING: {"uz": "KATM skoringi", "en": "KATM scoring"},
     Module.BANK_REVIEW: {"uz": "Bank bosqichi", "en": "Bank stage"},
     Module.COUNCIL_REVIEW: {"uz": "Kengash bosqichi", "en": "Council stage"},
@@ -330,6 +380,7 @@ MODULE_I18N: dict[str, dict[str, str]] = {
     Module.LEADERSHIP: {"uz": "Saytdagi rahbariyat", "en": "Leadership on the website"},
     Module.CONTACTS: {"uz": "Saytdagi kontaktlar", "en": "Contacts on the website"},
     Module.TESTIMONIALS: {"uz": "Saytdagi fikrlar", "en": "Testimonials on the website"},
+    Module.REGISTRY: {"uz": "Loyihalar reestri va tahlil", "en": "Project registry and analytics"},
 }
 
 ACTION_I18N: dict[str, dict[str, str]] = {

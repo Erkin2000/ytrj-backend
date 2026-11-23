@@ -17,6 +17,7 @@ class Module(StrEnum):
     BANKS = "banks"
     PRODUCTS = "products"
     APPLICATIONS = "applications"
+    FUND_REVIEW = "fund_review"
     SCORING = "scoring"
     BANK_REVIEW = "bank_review"
     COUNCIL_REVIEW = "council_review"
@@ -30,6 +31,7 @@ class Module(StrEnum):
     LEADERSHIP = "leadership"
     CONTACTS = "contacts"
     TESTIMONIALS = "testimonials"
+    REGISTRY = "registry"
 
 
 class Action(StrEnum):
@@ -46,6 +48,7 @@ MODULE_NAMES: dict[Module, str] = {
     Module.BANKS: "Каталог банков",
     Module.PRODUCTS: "Продукты",
     Module.APPLICATIONS: "Заявки",
+    Module.FUND_REVIEW: "Рабочее окно Фонда (заявки)",
     Module.SCORING: "Скоринг KATM",
     Module.BANK_REVIEW: "Этап банка",
     Module.COUNCIL_REVIEW: "Этап Совета",
@@ -59,6 +62,7 @@ MODULE_NAMES: dict[Module, str] = {
     Module.LEADERSHIP: "Руководство на сайте",
     Module.CONTACTS: "Контакты на сайте",
     Module.TESTIMONIALS: "Отзывы на сайте",
+    Module.REGISTRY: "Реестр проектов и аналитика",
 }
 
 ACTION_NAMES: dict[Action, str] = {
@@ -98,6 +102,11 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "applications.update": ("Изменение заявки", "Редактирование черновика, запрос дополнений"),
     "applications.delete": ("Удаление заявки", "Удаление черновика"),
     "applications.approve": ("Направление в Совет", "Подготовка и отправка заявки в Совет"),
+    "fund_review.read": (
+        "Заявки в рабочем окне Фонда",
+        "Список, счётчики и карточки заявок Фонда (/fund/applications)",
+    ),
+    "fund_review.approve": ("Отказ Фонда по заявке", "Отклонить заявку до Совета с причиной"),
     "scoring.read": ("Просмотр скоринга", "Полные причины результата KATM"),
     "scoring.update": ("Повторный скоринг", "Повторная обработка после технической ошибки"),
     "bank_review.read": ("Просмотр заявок банка", "Заявки, направленные в банк сотрудника"),
@@ -145,6 +154,14 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "testimonials.read": ("Просмотр отзывов на сайте", "Все отзывы, включая скрытые"),
     "testimonials.update": ("Изменение отзывов на сайте", "Текст, фото, порядок и показ"),
     "testimonials.delete": ("Удаление отзывов с сайта", "Удаление отзыва с фото"),
+    "registry.create": ("Добавление в реестр проектов", "Новая программа или проект вручную"),
+    "registry.read": ("Просмотр реестра и аналитики", "Проекты, программы, итоги и разрезы"),
+    "registry.update": ("Изменение реестра проектов", "Данные программы или проекта"),
+    "registry.delete": ("Удаление из реестра проектов", "Удаление проекта или пустой программы"),
+    "registry.approve": (
+        "Импорт Excel в реестр",
+        "Загрузка файла отдела с заменой данных программы",
+    ),
 }
 
 
@@ -170,8 +187,6 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
         "Повседневные бизнес-процессы Фонда: заявки, Совет, финансирование",
         False,
         [
-            "users.read",
-            "roles.read",
             "banks.read",
             "products.create",
             "products.read",
@@ -181,10 +196,11 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "applications.read",
             "applications.update",
             "applications.approve",
+            "fund_review.read",
+            "fund_review.approve",
             "scoring.read",
             "scoring.update",
             "bank_review.read",
-            "council_review.read",
             "allocation.create",
             "allocation.read",
             "allocation.approve",
@@ -193,6 +209,11 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "bulletins.update",
             "bulletins.delete",
             "bulletins.approve",
+            "registry.create",
+            "registry.read",
+            "registry.update",
+            "registry.delete",
+            "registry.approve",
         ],
     ),
     RoleCode.BANK_EMPLOYEE: (

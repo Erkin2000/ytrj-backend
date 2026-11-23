@@ -379,6 +379,33 @@ class AboutSectionNotFoundException(NotFoundException):
     message = "About section not found"
 
 
+class RegistryProgramNotFoundException(NotFoundException):
+    message = "Registry program not found"
+
+
+class RegistryProjectNotFoundException(NotFoundException):
+    message = "Registry project not found"
+
+
+class RegistryProgramCodeTakenException(ConflictException):
+    message = "Registry program with this code already exists"
+    field = "code"
+
+
+class RegistryProgramInUseException(ConflictException):
+    message = "Registry program has projects and cannot be deleted"
+
+
+class RegistryImportFileException(BadRequestException):
+    message = "Invalid import file"
+    field = "file"
+
+
+class RegistryImportTemplateException(BadRequestException):
+    message = "The file does not match the program import template"
+    field = "file"
+
+
 class SiteContactNotFoundException(NotFoundException):
     message = "Contact not found"
 

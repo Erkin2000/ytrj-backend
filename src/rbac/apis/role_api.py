@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends
 
-from src.common.dependencies import DBDep, PaginationDep, require_permission
+from src.common.dependencies import (
+    DBDep,
+    PaginationDep,
+    require_any_permission,
+    require_permission,
+)
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import COMMON_ERRORS, CONFLICT, paginated_example, success_example
 from src.rbac.permissions import Action, Module
@@ -8,6 +13,9 @@ from src.rbac.schemas.role_schema import RoleRequestAddDTO, RoleRequestUpdateDTO
 from src.rbac.services.role_service import RoleService
 
 router = APIRouter(prefix="/roles", tags=["RBAC: роли"])
+
+# Список ролей нужен и форме пользователя: roles.read или users.create / users.update.
+ROLES_READ = Depends(require_any_permission("roles.read", "users.create", "users.update"))
 
 ROLE_EXAMPLE = {
     "id": 2,
@@ -38,7 +46,7 @@ ROLE_EXAMPLE = {
 @router.get(
     "",
     summary="Каталог ролей",
-    dependencies=[Depends(require_permission(Module.ROLES, Action.READ))],
+    dependencies=[ROLES_READ],
     responses={200: paginated_example(ROLE_EXAMPLE), **COMMON_ERRORS},
 )
 async def get_roles(db: DBDep, pagination: PaginationDep):
@@ -47,9 +55,41 @@ async def get_roles(db: DBDep, pagination: PaginationDep):
 
 
 @router.get(
+    "/options",
+    summary="Роли для выбора в форме пользователя (id, код, название)",
+    description=(
+        "Лёгкий список без прав и пагинации: все роли, кроме заявителя (её нельзя назначить "
+        "вручную). Доступно с `roles.read`, `users.create` или `users.update`."
+    ),
+    dependencies=[ROLES_READ],
+    responses={
+        200: success_example(
+            [
+                {
+                    "id": 2,
+                    "code": "FUND_OPERATOR",
+                    "translations": [
+                        {"language": "ru", "name": "Оператор Фонда"},
+                        {"language": "uz", "name": "Jamgʻarma operatori"},
+                        {"language": "en", "name": "Fund operator"},
+                    ],
+                    "is_superuser": False,
+                }
+            ],
+            "Role options retrieved.",
+        ),
+        **COMMON_ERRORS,
+    },
+)
+async def get_role_options(db: DBDep):
+    data = await RoleService(db).get_options()
+    return ResponseBuilder.success(data=data, message="Role options retrieved.")
+
+
+@router.get(
     "/{role_id}",
     summary="Роль по ID с матрицей прав",
-    dependencies=[Depends(require_permission(Module.ROLES, Action.READ))],
+    dependencies=[ROLES_READ],
     responses={200: success_example(ROLE_EXAMPLE, "Role found."), **COMMON_ERRORS},
 )
 async def get_role(role_id: int, db: DBDep):

@@ -22,6 +22,9 @@ class RoleRepository(BaseRepository):
         )
         return await self.session.scalar(stmt)
 
+    async def get_orm_list(self) -> list[RoleORM]:
+        return list((await self.session.scalars(select(self.model).order_by(self.model.id))).all())
+
     async def get_by_name(self, name: str) -> RoleORM | None:
         return await self.session.scalar(select(self.model).where(self.model.name == name))
 

@@ -3,12 +3,14 @@ from src.account.profile import missing_profile_fields
 from src.account.schemas.user_schema import (
     BankShortDTO,
     CurrentUserDTO,
+    Direction,
     UserDetailDTO,
     UserDTO,
     UserProfileDTO,
 )
 from src.rbac.access import effective_permissions
 from src.rbac.mappers import RoleDataMapper
+from src.rbac.permissions import RoleCode
 from src.utils.base_rep.mappers.base import DataMapper
 
 
@@ -36,6 +38,18 @@ def _base_fields(model: UserORM) -> dict:
         "last_login_at": model.last_login_at,
         "created_at": model.created_at,
     }
+
+
+DIRECTIONS = {
+    RoleCode.FUND_OPERATOR: Direction.FUND,
+    RoleCode.BANK_EMPLOYEE: Direction.BANK,
+    RoleCode.COUNCIL_MEMBER: Direction.COUNCIL,
+}
+
+
+def is_staff(role) -> bool:
+    """Сотрудник — любой с ролью, кроме заявителя."""
+    return role is not None and (role.is_superuser or role.code != RoleCode.APPLICANT)
 
 
 class UserDataMapper(DataMapper):
@@ -93,7 +107,9 @@ class UserDataMapper(DataMapper):
             role=RoleDataMapper.map_to_short(role),
             bank=_bank_short(model),
             is_superuser=bool(role and role.is_superuser),
+            is_staff=is_staff(role),
             is_direction_admin=model.is_direction_admin,
+            direction=DIRECTIONS.get(role.code) if role else None,
             permissions=permissions,
             profile_complete=not missing,
             missing_fields=missing,

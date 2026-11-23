@@ -36,7 +36,7 @@ ITEM = {
 @router.get(
     "",
     summary="Поиск заявок по статусу, банку, дате, типу субъекта, номеру/ФИО",
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.READ))],
+    dependencies=[Depends(require_permission(Module.FUND_REVIEW, Action.READ))],
     responses={200: paginated_example(ITEM), **COMMON_ERRORS},
 )
 async def get_applications(
@@ -51,7 +51,7 @@ async def get_applications(
 @router.get(
     "/counters",
     summary="Счётчики главного экрана Фонда",
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.READ))],
+    dependencies=[Depends(require_permission(Module.FUND_REVIEW, Action.READ))],
     responses={
         200: success_example(
             {
@@ -75,7 +75,7 @@ async def get_counters(db: DBDep, user: CurrentUserDep):
 @router.get(
     "/{application_id}",
     summary="Карточка заявки (полные данные, этапы, документы)",
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.READ))],
+    dependencies=[Depends(require_permission(Module.FUND_REVIEW, Action.READ))],
     responses={200: success_example(ITEM, "Application found."), **COMMON_ERRORS},
 )
 async def get_application(application_id: int, db: DBDep, user: CurrentUserDep):
@@ -130,7 +130,7 @@ async def retry_scoring(application_id: int, db: DBDep, user: CurrentUserDep):
     "/{application_id}/reject",
     summary="Отклонить заявку до Совета (FUND_REVIEW → FUND_REJECTED)",
     description="Причина обязательна и показывается заявителю.",
-    dependencies=[Depends(require_permission(Module.APPLICATIONS, Action.APPROVE))],
+    dependencies=[Depends(require_permission(Module.FUND_REVIEW, Action.APPROVE))],
     responses={
         200: success_example({**ITEM, "status": "FUND_REJECTED"}, "Application rejected."),
         **COMMON_ERRORS,

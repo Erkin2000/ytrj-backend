@@ -13,6 +13,7 @@ from src.news.repositories.news_rep import NewsRepository
 from src.product.repositories.product_rep import ProductRepository
 from src.rbac.repositories.permission_rep import PermissionRepository
 from src.rbac.repositories.role_rep import RoleRepository
+from src.registry.repositories.registry_rep import RegistryRepository
 from src.website.repositories.website_rep import WebsiteRepository
 
 
@@ -42,6 +43,7 @@ class DBManager:
         self.faq = FaqRepository(self.session)
         self.news = NewsRepository(self.session)
         self.website = WebsiteRepository(self.session)
+        self.registry = RegistryRepository(self.session)
 
         return self
 

@@ -30,6 +30,11 @@ from src.product.models.product_model import (
 from src.rbac.models.permission_model import PermissionORM, PermissionTranslationORM
 from src.rbac.models.role_model import RoleORM, RoleTranslationORM
 from src.rbac.models.role_permission_model import RolePermissionORM
+from src.registry.models.registry_model import (
+    RegistryProgramORM,
+    RegistryProgramTranslationORM,
+    RegistryProjectORM,
+)
 from src.website.models.website_model import (
     AboutSectionORM,
     AboutTranslationORM,
@@ -84,4 +89,7 @@ __all__ = [
     "RoleORM",
     "RoleTranslationORM",
     "RolePermissionORM",
+    "RegistryProgramORM",
+    "RegistryProgramTranslationORM",
+    "RegistryProjectORM",
 ]

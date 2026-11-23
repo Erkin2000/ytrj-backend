@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import (
@@ -60,6 +61,12 @@ class UserDetailDTO(UserDTO):
     permissions: list[str] = []
 
 
+class Direction(StrEnum):
+    FUND = "FUND"
+    BANK = "BANK"
+    COUNCIL = "COUNCIL"
+
+
 class UserProfileDTO(BaseModel):
     id: int
     username: str
@@ -75,8 +82,21 @@ class UserProfileDTO(BaseModel):
     role: RoleShortDTO | None = None
     bank: BankShortDTO | None = None
     is_superuser: bool
-    is_direction_admin: bool = False
-    permissions: list[str]
+    is_staff: bool = Field(
+        description="Сотрудник (Super Admin, Фонд, банк, Совет, маркетинг): можно пускать в "
+        "админ-панель. Заявитель и пользователь без роли — `false`."
+    )
+    is_direction_admin: bool = Field(
+        default=False,
+        description="Админ направления: управляет сотрудниками своего направления через `/users`.",
+    )
+    direction: Direction | None = Field(
+        default=None,
+        description="Направление сотрудника: `FUND` | `BANK` | `COUNCIL`; у остальных — `null`.",
+    )
+    permissions: list[str] = Field(
+        description="Итоговые права: личные права ∩ права роли; у Super Admin — весь каталог."
+    )
     profile_complete: bool = Field(
         description="Все данные заявителя заполнены — можно создавать заявку."
     )

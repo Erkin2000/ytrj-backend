@@ -12,6 +12,7 @@ from alembic import context
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Модели должны быть импортированы, чтобы попасть в Base.metadata (autogenerate).
+import src.registry.models.registry_model  # noqa: E402, F401
 import src.website.models.website_model  # noqa: E402, F401
 from src.account.models.user_model import UserORM  # noqa: E402, F401
 from src.account.models.user_permission_model import UserPermissionORM  # noqa: E402, F401
