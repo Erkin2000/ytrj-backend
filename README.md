@@ -374,6 +374,18 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
   Пустой контакт или неверный формат при создании — 422; если `PATCH` убирает и телефон, и email —
   400 `site_contact_empty`.
 
+### Отзывы пользователей на сайте (маркетинг)
+
+Миграция `c2e4a6b8d0f1`; права `testimonials.create/read/update/delete` — роли `MARKETING`.
+
+- Отзыв: фото (необязательно, JPEG / PNG / WEBP), Ф.И.О. и текст на трёх языках (`translations`: ровно `ru`, `uz`, `en`
+  с полями `full_name`, `description`), `sort_order`, `is_active`.
+- Сайт без токена: `GET /api/v1/testimonials` (активные, по `sort_order`, затем `id`), `GET /api/v1/testimonials/{id}`,
+  `GET /api/v1/testimonials/{id}/photo`. Неактивный отзыв — 404.
+- Маркетинг: `GET /api/v1/marketing/testimonials`; создание — `POST` multipart/form-data (`full_name_ru/uz/en`,
+  `description_ru/uz/en`, `sort_order?`, `is_active?`, `photo?`); `GET/PATCH/DELETE /{id}` (изменение — JSON),
+  фото — `GET/PUT/DELETE /{id}/photo`. Фото — `MEDIA_PATH/site/testimonials/<id>/`, удаляются вместе с отзывом.
+
 ## Режимы, пока нет интеграций
 
 - `SSO_MOCK=true` — вместо YIA Portal доступен `POST /api/v1/auth/sso/mock-login` (ПИНФЛ + ФИО, опционально `sub`).

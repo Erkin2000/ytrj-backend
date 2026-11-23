@@ -322,3 +322,92 @@ class SiteContactPublicDTO(BaseModel):
 
 class SiteContactDTO(AuditDTO, SiteContactPublicDTO):
     is_active: bool
+
+
+# ---------- отзывы ----------
+
+TESTIMONIAL_TRANSLATIONS_EXAMPLE = [
+    {
+        "language": "ru",
+        "full_name": "Каримова Нилуфар",
+        "description": "Подала заявку онлайн и получила кредит на швейный цех за месяц.",
+    },
+    {
+        "language": "uz",
+        "full_name": "Karimova Nilufar",
+        "description": "Arizani onlayn topshirdim va bir oyda tikuv sexi uchun kredit oldim.",
+    },
+    {
+        "language": "en",
+        "full_name": "Nilufar Karimova",
+        "description": "I applied online and got a loan for my sewing workshop within a month.",
+    },
+]
+
+
+class TestimonialTranslationDTO(BaseModel):
+    language: Language = Field(examples=["ru"])
+    full_name: FullNameStr = Field(description="Ф.И.О. автора отзыва.")
+    description: DescriptionStr = Field(description="Текст отзыва, до 10 000 символов.")
+
+
+TestimonialTranslations = Annotated[
+    list[TestimonialTranslationDTO],
+    Field(min_length=3, max_length=3),
+    AfterValidator(check_languages),
+]
+
+
+class TestimonialCreateForm(BaseModel):
+    """Поля формы (multipart/form-data, фото — полем `photo`)."""
+
+    full_name_ru: FullNameStr = Field(description="Ф.И.О. (ru).")
+    full_name_uz: FullNameStr = Field(description="Ф.И.О. (uz).")
+    full_name_en: FullNameStr = Field(description="Ф.И.О. (en).")
+    description_ru: DescriptionStr = Field(description="Текст отзыва (ru).")
+    description_uz: DescriptionStr = Field(description="Текст отзыва (uz).")
+    description_en: DescriptionStr = Field(description="Текст отзыва (en).")
+    sort_order: int = Field(default=0, ge=0, description="Порядок на сайте: меньше — выше.")
+    is_active: bool = Field(default=True, description="Неактивный отзыв не показывается на сайте.")
+    photo: UploadFile | None = Field(
+        default=None, description="Фото JPEG / PNG / WEBP, необязательно."
+    )
+
+    def translations(self) -> list[TestimonialTranslationDTO]:
+        return [
+            TestimonialTranslationDTO(
+                language=lang,
+                full_name=getattr(self, f"full_name_{lang.value}"),
+                description=getattr(self, f"description_{lang.value}"),
+            )
+            for lang in (Language.RU, Language.UZ, Language.EN)
+        ]
+
+
+class TestimonialUpdateDTO(BaseModel):
+    """Фото меняется отдельно: `PUT` / `DELETE /{id}/photo`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    translations: TestimonialTranslations | None = Field(
+        default=None, description=TRANSLATIONS_NOTE, examples=[TESTIMONIAL_TRANSLATIONS_EXAMPLE]
+    )
+    sort_order: int | None = Field(default=None, ge=0)
+    is_active: bool | None = None
+
+
+class TestimonialTranslationOutDTO(BaseModel):
+    language: Language
+    full_name: str
+    description: str
+
+
+class TestimonialPublicDTO(BaseModel):
+    id: int
+    translations: list[TestimonialTranslationOutDTO]
+    sort_order: int
+    photo: PhotoDTO | None = None
+
+
+class TestimonialDTO(AuditDTO, TestimonialPublicDTO):
+    is_active: bool

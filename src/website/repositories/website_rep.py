@@ -10,6 +10,7 @@ from src.website.models.website_model import (
     EventORM,
     PersonORM,
     SiteContactORM,
+    TestimonialORM,
 )
 from src.website.schemas.website_schema import EventFilterDTO
 
@@ -100,4 +101,15 @@ class WebsiteRepository(BaseRepository):
         stmt = select(SiteContactORM).order_by(SiteContactORM.sort_order, SiteContactORM.id)
         if only_active:
             stmt = stmt.where(SiteContactORM.is_active.is_(True))
+        return list((await self.session.scalars(stmt)).all())
+
+    # ---------- отзывы ----------
+
+    async def get_testimonial(self, testimonial_id: int) -> TestimonialORM | None:
+        return await self._get(TestimonialORM, testimonial_id)
+
+    async def get_testimonials(self, only_active: bool) -> list[TestimonialORM]:
+        stmt = select(TestimonialORM).order_by(TestimonialORM.sort_order, TestimonialORM.id)
+        if only_active:
+            stmt = stmt.where(TestimonialORM.is_active.is_(True))
         return list((await self.session.scalars(stmt)).all())

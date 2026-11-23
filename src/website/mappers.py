@@ -5,6 +5,7 @@ from src.website.models.website_model import (
     EventORM,
     PersonORM,
     SiteContactORM,
+    TestimonialORM,
 )
 from src.website.schemas.website_schema import (
     AboutDTO,
@@ -17,6 +18,9 @@ from src.website.schemas.website_schema import (
     PhotoDTO,
     SiteContactDTO,
     SiteContactPublicDTO,
+    TestimonialDTO,
+    TestimonialPublicDTO,
+    TestimonialTranslationOutDTO,
     TitleTextOutDTO,
 )
 
@@ -132,6 +136,36 @@ def contact_dto(model: SiteContactORM) -> SiteContactDTO:
         phone=model.phone,
         email=model.email,
         sort_order=model.sort_order,
+        is_active=model.is_active,
+        **_audit(model),
+    )
+
+
+# Пути отзывов: публичный и для маркетинга.
+TESTIMONIAL_PATHS = ("/api/v1/testimonials", "/api/v1/marketing/testimonials")
+
+
+def _testimonial_fields(model: TestimonialORM, prefix: str) -> dict:
+    return {
+        "id": model.id,
+        "translations": [
+            TestimonialTranslationOutDTO(
+                language=t.language, full_name=t.full_name, description=t.description
+            )
+            for t in model.translations
+        ],
+        "sort_order": model.sort_order,
+        "photo": photo_dto(model, f"{prefix}/{model.id}/photo"),
+    }
+
+
+def testimonial_public(model: TestimonialORM) -> TestimonialPublicDTO:
+    return TestimonialPublicDTO(**_testimonial_fields(model, TESTIMONIAL_PATHS[0]))
+
+
+def testimonial_dto(model: TestimonialORM) -> TestimonialDTO:
+    return TestimonialDTO(
+        **_testimonial_fields(model, TESTIMONIAL_PATHS[1]),
         is_active=model.is_active,
         **_audit(model),
     )

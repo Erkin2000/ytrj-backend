@@ -1,5 +1,6 @@
 """Контент сайта, который ведёт отдел маркетинга (роль MARKETING):
-события, разделы «О нас», карточки членов Совета и руководства, контакты организации.
+события, разделы «О нас», карточки членов Совета и руководства, контакты организации,
+отзывы пользователей сайта.
 
 Тексты — в таблицах переводов, по строке на язык (ru / uz / en).
 Карточки людей — это страница сайта, а не учётные записи пользователей:
@@ -211,3 +212,52 @@ class SiteContactORM(AuthorMixin, TimestampMixin, Base):
 
     def __str__(self) -> str:
         return self.phone or self.email or f"Contact #{self.id}"
+
+
+# ---------- отзывы ----------
+
+
+class TestimonialORM(AuthorMixin, TimestampMixin, Base):
+    """Положительный отзыв человека, который пользуется сайтом: фото, Ф.И.О. и текст."""
+
+    __tablename__ = "site_testimonials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Фото необязательно: MEDIA_PATH/site/testimonials/<id>/.
+    photo_path: Mapped[str | None] = mapped_column(String(500))
+    photo_name: Mapped[str | None] = mapped_column(String(255))
+    photo_content_type: Mapped[str | None] = mapped_column(String(100))
+    photo_size: Mapped[int | None] = mapped_column(Integer)
+
+    translations: Mapped[list["TestimonialTranslationORM"]] = relationship(
+        back_populates="testimonial",
+        cascade="all, delete-orphan",
+        order_by="TestimonialTranslationORM.language",
+        lazy="selectin",
+    )
+    created_by: Mapped["UserORM | None"] = relationship(
+        foreign_keys="TestimonialORM.created_by_id", lazy="selectin"
+    )
+    updated_by: Mapped["UserORM | None"] = relationship(
+        foreign_keys="TestimonialORM.updated_by_id", lazy="selectin"
+    )
+
+    def __str__(self) -> str:
+        return _ru(self.translations, "full_name", f"Testimonial #{self.id}")
+
+
+class TestimonialTranslationORM(Base):
+    __tablename__ = "site_testimonial_translations"
+    __table_args__ = (UniqueConstraint("testimonial_id", "language"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    testimonial_id: Mapped[int] = mapped_column(
+        ForeignKey("site_testimonials.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    language: Mapped[Language] = mapped_column(LanguageType, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+
+    testimonial: Mapped["TestimonialORM"] = relationship(back_populates="translations")

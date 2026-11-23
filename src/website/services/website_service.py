@@ -1,4 +1,4 @@
-"""Контент сайта: события, «О нас», члены Совета и руководство, контакты."""
+"""Контент сайта: события, «О нас», члены Совета и руководство, контакты, отзывы."""
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -17,6 +17,8 @@ from src.common.responses.exceptions import (
     PersonPhotoNotFoundException,
     SiteContactEmptyException,
     SiteContactNotFoundException,
+    TestimonialNotFoundException,
+    TestimonialPhotoNotFoundException,
 )
 from src.product.services.product_service import apply_translations
 from src.utils.base_service import BaseService
@@ -30,6 +32,8 @@ from src.website.mappers import (
     event_public,
     person_dto,
     person_public,
+    testimonial_dto,
+    testimonial_public,
 )
 from src.website.models.website_model import (
     AboutSectionORM,
@@ -39,6 +43,8 @@ from src.website.models.website_model import (
     PersonORM,
     PersonTranslationORM,
     SiteContactORM,
+    TestimonialORM,
+    TestimonialTranslationORM,
 )
 from src.website.schemas.website_schema import (
     AboutCreateDTO,
@@ -59,8 +65,17 @@ from src.website.schemas.website_schema import (
     SiteContactDTO,
     SiteContactPublicDTO,
     SiteContactUpdateDTO,
+    TestimonialCreateForm,
+    TestimonialDTO,
+    TestimonialPublicDTO,
+    TestimonialUpdateDTO,
 )
-from src.website.storage import EventPhotoStorage, PersonPhotoStorage, SitePhotoStorage
+from src.website.storage import (
+    EventPhotoStorage,
+    PersonPhotoStorage,
+    SitePhotoStorage,
+    TestimonialPhotoStorage,
+)
 
 # Календарь событий: не больше ~квартала за один запрос.
 CALENDAR_MAX_DAYS = 93
@@ -304,6 +319,113 @@ class SiteContactService(BaseService):
         if contact is None:
             raise SiteContactNotFoundException()
         return contact
+
+
+class TestimonialService(BaseService):
+    """Отзывы пользователей сайта: фото, Ф.И.О. и текст на ru / uz / en."""
+
+    storage = TestimonialPhotoStorage()
+
+    # ---------- сайт ----------
+
+    async def get_public_list(self) -> list[TestimonialPublicDTO]:
+        items = await self.db.website.get_testimonials(only_active=True)
+        return [testimonial_public(t) for t in items]
+
+    async def get_public(self, testimonial_id: int) -> TestimonialPublicDTO:
+        return testimonial_public(await self._get(testimonial_id, active=True))
+
+    async def public_photo(self, testimonial_id: int) -> tuple[Path, str, str]:
+        return self._photo_file(await self._get(testimonial_id, active=True))
+
+    # ---------- маркетинг ----------
+
+    async def get_list(self) -> list[TestimonialDTO]:
+        items = await self.db.website.get_testimonials(only_active=False)
+        return [testimonial_dto(t) for t in items]
+
+    async def get_detail(self, testimonial_id: int) -> TestimonialDTO:
+        return testimonial_dto(await self._get(testimonial_id))
+
+    async def photo(self, testimonial_id: int) -> tuple[Path, str, str]:
+        return self._photo_file(await self._get(testimonial_id))
+
+    async def create(self, user: CurrentUserDTO, form: TestimonialCreateForm) -> TestimonialDTO:
+        testimonial = TestimonialORM(
+            sort_order=form.sort_order,
+            is_active=form.is_active,
+            created_by_id=user.id,
+            updated_by_id=user.id,
+        )
+        apply_translations(testimonial.translations, form.translations(), TestimonialTranslationORM)
+        self.db.session.add(testimonial)
+        await self.db.flush()
+        try:
+            if form.photo is not None:
+                await store_photo(self.storage, testimonial, form.photo)
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            await self.storage.delete_dir(testimonial.id)
+            raise
+        return await self.get_detail(testimonial.id)
+
+    async def update(
+        self, user: CurrentUserDTO, testimonial_id: int, data: TestimonialUpdateDTO
+    ) -> TestimonialDTO:
+        testimonial = await self._get(testimonial_id)
+        if data.translations is not None:
+            apply_translations(
+                testimonial.translations, data.translations, TestimonialTranslationORM
+            )
+        if data.sort_order is not None:
+            testimonial.sort_order = data.sort_order
+        if data.is_active is not None:
+            testimonial.is_active = data.is_active
+        testimonial.updated_by_id = user.id
+        await self.db.commit()
+        return await self.get_detail(testimonial_id)
+
+    async def delete(self, testimonial_id: int) -> None:
+        await self.db.session.delete(await self._get(testimonial_id))
+        await self.db.commit()
+        await self.storage.delete_dir(testimonial_id)
+
+    async def set_photo(
+        self, user: CurrentUserDTO, testimonial_id: int, photo: UploadFile
+    ) -> TestimonialDTO:
+        testimonial = await self._get(testimonial_id)
+        old_path = testimonial.photo_path
+        await store_photo(self.storage, testimonial, photo)
+        testimonial.updated_by_id = user.id
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.storage.delete(testimonial.photo_path)
+            raise
+        if old_path and old_path != testimonial.photo_path:
+            await self.storage.delete(old_path)
+        return await self.get_detail(testimonial_id)
+
+    async def delete_photo(self, user: CurrentUserDTO, testimonial_id: int) -> TestimonialDTO:
+        testimonial = await self._get(testimonial_id)
+        if not testimonial.photo_path:
+            raise TestimonialPhotoNotFoundException()
+        old_path = testimonial.photo_path
+        clear_photo(testimonial)
+        testimonial.updated_by_id = user.id
+        await self.db.commit()
+        await self.storage.delete(old_path)
+        return await self.get_detail(testimonial_id)
+
+    async def _get(self, testimonial_id: int, active: bool = False) -> TestimonialORM:
+        testimonial = await self.db.website.get_testimonial(testimonial_id)
+        if testimonial is None or (active and not testimonial.is_active):
+            raise TestimonialNotFoundException()
+        return testimonial
+
+    def _photo_file(self, testimonial: TestimonialORM) -> tuple[Path, str, str]:
+        return photo_file(self.storage, testimonial, TestimonialPhotoNotFoundException)
 
 
 NOT_FOUND = {

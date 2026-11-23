@@ -48,6 +48,7 @@ def marketing(api, role_ids):
         "site_about_sections": [],
         "site_people": [],
         "site_contacts": [],
+        "site_testimonials": [],
     }
     yield headers, created
 
@@ -63,6 +64,10 @@ def marketing(api, role_ids):
         shutil.rmtree(Path(settings.MEDIA_PATH) / "site" / "people" / str(person_id), True)
     for event_id in created["site_events"]:
         shutil.rmtree(Path(settings.MEDIA_PATH) / "site" / "events" / str(event_id), True)
+    for testimonial_id in created["site_testimonials"]:
+        shutil.rmtree(
+            Path(settings.MEDIA_PATH) / "site" / "testimonials" / str(testimonial_id), True
+        )
 
 
 def test_events_crud(client, marketing):
@@ -393,4 +398,75 @@ def test_contacts_crud(client, marketing):
 
     assert client.delete(f"{base}/{second['id']}", headers=headers).status_code == 200
     assert client.get(f"{base}/{second['id']}", headers=headers).status_code == 404
+    assert client.get(base).status_code == 401
+
+
+def test_testimonials_crud(client, marketing):
+    headers, created = marketing
+    base = "/api/v1/marketing/testimonials"
+    png = ("photo.png", png_bytes(), "image/png")
+
+    r = client.post(
+        base,
+        headers=headers,
+        data=person_form("TEST Отзыв", sort_order="900001"),
+        files={"photo": png},
+    )
+    assert r.status_code == 201, r.text
+    first = data(r)
+    created["site_testimonials"].append(first["id"])
+    assert [t["language"] for t in first["translations"]] == ["ru", "uz", "en"]
+    assert first["photo"]["url"] == f"{base}/{first['id']}/photo"
+    folder = Path(settings.MEDIA_PATH) / "site" / "testimonials" / str(first["id"])
+    assert folder.exists()
+
+    # Без фото — можно; без перевода — 422
+    r = client.post(base, headers=headers, data=person_form("TEST Без фото", sort_order="900002"))
+    assert r.status_code == 201, r.text
+    second = data(r)
+    created["site_testimonials"].append(second["id"])
+    assert second["photo"] is None
+    body = person_form("TEST Неполный")
+    body.pop("description_en")
+    assert client.post(base, headers=headers, data=body).status_code == 422
+
+    # Сайт: без токена, только активные, по порядку, фото — по публичному адресу
+    public = data(client.get("/api/v1/testimonials"))
+    ids = [t["id"] for t in public]
+    assert ids.index(first["id"]) < ids.index(second["id"])
+    item = next(t for t in public if t["id"] == first["id"])
+    assert "is_active" not in item and item["photo"]["url"].startswith("/api/v1/testimonials/")
+    assert client.get(item["photo"]["url"]).status_code == 200
+
+    # Изменение: переводы, скрытие
+    r = client.patch(
+        f"{base}/{first['id']}",
+        headers=headers,
+        json={
+            "translations": [
+                {"language": lang, "full_name": f"TEST Новое {lang}", "description": "Спасибо!"}
+                for lang in ("en", "ru", "uz")
+            ],
+            "is_active": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert data(r)["translations"][0]["full_name"] == "TEST Новое ru"
+    assert first["id"] not in [t["id"] for t in data(client.get("/api/v1/testimonials"))]
+    assert client.get(f"/api/v1/testimonials/{first['id']}").status_code == 404
+    assert client.get(f"/api/v1/testimonials/{first['id']}/photo").status_code == 404
+    assert client.get(f"{base}/{first['id']}/photo", headers=headers).status_code == 200
+
+    # Фото: загрузить второму, удалить у первого
+    r = client.put(f"{base}/{second['id']}/photo", headers=headers, files={"photo": png})
+    assert r.status_code == 200 and data(r)["photo"], r.text
+    r = client.delete(f"{base}/{first['id']}/photo", headers=headers)
+    assert r.status_code == 200 and data(r)["photo"] is None
+    r = client.delete(f"{base}/{first['id']}/photo", headers=headers)
+    assert r.status_code == 404 and r.json()["code"] == "testimonial_photo_not_found"
+
+    # Удаление убирает и каталог с фото
+    assert client.delete(f"{base}/{second['id']}", headers=headers).status_code == 200
+    assert client.get(f"{base}/{second['id']}", headers=headers).status_code == 404
+    assert not (Path(settings.MEDIA_PATH) / "site" / "testimonials" / str(second["id"])).exists()
     assert client.get(base).status_code == 401

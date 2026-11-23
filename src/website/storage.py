@@ -26,3 +26,7 @@ class PersonPhotoStorage(SitePhotoStorage):
 
 class EventPhotoStorage(SitePhotoStorage):
     folder = "events"
+
+
+class TestimonialPhotoStorage(SitePhotoStorage):
+    folder = "testimonials"

@@ -1,7 +1,8 @@
-"""Контент сайта: события, «О нас», члены Совета, руководство и контакты.
+"""Контент сайта: события, «О нас», члены Совета, руководство, контакты и отзывы.
 
 Публичные ручки — без авторизации, для сайта; ручки `/marketing/...` — для отдела
-маркетинга (права events.*, about.*, council_profiles.*, leadership.*, contacts.*).
+маркетинга (права events.*, about.*, council_profiles.*, leadership.*, contacts.*,
+testimonials.*).
 """
 
 from datetime import date
@@ -23,6 +24,8 @@ from src.common.responses.exceptions import (
     PhotoTooLargeException,
     SiteContactEmptyException,
     SiteContactNotFoundException,
+    TestimonialNotFoundException,
+    TestimonialPhotoNotFoundException,
 )
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
@@ -34,11 +37,12 @@ from src.common.swagger.responses import (
 )
 from src.rbac.permissions import Action, Module
 from src.website.enums import PersonKind
-from src.website.mappers import PERSON_PATHS
+from src.website.mappers import PERSON_PATHS, TESTIMONIAL_PATHS
 from src.website.schemas.website_schema import (
     ABOUT_TRANSLATIONS_EXAMPLE,
     EVENT_TRANSLATIONS_EXAMPLE,
     PERSON_TRANSLATIONS_EXAMPLE,
+    TESTIMONIAL_TRANSLATIONS_EXAMPLE,
     AboutCreateDTO,
     AboutUpdateDTO,
     EventCreateForm,
@@ -48,12 +52,15 @@ from src.website.schemas.website_schema import (
     PersonUpdateDTO,
     SiteContactCreateDTO,
     SiteContactUpdateDTO,
+    TestimonialCreateForm,
+    TestimonialUpdateDTO,
 )
 from src.website.services.website_service import (
     AboutService,
     EventService,
     PersonService,
     SiteContactService,
+    TestimonialService,
 )
 
 AUDIT = {
@@ -490,6 +497,209 @@ async def delete_contact(contact_id: int, db: DBDep):
     return ResponseBuilder.success(message="Contact deleted.")
 
 
+# ======================= отзывы =======================
+
+TESTIMONIAL_BASE = {"id": 4, "translations": TESTIMONIAL_TRANSLATIONS_EXAMPLE, "sort_order": 0}
+TESTIMONIAL_PUBLIC = {
+    **TESTIMONIAL_BASE,
+    "photo": {"url": f"{TESTIMONIAL_PATHS[0]}/4/photo", **PHOTO},
+}
+TESTIMONIAL = {
+    **TESTIMONIAL_BASE,
+    "photo": {"url": f"{TESTIMONIAL_PATHS[1]}/4/photo", **PHOTO},
+    "is_active": True,
+    **AUDIT,
+}
+TESTIMONIAL_NOT_FOUND = {404: error_examples(TestimonialNotFoundException)}
+TESTIMONIAL_PHOTO_NOT_FOUND = {
+    404: error_examples(TestimonialNotFoundException, TestimonialPhotoNotFoundException)
+}
+
+testimonials_public = APIRouter(prefix="/testimonials", tags=["Отзывы: сайт"])
+testimonials = APIRouter(prefix="/marketing/testimonials", tags=["Отзывы: управление (маркетинг)"])
+
+
+@testimonials_public.get(
+    "",
+    summary="Отзывы для сайта (активные), по порядку",
+    description="Без авторизации. Порядок — по `sort_order`, затем по `id`. Фото — по `photo.url`.",
+    responses={
+        200: success_example([TESTIMONIAL_PUBLIC], "Testimonials retrieved."),
+        **PUBLIC_ERRORS,
+    },
+)
+async def get_public_testimonials(db: DBDep):
+    data = await TestimonialService(db).get_public_list()
+    return ResponseBuilder.success(data=data, message="Testimonials retrieved.")
+
+
+@testimonials_public.get(
+    "/{testimonial_id}",
+    summary="Отзыв для сайта",
+    description="Без авторизации. Неактивный отзыв — 404.",
+    responses={
+        200: success_example(TESTIMONIAL_PUBLIC, "Testimonial found."),
+        **PUBLIC_ERRORS,
+        **TESTIMONIAL_NOT_FOUND,
+    },
+)
+async def get_public_testimonial(testimonial_id: int, db: DBDep):
+    data = await TestimonialService(db).get_public(testimonial_id)
+    return ResponseBuilder.success(data=data, message="Testimonial found.")
+
+
+@testimonials_public.get(
+    "/{testimonial_id}/photo",
+    summary="Фото автора отзыва",
+    description="Без авторизации.",
+    response_class=FileResponse,
+    responses=TESTIMONIAL_PHOTO_NOT_FOUND,
+)
+async def get_public_testimonial_photo(testimonial_id: int, db: DBDep):
+    path, content_type, name = await TestimonialService(db).public_photo(testimonial_id)
+    return FileResponse(
+        path,
+        media_type=content_type,
+        filename=name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@testimonials.get(
+    "",
+    summary="Все отзывы, включая неактивные",
+    dependencies=[perm(Module.TESTIMONIALS, Action.READ)],
+    responses={200: success_example([TESTIMONIAL], "Testimonials retrieved."), **COMMON_ERRORS},
+)
+async def get_testimonials(db: DBDep):
+    data = await TestimonialService(db).get_list()
+    return ResponseBuilder.success(data=data, message="Testimonials retrieved.")
+
+
+@testimonials.post(
+    "",
+    status_code=201,
+    summary="Добавить отзыв (multipart/form-data): фото, Ф.И.О., текст",
+    description=(
+        "Ф.И.О. и текст отзыва — на трёх языках: `full_name_ru`, `full_name_uz`, `full_name_en`, "
+        "`description_ru`, `description_uz`, `description_en`. Необязательно: `sort_order`, "
+        "`is_active`, `photo` (JPEG / PNG / WEBP)."
+    ),
+    dependencies=[perm(Module.TESTIMONIALS, Action.CREATE)],
+    responses={
+        201: success_example(TESTIMONIAL, "Testimonial created."),
+        **COMMON_ERRORS,
+        **PHOTO_ERRORS,
+    },
+)
+async def create_testimonial(
+    db: DBDep,
+    user: CurrentUserDep,
+    form: Annotated[TestimonialCreateForm, Form(media_type="multipart/form-data")],
+):
+    data = await TestimonialService(db).create(user, form)
+    return ResponseBuilder.success(data=data, message="Testimonial created.", status_code=201)
+
+
+@testimonials.get(
+    "/{testimonial_id}",
+    summary="Отзыв по ID",
+    dependencies=[perm(Module.TESTIMONIALS, Action.READ)],
+    responses={
+        200: success_example(TESTIMONIAL, "Testimonial found."),
+        **COMMON_ERRORS,
+        **TESTIMONIAL_NOT_FOUND,
+    },
+)
+async def get_testimonial(testimonial_id: int, db: DBDep):
+    data = await TestimonialService(db).get_detail(testimonial_id)
+    return ResponseBuilder.success(data=data, message="Testimonial found.")
+
+
+@testimonials.patch(
+    "/{testimonial_id}",
+    summary="Изменить отзыв: переводы, порядок, активность",
+    description="Передаются только изменяемые поля. Фото — `PUT` / `DELETE /{testimonial_id}/photo`.",
+    dependencies=[perm(Module.TESTIMONIALS, Action.UPDATE)],
+    responses={
+        200: success_example(TESTIMONIAL, "Testimonial updated."),
+        **COMMON_ERRORS,
+        **TESTIMONIAL_NOT_FOUND,
+    },
+)
+async def update_testimonial(
+    testimonial_id: int, data: TestimonialUpdateDTO, db: DBDep, user: CurrentUserDep
+):
+    result = await TestimonialService(db).update(user, testimonial_id, data)
+    return ResponseBuilder.success(data=result, message="Testimonial updated.")
+
+
+@testimonials.delete(
+    "/{testimonial_id}",
+    summary="Удалить отзыв вместе с фото",
+    dependencies=[perm(Module.TESTIMONIALS, Action.DELETE)],
+    responses={
+        200: success_example(None, "Testimonial deleted."),
+        **COMMON_ERRORS,
+        **TESTIMONIAL_NOT_FOUND,
+    },
+)
+async def delete_testimonial(testimonial_id: int, db: DBDep):
+    await TestimonialService(db).delete(testimonial_id)
+    return ResponseBuilder.success(message="Testimonial deleted.")
+
+
+@testimonials.get(
+    "/{testimonial_id}/photo",
+    summary="Фото автора отзыва (в том числе неактивного отзыва)",
+    dependencies=[perm(Module.TESTIMONIALS, Action.READ)],
+    response_class=FileResponse,
+    responses={**COMMON_ERRORS, **TESTIMONIAL_PHOTO_NOT_FOUND},
+)
+async def get_testimonial_photo(testimonial_id: int, db: DBDep):
+    path, content_type, name = await TestimonialService(db).photo(testimonial_id)
+    return FileResponse(
+        path, media_type=content_type, filename=name, content_disposition_type="inline"
+    )
+
+
+@testimonials.put(
+    "/{testimonial_id}/photo",
+    summary="Загрузить или заменить фото автора отзыва",
+    dependencies=[perm(Module.TESTIMONIALS, Action.UPDATE)],
+    responses={
+        200: success_example(TESTIMONIAL, "Photo uploaded."),
+        **COMMON_ERRORS,
+        **TESTIMONIAL_NOT_FOUND,
+        **PHOTO_ERRORS,
+    },
+)
+async def set_testimonial_photo(
+    testimonial_id: int,
+    db: DBDep,
+    user: CurrentUserDep,
+    photo: Annotated[UploadFile, File(description="JPEG / PNG / WEBP.")],
+):
+    data = await TestimonialService(db).set_photo(user, testimonial_id, photo)
+    return ResponseBuilder.success(data=data, message="Photo uploaded.")
+
+
+@testimonials.delete(
+    "/{testimonial_id}/photo",
+    summary="Удалить фото автора отзыва",
+    dependencies=[perm(Module.TESTIMONIALS, Action.UPDATE)],
+    responses={
+        200: success_example({**TESTIMONIAL, "photo": None}, "Photo deleted."),
+        **COMMON_ERRORS,
+        **TESTIMONIAL_PHOTO_NOT_FOUND,
+    },
+)
+async def delete_testimonial_photo(testimonial_id: int, db: DBDep, user: CurrentUserDep):
+    data = await TestimonialService(db).delete_photo(user, testimonial_id)
+    return ResponseBuilder.success(data=data, message="Photo deleted.")
+
+
 # ======================= члены Совета и руководство =======================
 
 SECTIONS = {
@@ -721,4 +931,6 @@ ROUTERS = [
     leadership,
     contacts_public,
     contacts,
+    testimonials_public,
+    testimonials,
 ]

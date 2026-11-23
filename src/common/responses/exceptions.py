@@ -378,6 +378,14 @@ class SiteContactNotFoundException(NotFoundException):
     message = "Contact not found"
 
 
+class TestimonialNotFoundException(NotFoundException):
+    message = "Testimonial not found"
+
+
+class TestimonialPhotoNotFoundException(NotFoundException):
+    message = "Testimonial photo not found"
+
+
 class SiteContactEmptyException(BadRequestException):
     message = "Contact needs a phone or an email"
     field = "phone"

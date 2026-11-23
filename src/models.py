@@ -38,6 +38,8 @@ from src.website.models.website_model import (
     PersonORM,
     PersonTranslationORM,
     SiteContactORM,
+    TestimonialORM,
+    TestimonialTranslationORM,
 )
 
 __all__ = [
@@ -69,6 +71,8 @@ __all__ = [
     "PersonORM",
     "PersonTranslationORM",
     "SiteContactORM",
+    "TestimonialORM",
+    "TestimonialTranslationORM",
     "ProductCategoryORM",
     "ProductORM",
     "ProductStageORM",
