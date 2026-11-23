@@ -12,6 +12,7 @@ from pydantic import (
 )
 
 from src.account.models.user_model import Gender, UserStatus
+from src.rbac.schemas.permission_schema import PermissionDTO
 from src.rbac.schemas.role_schema import RoleShortDTO
 
 PasswordStr = Annotated[str, StringConstraints(min_length=8, max_length=128)]
@@ -239,7 +240,9 @@ class UserUpdateDTO(BaseModel):
 class GrantablePermissionsDTO(BaseModel):
     role_id: int
     role_code: str
-    permissions: list[str]
+    permissions: list[PermissionDTO] = Field(
+        description="Права по коду (`code`), с названием и описанием на ru / uz / en."
+    )
 
 
 class UserSessionDTO(BaseModel):

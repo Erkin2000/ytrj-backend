@@ -27,7 +27,9 @@ def test_grantable_permissions_are_own_permissions(api, fund_admin):
     headers, _, permissions = fund_admin
     g = data(api.client.get("/api/v1/users/grantable-permissions", headers=headers))
     assert g["role_code"] == "FUND_OPERATOR"
-    assert g["permissions"] == permissions
+    assert [p["code"] for p in g["permissions"]] == permissions
+    for p in g["permissions"]:
+        assert [t["language"] for t in p["translations"]] == ["ru", "uz", "en"]
 
 
 def test_creates_staff_in_own_direction_with_chosen_permissions(api, fund_admin):

@@ -14,6 +14,17 @@ class RoleRepository(BaseRepository):
         stmt = select(self.model).order_by(self.model.id)
         return await self.paginate(stmt, page, per_page)
 
+    async def get_orm(self, role_id: int) -> RoleORM | None:
+        stmt = (
+            select(self.model)
+            .where(self.model.id == role_id)
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
+    async def get_by_name(self, name: str) -> RoleORM | None:
+        return await self.session.scalar(select(self.model).where(self.model.name == name))
+
     async def get_by_code(self, code: str) -> RoleORM | None:
         return await self.session.scalar(select(self.model).where(self.model.code == code))
 

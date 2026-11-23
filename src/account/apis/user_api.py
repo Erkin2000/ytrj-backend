@@ -29,7 +29,16 @@ USER_EXAMPLE = {
     "full_name": "Каримова Нигора",
     "phone": "+998901234567",
     "status": "ACTIVE",
-    "role": {"id": 2, "code": "FUND_OPERATOR", "name": "Оператор Фонда", "is_superuser": False},
+    "role": {
+        "id": 2,
+        "code": "FUND_OPERATOR",
+        "translations": [
+            {"language": "ru", "name": "Оператор Фонда"},
+            {"language": "uz", "name": "Jamgʻarma operatori"},
+            {"language": "en", "name": "Fund operator"},
+        ],
+        "is_superuser": False,
+    },
     "bank": None,
     "last_login_at": "2026-10-19T09:30:00Z",
 }
@@ -60,7 +69,29 @@ async def get_users(db: DBDep, pagination: PaginationDep, filters: FilterDep, ac
             {
                 "role_id": 2,
                 "role_code": "FUND_OPERATOR",
-                "permissions": ["applications.read", "applications.update"],
+                "permissions": [
+                    {
+                        "id": 10,
+                        "code": "applications.read",
+                        "translations": [
+                            {
+                                "language": "ru",
+                                "name": "Просмотр заявок",
+                                "description": "Просмотр заявок в рамках scope",
+                            },
+                            {
+                                "language": "uz",
+                                "name": "Arizalarni koʻrish",
+                                "description": "Scope doirasidagi arizalarni koʻrish",
+                            },
+                            {
+                                "language": "en",
+                                "name": "View applications",
+                                "description": "View applications within scope",
+                            },
+                        ],
+                    }
+                ],
             },
             "Grantable permissions retrieved.",
         ),

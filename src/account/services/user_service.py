@@ -186,9 +186,12 @@ class UserService(BaseService):
             raise RoleRequiredException()
 
         role = await self._get_role(role_id)
-        permissions = self._grantable(actor, role) if uses_personal_permissions(role) else set()
+        codes = self._grantable(actor, role) if uses_personal_permissions(role) else set()
+        permissions = await self.db.permission.get_by_codes(sorted(codes)) if codes else []
         return GrantablePermissionsDTO(
-            role_id=role.id, role_code=role.code, permissions=sorted(permissions)
+            role_id=role.id,
+            role_code=role.code,
+            permissions=sorted(permissions, key=lambda p: p.code),
         )
 
     async def add_user(self, data: UserRequestAddDTO, actor: CurrentUserDTO) -> UserDetailDTO:

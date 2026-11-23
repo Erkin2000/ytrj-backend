@@ -11,9 +11,24 @@ router = APIRouter(prefix="/roles", tags=["RBAC: роли"])
 
 ROLE_EXAMPLE = {
     "id": 2,
-    "name": "Оператор Фонда",
     "code": "FUND_OPERATOR",
-    "description": "Повседневные бизнес-процессы Фонда",
+    "translations": [
+        {
+            "language": "ru",
+            "name": "Оператор Фонда",
+            "description": "Повседневные бизнес-процессы Фонда: заявки, Совет, финансирование",
+        },
+        {
+            "language": "uz",
+            "name": "Jamgʻarma operatori",
+            "description": "Jamgʻarmaning kundalik jarayonlari: arizalar, Kengash, moliyalashtirish",
+        },
+        {
+            "language": "en",
+            "name": "Fund operator",
+            "description": "Day-to-day Fund processes: applications, Council, financing",
+        },
+    ],
     "is_superuser": False,
     "is_system": True,
     "permissions": ["applications.read", "applications.approve"],

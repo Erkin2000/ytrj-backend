@@ -27,8 +27,8 @@ from src.product.models.product_model import (
     ProductORM,
     ProductStageORM,
 )
-from src.rbac.models.permission_model import PermissionORM
-from src.rbac.models.role_model import RoleORM
+from src.rbac.models.permission_model import PermissionORM, PermissionTranslationORM
+from src.rbac.models.role_model import RoleORM, RoleTranslationORM
 from src.rbac.models.role_permission_model import RolePermissionORM
 from src.website.models.website_model import (
     AboutSectionORM,
@@ -80,6 +80,8 @@ __all__ = [
     "ProductFieldOptionORM",
     "ProductFieldOptionTranslationORM",
     "PermissionORM",
+    "PermissionTranslationORM",
     "RoleORM",
+    "RoleTranslationORM",
     "RolePermissionORM",
 ]

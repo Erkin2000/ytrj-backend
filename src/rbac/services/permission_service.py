@@ -1,6 +1,10 @@
 from src.common.responses.exceptions import PermissionNotFoundException
-from src.rbac.permissions import MODULE_NAMES
-from src.rbac.schemas.permission_schema import PermissionDTO, PermissionGroupDTO
+from src.rbac.i18n import module_translations
+from src.rbac.schemas.permission_schema import (
+    ModuleTranslationDTO,
+    PermissionDTO,
+    PermissionGroupDTO,
+)
 from src.utils.base_service import BaseService
 
 
@@ -20,7 +24,10 @@ class PermissionService(BaseService):
         return [
             PermissionGroupDTO(
                 module=module,
-                module_name=MODULE_NAMES.get(module, module),
+                translations=[
+                    ModuleTranslationDTO(language=lang, name=name)
+                    for lang, name in module_translations(module).items()
+                ],
                 permissions=items,
             )
             for module, items in groups.items()

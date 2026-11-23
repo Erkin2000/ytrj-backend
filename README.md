@@ -124,6 +124,16 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 
 Права по умолчанию для ролей — `src/rbac/permissions.py` (`ROLE_PRESETS`); новые права добавляются туда и в миграцию.
 
+Названия ролей, прав и модулей — на трёх языках (миграция `d3f5b7c9e1a2`, таблицы `role_translations`,
+`permission_translations`). В API вместо `name` / `description` — `translations: [{language, name, description}]`
+в порядке ru, uz, en: `GET /roles`, `/roles/{id}`, `GET /permissions`, `/permissions/matrix` (у модуля —
+`translations: [{language, name}]`), роль пользователя (`role.translations`) в `/auth/me` и `/users`.
+`POST /roles` и `PATCH /roles/{id}` принимают `translations` (ровно ru, uz, en; описание — на всех трёх или ни на одном);
+русское название роли уникально (409 `role_name_already_exists`). Переводы каталога прав, модулей и системных
+ролей — `src/rbac/i18n.py`; новое право без перевода роняет тест `test_rbac_catalog_translated`, а миграция,
+добавляющая права, должна заполнить и их переводы. В админ-панели роли не создаются, название и описание
+роли не редактируются (только через API).
+
 ### Права сотрудника и админы направлений
 
 - **Направление** — роль сотрудника: Фонд (`FUND_OPERATOR`), банк (`BANK_EMPLOYEE` + конкретный банк), Совет (`COUNCIL_MEMBER`).

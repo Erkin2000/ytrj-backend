@@ -12,7 +12,8 @@ from src.auth.models.refresh_token_model import RefreshTokenORM
 from src.auth.services.password_service import hash_password
 from src.config import settings
 from src.database import async_session_maker_null_pool
-from src.rbac.models.role_model import RoleORM
+from src.rbac.i18n import role_translations
+from src.rbac.models.role_model import RoleORM, RoleTranslationORM
 from src.rbac.permissions import ROLE_PRESETS, RoleCode
 
 MIN_PASSWORD_LENGTH = 8
@@ -52,6 +53,12 @@ async def create_superuser(password: str, *, if_missing: bool = False) -> None:
                 description=description,
                 is_superuser=True,
                 is_system=True,
+                translations=[
+                    RoleTranslationORM(language=lang, name=n, description=d)
+                    for lang, (n, d) in role_translations(
+                        RoleCode.SUPER_ADMIN, name, description
+                    ).items()
+                ],
             )
             session.add(role)
             await session.flush()

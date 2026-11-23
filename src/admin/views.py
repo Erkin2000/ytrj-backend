@@ -449,7 +449,17 @@ class RoleAdmin(LocalizedLabelsMixin, ModelView, model=RoleORM):
         RoleORM.updated_at: "Обновлена",
     }
     column_formatters = {RoleORM.is_superuser: fmt_bool, RoleORM.is_system: fmt_bool}
-    form_excluded_columns = [RoleORM.users, RoleORM.created_at, RoleORM.updated_at]
+    # Названия на ru / uz / en ведутся через API (`translations`), поэтому здесь
+    # роль не создаётся, а название и описание не редактируются.
+    can_create = False
+    form_excluded_columns = [
+        RoleORM.users,
+        RoleORM.created_at,
+        RoleORM.updated_at,
+        RoleORM.name,
+        RoleORM.description,
+        RoleORM.translations,
+    ]
     form_ajax_refs = {
         "permissions": {"fields": ("code", "name"), "order_by": "code"},
     }
@@ -475,7 +485,10 @@ class PermissionAdmin(LocalizedLabelsMixin, ModelView, model=PermissionORM):
         PermissionORM.description: "Описание",
         PermissionORM.roles: "Роли",
     }
-    form_excluded_columns = [PermissionORM.roles]
+    # Каталог прав задаётся кодом и миграциями (переводы ru / uz / en).
+    can_create = False
+    can_edit = False
+    form_excluded_columns = [PermissionORM.roles, PermissionORM.translations]
     can_delete = False
     page_size = 50
 

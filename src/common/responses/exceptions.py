@@ -233,6 +233,11 @@ class RoleCodeAlreadyExistsException(ConflictException):
     message = "Role with this code already exists"
 
 
+class RoleNameAlreadyExistsException(ConflictException):
+    message = "Role with this Russian name already exists"
+    field = "translations"
+
+
 class RoleInUseException(ConflictException):
     message = "Role is assigned to users and cannot be deleted"
 

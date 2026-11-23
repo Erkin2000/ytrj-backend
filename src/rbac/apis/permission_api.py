@@ -22,8 +22,23 @@ router = APIRouter(
                 {
                     "id": 1,
                     "code": "users.read",
-                    "name": "Просмотр пользователей",
-                    "description": "...",
+                    "translations": [
+                        {
+                            "language": "ru",
+                            "name": "Просмотр пользователей",
+                            "description": "Просмотр, поиск и фильтрация профилей",
+                        },
+                        {
+                            "language": "uz",
+                            "name": "Foydalanuvchilarni koʻrish",
+                            "description": "Profillarni koʻrish, qidirish va saralash",
+                        },
+                        {
+                            "language": "en",
+                            "name": "View users",
+                            "description": "View, search and filter profiles",
+                        },
+                    ],
                 }
             ],
             "Permissions retrieved successfully.",
@@ -44,9 +59,33 @@ async def get_permissions(db: DBDep):
             [
                 {
                     "module": "applications",
-                    "module_name": "Заявки",
+                    "translations": [
+                        {"language": "ru", "name": "Заявки"},
+                        {"language": "uz", "name": "Arizalar"},
+                        {"language": "en", "name": "Applications"},
+                    ],
                     "permissions": [
-                        {"id": 10, "code": "applications.read", "name": "Просмотр заявок"}
+                        {
+                            "id": 10,
+                            "code": "applications.read",
+                            "translations": [
+                                {
+                                    "language": "ru",
+                                    "name": "Просмотр заявок",
+                                    "description": "Просмотр заявок в рамках scope",
+                                },
+                                {
+                                    "language": "uz",
+                                    "name": "Arizalarni koʻrish",
+                                    "description": "Scope doirasidagi arizalarni koʻrish",
+                                },
+                                {
+                                    "language": "en",
+                                    "name": "View applications",
+                                    "description": "View applications within scope",
+                                },
+                            ],
+                        }
                     ],
                 }
             ],

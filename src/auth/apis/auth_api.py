@@ -102,7 +102,16 @@ PROFILE_EXAMPLE = {
     "gender": "MALE",
     "date_of_birth": "1998-05-20",
     "status": "ACTIVE",
-    "role": {"id": 5, "code": "APPLICANT", "name": "Заявитель", "is_superuser": False},
+    "role": {
+        "id": 5,
+        "code": "APPLICANT",
+        "translations": [
+            {"language": "ru", "name": "Заявитель"},
+            {"language": "uz", "name": "Ariza beruvchi"},
+            {"language": "en", "name": "Applicant"},
+        ],
+        "is_superuser": False,
+    },
     "bank": None,
     "is_superuser": False,
     "permissions": ["applications.create", "applications.read"],

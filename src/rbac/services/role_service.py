@@ -1,18 +1,25 @@
 from src.common.responses.exceptions import (
     RoleCodeAlreadyExistsException,
     RoleInUseException,
+    RoleNameAlreadyExistsException,
     RoleNotFoundException,
     SystemRoleException,
 )
+from src.product.enums import Language
+from src.product.services.product_service import apply_translations
+from src.rbac.models.role_model import RoleORM, RoleTranslationORM
 from src.rbac.schemas.role_schema import (
-    RoleAddDTO,
     RoleDTO,
     RoleRequestAddDTO,
     RoleRequestUpdateDTO,
-    RoleUpdateDTO,
+    RoleTranslationDTO,
 )
 from src.rbac.services.permission_service import PermissionService
 from src.utils.base_service import BaseService
+
+
+def ru_of(translations: list[RoleTranslationDTO]) -> RoleTranslationDTO:
+    return next(t for t in translations if t.language == Language.RU)
 
 
 class RoleService(BaseService):
@@ -32,12 +39,23 @@ class RoleService(BaseService):
     async def add_role(self, data: RoleRequestAddDTO) -> RoleDTO:
         if await self.db.role.get_by_code(data.code):
             raise RoleCodeAlreadyExistsException()
+        ru = ru_of(data.translations)
+        await self._check_name(ru.name)
 
         # Коды прав проверяются до вставки роли, чтобы не создавать
         # роль, которой не удастся назначить права.
         permission_ids = await self.permission_service.get_permission_ids(data.permissions)
 
-        role = await self.db.role.add(RoleAddDTO(**data.model_dump(exclude={"permissions"})))
+        role = RoleORM(
+            code=data.code,
+            name=ru.name,
+            description=ru.description,
+            is_superuser=data.is_superuser,
+            is_system=False,
+        )
+        apply_translations(role.translations, data.translations, RoleTranslationORM)
+        self.db.session.add(role)
+        await self.db.session.flush()
 
         await self.db.permission.set_role_permissions(
             role_id=role.id,
@@ -48,27 +66,32 @@ class RoleService(BaseService):
         return await self.get_role_by_id(role.id)
 
     async def update_role(self, role_id: int, data: RoleRequestUpdateDTO) -> RoleDTO:
-        role = await self.get_role_by_id(role_id)
-
-        update_data = data.model_dump(exclude_unset=True, exclude={"permissions"})
+        role = await self.db.role.get_orm(role_id)
+        if role is None:
+            raise RoleNotFoundException()
 
         if role.is_system:
             # У системной роли нельзя менять код и флаг суперпользователя.
-            if "code" in update_data and update_data["code"] != role.code:
+            if data.code is not None and data.code != role.code:
                 raise SystemRoleException()
-            if "is_superuser" in update_data and update_data["is_superuser"] != role.is_superuser:
+            if data.is_superuser is not None and data.is_superuser != role.is_superuser:
                 raise SystemRoleException()
 
-        if "code" in update_data and update_data["code"] != role.code:
-            if await self.db.role.get_by_code(update_data["code"]):
+        if data.code is not None and data.code != role.code:
+            if await self.db.role.get_by_code(data.code):
                 raise RoleCodeAlreadyExistsException()
+            role.code = data.code
 
-        if update_data:
-            await self.db.role.edit(
-                data=RoleUpdateDTO(**update_data),
-                exclude_unset=True,
-                id=role_id,
-            )
+        if data.translations is not None:
+            ru = ru_of(data.translations)
+            if ru.name != role.name:
+                await self._check_name(ru.name)
+            role.name = ru.name
+            role.description = ru.description
+            apply_translations(role.translations, data.translations, RoleTranslationORM)
+
+        if data.is_superuser is not None:
+            role.is_superuser = data.is_superuser
 
         if data.permissions is not None:
             await self.permission_service.set_role_permissions(
@@ -89,3 +112,7 @@ class RoleService(BaseService):
 
         await self.db.role.delete(id=role_id)
         await self.db.commit()
+
+    async def _check_name(self, name: str) -> None:
+        if await self.db.role.get_by_name(name):
+            raise RoleNameAlreadyExistsException()

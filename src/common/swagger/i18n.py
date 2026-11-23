@@ -703,6 +703,12 @@ UZ: dict[str, str] = {
     "Ф.И.О. и текст отзыва — на трёх языках: `full_name_ru`, `full_name_uz`, `full_name_en`, `description_ru`, `description_uz`, `description_en`. Необязательно: `sort_order`, `is_active`, `photo` (JPEG / PNG / WEBP).": "F.I.Sh. va fikr matni — uch tilda: `full_name_ru`, `full_name_uz`, `full_name_en`, `description_ru`, `description_uz`, `description_en`. Ixtiyoriy: `sort_order`, `is_active`, `photo` (JPEG / PNG / WEBP).",
     "Фото автора отзыва (в том числе неактивного отзыва)": "Fikr muallifi rasmi (nofaol fikr uchun ham)",
     "Фото автора отзыва": "Fikr muallifi rasmi",
+    "Аналитик Фонда": "Jamgʻarma tahlilchisi",
+    "Отчёты по заявкам": "Arizalar boʻyicha hisobotlar",
+    "Повседневные бизнес-процессы Фонда: заявки, Совет, финансирование": "Jamgʻarmaning kundalik jarayonlari: arizalar, Kengash, moliyalashtirish",
+    "Просмотр заявок в рамках scope": "Scope doirasidagi arizalarni koʻrish",
+    "Просмотр, поиск и фильтрация профилей": "Profillarni koʻrish, qidirish va saralash",
+    "Ровно три перевода — `ru`, `uz`, `en`, каждый язык один раз. Описание — на всех трёх языках или ни на одном. При изменении передаются все три.": "Aynan uchta tarjima — `ru`, `uz`, `en`, har bir til bir marta. Tavsif — uchala tilda yoki hech birida. Oʻzgartirishda uchalasi ham yuboriladi.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")
