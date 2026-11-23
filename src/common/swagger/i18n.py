@@ -785,6 +785,18 @@ UZ: dict[str, str] = {
     "Админ направления: управляет сотрудниками своего направления через `/users`.": "Yoʻnalish admini: `/users` orqali oʻz yoʻnalishi xodimlarini boshqaradi.",
     "Направление сотрудника: `FUND` | `BANK` | `COUNCIL`; у остальных — `null`.": "Xodimning yoʻnalishi: `FUND` | `BANK` | `COUNCIL`; qolganlarida — `null`.",
     "Итоговые права: личные права ∩ права роли; у Super Admin — весь каталог.": "Yakuniy huquqlar: shaxsiy huquqlar ∩ rol huquqlari; Super Admin'da — butun katalog.",
+    "Аналитика: сайт": "Tahlil: sayt",
+    "Без авторизации. Только активные программы; суммы — в сўм.": "Avtorizatsiyasiz. Faqat faol dasturlar; summalar — soʻmda.",
+    "Без авторизации. Только активные программы; суммы — в сўм. `group_by` — разрез, например `region` для карты или `month` для графика; `region=ANDIJAN&group_by=district` — туманы области.": "Avtorizatsiyasiz. Faqat faol dasturlar; summalar — soʻmda. `group_by` — kesim, masalan xarita uchun `region` yoki grafik uchun `month`; `region=ANDIJAN&group_by=district` — viloyat tumanlari.",
+    "Без авторизации. Только активные программы; суммы — в сўм. Фильтры — программа, регион, туман, банк, отрасль, пол, год, период.": "Avtorizatsiyasiz. Faqat faol dasturlar; summalar — soʻmda. Filtrlar — dastur, hudud, tuman, bank, soha, jins, yil, davr.",
+    "Итоги для сайта: проекты, запрошено, выделено, выдано, возвраты, рабочие места": "Sayt uchun jami: loyihalar, soʻralgan, ajratilgan, berilgan, qaytarilgan, ish oʻrinlari",
+    "Итоги и разрезы реестра профинансированных проектов для сайта — без токена.": "Sayt uchun moliyalashtirilgan loyihalar reestrining jami va kesimlari — tokensiz.",
+    "Программы финансирования для сайта: название, число проектов, дата обновления": "Sayt uchun moliyalashtirish dasturlari: nomi, loyihalar soni, yangilangan sana",
+    "Разрез для сайта: по программе, региону, туману, банку, отрасли, полу, году, месяцу": "Sayt uchun kesim: dastur, hudud, tuman, bank, soha, jins, yil, oy boʻyicha",
+    "Справочники для фильтров: регионы, банки, отрасли, статусы, разрезы": "Filtrlar uchun maʼlumotnomalar: hududlar, banklar, sohalar, holatlar, kesimlar",
+    "Когда данные программы обновлены (последний импорт).": "Dastur maʼlumotlari qachon yangilangan (oxirgi import).",
+    "Фильтры аналитики. Дата и год — по дате решения Совета, а если её нет — по дате заявки.": "Tahlil filtrlari. Sana va yil — Kengash qarori sanasi boʻyicha, u boʻlmasa — ariza sanasi boʻyicha.",
+    "Фильтры списка проектов и аналитики (кабинет). Дата и год — по дате решения Совета,\nа если её нет — по дате заявки.": "Loyihalar roʻyxati va tahlil filtrlari (kabinet). Sana va yil — Kengash qarori sanasi boʻyicha,\nu boʻlmasa — ariza sanasi boʻyicha.",
 }
 
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")

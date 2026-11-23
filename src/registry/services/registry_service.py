@@ -60,6 +60,9 @@ from src.registry.schemas.registry_schema import (
     ProjectDTO,
     ProjectFilterDTO,
     ProjectUpdateDTO,
+    PublicAnalyticsFilterDTO,
+    PublicProgramDTO,
+    PublicScopeFilterDTO,
     SummaryDTO,
     TotalsDTO,
 )
@@ -343,3 +346,32 @@ class RegistryAnalyticsService(BaseService):
             return [{"language": t.language, "name": t.name} for t in programs[key].translations]
         text = str(label or key)
         return labels((text, text, text))
+
+
+class PublicAnalyticsService(BaseService):
+    """Аналитика для сайта без токена: только агрегаты по активным программам —
+    без списка проектов, имён, ПИНФЛ, телефонов и поиска."""
+
+    @staticmethod
+    def _scope(filters: PublicAnalyticsFilterDTO) -> PublicScopeFilterDTO:
+        return PublicScopeFilterDTO(**filters.model_dump())
+
+    async def programs(self) -> list[PublicProgramDTO]:
+        counts = await self.db.registry.projects_count_by_program()
+        return [
+            PublicProgramDTO(
+                **program_short(p).model_dump(),
+                projects_count=counts.get(p.id, 0),
+                last_import_at=p.last_import_at,
+            )
+            for p in await self.db.registry.get_programs(only_active=True)
+        ]
+
+    async def dictionaries(self) -> DictionariesDTO:
+        return await RegistryAnalyticsService(self.db).dictionaries()
+
+    async def summary(self, filters: PublicAnalyticsFilterDTO) -> SummaryDTO:
+        return await RegistryAnalyticsService(self.db).summary(self._scope(filters))
+
+    async def breakdown(self, group_by: GroupBy, filters: PublicAnalyticsFilterDTO) -> BreakdownDTO:
+        return await RegistryAnalyticsService(self.db).breakdown(group_by, self._scope(filters))

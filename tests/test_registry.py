@@ -232,3 +232,34 @@ def test_registry_permissions(api, role_ids, registry):
     assert c.get("/api/v1/registry/dictionaries").status_code == 401
     dictionaries = data(c.get("/api/v1/registry/dictionaries", headers=fund))
     assert len(dictionaries["regions"]) == 14 and "district" in dictionaries["group_by"]
+
+
+def test_public_analytics_without_token(client, superadmin, registry):
+    """Сайт: только агрегаты, без токена; неактивная программа не попадает."""
+    pid = registry["id"]
+    assert upload(client, superadmin, pid, pq60_workbook()).status_code == 200
+    base = "/api/v1/public/analytics"
+
+    programs = data(client.get(f"{base}/programs"))
+    mine = next(p for p in programs if p["id"] == pid)
+    assert mine["projects_count"] == 3 and mine["last_import_at"]
+    assert "import_template" not in mine
+
+    summary = data(client.get(f"{base}/summary?program_id={pid}"))
+    assert summary["projects"] == 3 and summary["allocated_amount"] == "150000000.00"
+    regions = data(client.get(f"{base}/breakdown?group_by=region&program_id={pid}"))
+    assert [r["key"] for r in regions["rows"]] == ["ANDIJAN", "KHOREZM"]
+    assert len(data(client.get(f"{base}/dictionaries"))["regions"]) == 14
+
+    # Поиска и списка проектов на сайте нет; лишний параметр игнорируется.
+    assert data(client.get(f"{base}/summary?program_id={pid}&search=Алиев"))["projects"] == 3
+    assert client.get("/api/v1/public/analytics/projects").status_code == 404
+    assert client.post(f"{base}/summary").status_code == 405
+
+    # Неактивная программа исчезает с сайта.
+    r = client.patch(
+        f"/api/v1/registry/programs/{pid}", headers=superadmin, json={"is_active": False}
+    )
+    assert r.status_code == 200
+    assert pid not in [p["id"] for p in data(client.get(f"{base}/programs"))]
+    assert data(client.get(f"{base}/summary?program_id={pid}"))["projects"] == 0

@@ -90,6 +90,12 @@ class RegistryRepository(BaseRepository):
 
     @staticmethod
     def apply_filters(stmt: Select, f: ProjectFilterDTO) -> Select:
+        if getattr(f, "active_programs_only", False):
+            stmt = stmt.where(
+                P.program_id.in_(
+                    select(RegistryProgramORM.id).where(RegistryProgramORM.is_active.is_(True))
+                )
+            )
         if f.program_id is not None:
             stmt = stmt.where(P.program_id == f.program_id)
         if f.kind is not None:

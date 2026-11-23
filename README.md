@@ -435,6 +435,10 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
   возвраты, рабочие места, средняя сумма, счётчики по полу, типу субъекта и статусу (`NOT_SPECIFIED` — не указано);
   `GET /registry/analytics/breakdown?group_by=program|kind|region|district|bank|sector|direction|gender|subject_type|status|year|month`
   — строки разреза с подписями на ru / uz / en и итог. Справочники для фильтров — `GET /registry/dictionaries`.
+- **Сайт без токена** — отдельные GET-ручки `/public/analytics/...` (`src/registry/apis/public_analytics_api.py`):
+  `programs` (активные программы, число проектов, дата обновления), `dictionaries`, `summary`, `breakdown?group_by=…`.
+  Только агрегаты по активным программам; списка проектов, имён, ПИНФЛ, телефонов и поиска там нет. Фильтры —
+  как у кабинета, без `search` и `source`.
 - Excel-файлы отдела содержат персональные данные (ПИНФЛ, паспорта, телефоны) — в репозиторий их не кладём.
 
 ## Режимы, пока нет интеграций

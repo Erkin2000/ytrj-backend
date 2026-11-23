@@ -119,6 +119,13 @@ class ProgramDTO(ProgramShortDTO):
     last_import_at: dt.datetime | None = None
 
 
+class PublicProgramDTO(ProgramShortDTO):
+    projects_count: int = 0
+    last_import_at: dt.datetime | None = Field(
+        default=None, description="Когда данные программы обновлены (последний импорт)."
+    )
+
+
 # ---------- проекты ----------
 
 
@@ -235,9 +242,8 @@ class ProjectDTO(BaseModel):
     updated_at: dt.datetime
 
 
-class ProjectFilterDTO(BaseModel):
-    """Фильтры списка проектов и аналитики. Дата и год — по дате решения Совета,
-    а если её нет — по дате заявки."""
+class PublicAnalyticsFilterDTO(BaseModel):
+    """Фильтры аналитики. Дата и год — по дате решения Совета, а если её нет — по дате заявки."""
 
     program_id: int | None = None
     kind: ProgramKind | None = None
@@ -249,13 +255,25 @@ class ProjectFilterDTO(BaseModel):
     gender: Gender | None = None
     subject_type: RegistrySubjectType | None = None
     status: ProjectStatus | None = None
-    source: Source | None = None
     year: int | None = Field(default=None, ge=2000, le=2100)
     date_from: dt.date | None = None
     date_to: dt.date | None = None
+
+
+class ProjectFilterDTO(PublicAnalyticsFilterDTO):
+    """Фильтры списка проектов и аналитики (кабинет). Дата и год — по дате решения Совета,
+    а если её нет — по дате заявки."""
+
+    source: Source | None = None
     search: str | None = Field(
         default=None, description="Поиск по инициатору, организации, СТИР / ПИНФЛ, телефону."
     )
+
+
+class PublicScopeFilterDTO(ProjectFilterDTO):
+    """Внутренний: публичная аналитика — только активные программы."""
+
+    active_programs_only: bool = True
 
 
 # ---------- импорт ----------

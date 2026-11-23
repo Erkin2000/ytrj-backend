@@ -32,7 +32,7 @@ from src.news.apis import news_api
 from src.news.telegram.poller import telegram_poller
 from src.product.apis import fund_category_api, fund_product_api, product_api
 from src.rbac.apis import permission_api, role_api
-from src.registry.apis import registry_api
+from src.registry.apis import public_analytics_api, registry_api
 from src.website.apis import website_api
 
 DESCRIPTION = """
@@ -150,6 +150,10 @@ TAGS_METADATA = [
             "Профинансированные проекты по программам (ПҚ-60, ПҚ-400, «Кўмак», инкубация…): "
             "импорт Excel отдела, CRUD, итоги и разрезы (права registry.*)."
         ),
+    },
+    {
+        "name": "Аналитика: сайт",
+        "description": "Итоги и разрезы реестра профинансированных проектов для сайта — без токена.",
     },
     {"name": "Отзывы: сайт", "description": "Положительные отзывы пользователей сайта."},
     {
@@ -276,6 +280,7 @@ app.include_router(news_api.router, prefix=API_PREFIX)
 for website_router in website_api.ROUTERS:
     app.include_router(website_router, prefix=API_PREFIX)
 app.include_router(registry_api.router, prefix=API_PREFIX)
+app.include_router(public_analytics_api.router, prefix=API_PREFIX)
 app.include_router(verify_api.api_router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)
