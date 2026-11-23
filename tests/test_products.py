@@ -66,7 +66,8 @@ def test_fund_builds_and_publishes_product(api, fund, bank_pair, applicant):
     r = c.post(publish, headers=fund)
     assert r.status_code == 400
     assert r.json()["code"] == "product_not_ready"
-    assert [e["field"] for e in r.json()["errors"]] == ["bank_ids", "stages"]
+    # банки не обязательны — не хватает только этапов
+    assert [e["field"] for e in r.json()["errors"]] == ["stages"]
 
     c.patch(f"/api/v1/fund/products/{product['id']}", headers=fund, json={"bank_ids": [bank["id"]]})
     stage_body = {"number": 1, "translations": tr("Этап", "Bosqich", "Stage")}

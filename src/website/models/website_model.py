@@ -1,5 +1,5 @@
 """Контент сайта, который ведёт отдел маркетинга (роль MARKETING):
-события, разделы «О нас», карточки членов Совета и руководства.
+события, разделы «О нас», карточки членов Совета и руководства, контакты организации.
 
 Тексты — в таблицах переводов, по строке на язык (ru / uz / en).
 Карточки людей — это страница сайта, а не учётные записи пользователей:
@@ -9,7 +9,16 @@
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base, TimestampMixin
@@ -177,3 +186,28 @@ class PersonTranslationORM(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     person: Mapped["PersonORM"] = relationship(back_populates="translations")
+
+
+# ---------- контакты организации ----------
+
+
+class SiteContactORM(AuthorMixin, TimestampMixin, Base):
+    """Контакт организации на сайте: телефон и/или email (хотя бы одно)."""
+
+    __tablename__ = "site_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str | None] = mapped_column(String(20))
+    email: Mapped[str | None] = mapped_column(String(255))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    created_by: Mapped["UserORM | None"] = relationship(
+        foreign_keys="SiteContactORM.created_by_id", lazy="selectin"
+    )
+    updated_by: Mapped["UserORM | None"] = relationship(
+        foreign_keys="SiteContactORM.updated_by_id", lazy="selectin"
+    )
+
+    def __str__(self) -> str:
+        return self.phone or self.email or f"Contact #{self.id}"

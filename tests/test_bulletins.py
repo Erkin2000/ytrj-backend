@@ -556,3 +556,59 @@ def test_member_who_left_is_removed_and_completed_cannot_be_cancelled(
     # Завершённый бюллетень аннулировать нельзя.
     r = c.post(f"{url}/cancel", headers=fund_h, json={"reason": "TEST"})
     assert r.status_code == 400 and r.json()["code"] == "bulletin_status"
+
+
+# ---------- продукт без банка ----------
+
+
+def test_product_without_bank_completes_on_council_approval(
+    api, role_ids, applicant, council, photo_upload
+):
+    """Продукт без банков публикуется; заявитель банк не выбирает, «Согласен» всего
+    Совета сразу завершает заявку (COMPLETED), банк её не видит."""
+    c = api.client
+    fund_h, _ = api.staff(role_id=role_ids["FUND_OPERATOR"])
+    product = api.product(fund_h, [])
+    assert product["status"] == "PUBLISHED" and product["banks"] == []
+
+    r = c.post(
+        "/api/v1/applications",
+        headers=applicant,
+        json={"product_id": product["id"], "subject_type": "SELF_EMPLOYED"},
+    )
+    assert r.status_code == 201, r.text
+    app_id = data(r)["id"]
+    api.application_ids.append(app_id)
+
+    stage = product["stages"][0]
+    number, photo, _ = stage["fields"]
+    r = c.put(
+        f"/api/v1/applications/{app_id}/stages/{stage['id']}",
+        headers=applicant,
+        json={"values": {str(number["id"]): "10 000 000"}},
+    )
+    assert r.status_code == 200, r.text
+    r = c.post(
+        f"/api/v1/applications/{app_id}/fields/{photo['id']}/files",
+        headers=applicant,
+        files=photo_upload(),
+    )
+    assert r.status_code == 201, r.text
+
+    check = data(c.get(f"/api/v1/applications/{app_id}/submission-check", headers=applicant))
+    assert "bank_id" not in check["missing"], check
+    r = c.post(f"/api/v1/applications/{app_id}/submit", headers=applicant)
+    assert r.status_code == 200, r.text
+    assert status(api, app_id, applicant) == "FUND_REVIEW"
+
+    (a_h, a_me), (b_h, b_me) = council
+    bid = api.bulletin(fund_h, application_id=app_id)["id"]
+    keep_only(bid, app_id, {a_me["id"], b_me["id"]})
+    assert api.sign(a_h, bid, a_me["pinfl"], "AGREE").status_code == 200
+    assert status(api, app_id, applicant) == "COUNCIL_REVIEW"
+    assert api.sign(b_h, bid, b_me["pinfl"], "AGREE").status_code == 200
+
+    detail = data(c.get(f"/api/v1/applications/{app_id}", headers=applicant))
+    assert detail["status"] == "COMPLETED"
+    assert detail["bank"] is None
+    assert "SENT_TO_BANK" not in workflow.history_statuses(api, app_id, applicant)

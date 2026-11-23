@@ -5,7 +5,12 @@ from sqlalchemy import func, select
 from src.utils.base_rep.base_rep import BaseRepository
 from src.website.enums import PersonKind
 from src.website.mappers import WebsiteDataMapper, event_public
-from src.website.models.website_model import AboutSectionORM, EventORM, PersonORM
+from src.website.models.website_model import (
+    AboutSectionORM,
+    EventORM,
+    PersonORM,
+    SiteContactORM,
+)
 from src.website.schemas.website_schema import EventFilterDTO
 
 
@@ -84,4 +89,15 @@ class WebsiteRepository(BaseRepository):
             stmt = stmt.where(PersonORM.is_active.is_(True))
         if for_update:
             stmt = stmt.with_for_update()
+        return list((await self.session.scalars(stmt)).all())
+
+    # ---------- контакты ----------
+
+    async def get_contact(self, contact_id: int) -> SiteContactORM | None:
+        return await self._get(SiteContactORM, contact_id)
+
+    async def get_contacts(self, only_active: bool) -> list[SiteContactORM]:
+        stmt = select(SiteContactORM).order_by(SiteContactORM.sort_order, SiteContactORM.id)
+        if only_active:
+            stmt = stmt.where(SiteContactORM.is_active.is_(True))
         return list((await self.session.scalars(stmt)).all())

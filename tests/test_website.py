@@ -43,7 +43,12 @@ def person_form(name: str, **extra) -> dict:
 @pytest.fixture
 def marketing(api, role_ids):
     headers, _ = api.staff(role_id=role_ids["MARKETING"], full_name="TEST Marketing")
-    created = {"site_events": [], "site_about_sections": [], "site_people": []}
+    created = {
+        "site_events": [],
+        "site_about_sections": [],
+        "site_people": [],
+        "site_contacts": [],
+    }
     yield headers, created
 
     async def run(session):
@@ -340,3 +345,52 @@ def test_website_management_requires_permission(api, client, role_ids):
     )
     assert client.get("/api/v1/marketing/council-members", headers=only_council).status_code == 200
     assert client.get("/api/v1/marketing/leadership", headers=only_council).status_code == 403
+
+
+def test_contacts_crud(client, marketing):
+    headers, created = marketing
+    base = "/api/v1/marketing/contacts"
+
+    r = client.post(
+        base,
+        headers=headers,
+        json={"phone": "+998712000000", "email": "Info@Example.COM", "sort_order": 900001},
+    )
+    assert r.status_code == 201, r.text
+    first = data(r)
+    created["site_contacts"].append(first["id"])
+    assert first["email"] == "info@example.com" and first["is_active"] is True
+
+    # Можно несколько; телефон или email может отсутствовать
+    r = client.post(
+        base, headers=headers, json={"email": "press@example.com", "sort_order": 900002}
+    )
+    assert r.status_code == 201, r.text
+    second = data(r)
+    created["site_contacts"].append(second["id"])
+    assert second["phone"] is None
+
+    # Пустой контакт и неверный формат — 422
+    for body in ({}, {"phone": "12345"}, {"email": "not-an-email"}):
+        assert client.post(base, headers=headers, json=body).status_code == 422, body
+
+    # Сайт: без токена, только активные, по порядку
+    public = data(client.get("/api/v1/contacts"))
+    ids = [c["id"] for c in public]
+    assert ids.index(first["id"]) < ids.index(second["id"])
+    assert set(public[0]) == {"id", "phone", "email", "sort_order"}
+
+    # Изменение: убрать email можно, но не оба значения сразу
+    r = client.patch(f"{base}/{first['id']}", headers=headers, json={"email": None})
+    assert r.status_code == 200 and data(r)["email"] is None and data(r)["phone"]
+    r = client.patch(f"{base}/{first['id']}", headers=headers, json={"phone": None})
+    assert r.status_code == 400 and r.json()["code"] == "site_contact_empty", r.text
+
+    r = client.patch(f"{base}/{second['id']}", headers=headers, json={"is_active": False})
+    assert r.status_code == 200
+    assert second["id"] not in [c["id"] for c in data(client.get("/api/v1/contacts"))]
+    assert second["id"] in [c["id"] for c in data(client.get(base, headers=headers))]
+
+    assert client.delete(f"{base}/{second['id']}", headers=headers).status_code == 200
+    assert client.get(f"{base}/{second['id']}", headers=headers).status_code == 404
+    assert client.get(base).status_code == 401

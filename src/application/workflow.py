@@ -1,7 +1,8 @@
 """State machine заявки и индикатор прогресса для заявителя (ТЗ, п. 60-63).
 
 Порядок (решение заказчика от 2026-11-05, отличается от ТЗ 30.09.2026):
-скоринг KATM → Фонд → Совет → банк. Одобрение банком завершает заявку."""
+скоринг KATM → Фонд → Совет → банк. Одобрение банком завершает заявку.
+Если у продукта нет банков, заявку завершает утверждение Советом."""
 
 from src.application.enums import REJECTED_STATUSES
 from src.application.enums import ApplicationStatus as S
@@ -15,7 +16,8 @@ TRANSITIONS: dict[S, set[S]] = {
     S.FUND_REVIEW: {S.FUND_REJECTED, S.COUNCIL_REVIEW},
     # → FUND_REVIEW: бюллетень по заявке удалён или аннулирован до итогового решения.
     S.COUNCIL_REVIEW: {S.COUNCIL_APPROVED, S.COUNCIL_REJECTED, S.FUND_REVIEW},
-    S.COUNCIL_APPROVED: {S.SENT_TO_BANK},
+    # → COMPLETED: продукт без банков — утверждение Советом завершает заявку.
+    S.COUNCIL_APPROVED: {S.SENT_TO_BANK, S.COMPLETED},
     S.SENT_TO_BANK: {S.BANK_REVIEW},
     S.BANK_REVIEW: {S.BANK_APPROVED, S.BANK_REJECTED},
     S.BANK_APPROVED: {S.COMPLETED},

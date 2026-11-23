@@ -28,6 +28,7 @@ class Module(StrEnum):
     ABOUT = "about"
     COUNCIL_PROFILES = "council_profiles"
     LEADERSHIP = "leadership"
+    CONTACTS = "contacts"
 
 
 class Action(StrEnum):
@@ -55,6 +56,7 @@ MODULE_NAMES: dict[Module, str] = {
     Module.ABOUT: "Страница «О нас»",
     Module.COUNCIL_PROFILES: "Члены Совета на сайте",
     Module.LEADERSHIP: "Руководство на сайте",
+    Module.CONTACTS: "Контакты на сайте",
 }
 
 ACTION_NAMES: dict[Action, str] = {
@@ -133,6 +135,10 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "leadership.read": ("Просмотр руководства на сайте", "Все карточки, включая скрытые"),
     "leadership.update": ("Изменение руководства на сайте", "Данные, фото, место в списке"),
     "leadership.delete": ("Удаление руководства с сайта", "Удаление карточки с фото"),
+    "contacts.create": ("Добавление контактов на сайт", "Новый телефон и/или email организации"),
+    "contacts.read": ("Просмотр контактов сайта", "Все контакты, включая скрытые"),
+    "contacts.update": ("Изменение контактов сайта", "Телефон, email, порядок и показ на сайте"),
+    "contacts.delete": ("Удаление контактов с сайта", "Удаление контакта"),
 }
 
 
@@ -207,7 +213,7 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
     ),
     RoleCode.MARKETING: (
         "Маркетинг",
-        "Контент сайта: новости, события, FAQ, «О нас», члены Совета и руководство",
+        "Контент сайта: новости, события, FAQ, «О нас», члены Совета, руководство и контакты",
         False,
         [
             "faq.create",
@@ -234,6 +240,10 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "leadership.read",
             "leadership.update",
             "leadership.delete",
+            "contacts.create",
+            "contacts.read",
+            "contacts.update",
+            "contacts.delete",
         ],
     ),
     RoleCode.APPLICANT: (

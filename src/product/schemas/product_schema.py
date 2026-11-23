@@ -169,7 +169,10 @@ class ProductCreateDTO(BaseModel):
     )
     bank_ids: list[int] = Field(
         default_factory=list,
-        description="Банки, через которые работает продукт (из каталога банков).",
+        description=(
+            "Банки, через которые работает продукт (из каталога банков). "
+            "Пусто — продукт без банка: заявку завершает утверждение Советом."
+        ),
         examples=[[1, 2]],
     )
 

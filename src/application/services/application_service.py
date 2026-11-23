@@ -484,7 +484,9 @@ class ApplicationService(ApplicationBaseService):
             missing.append("product_id")
 
         bank = application.bank
-        if (
+        if product is not None and not product.banks and bank is None:
+            pass  # продукт без банков: заявку завершает решение Совета
+        elif (
             bank is None
             or not bank.is_active
             or product is None

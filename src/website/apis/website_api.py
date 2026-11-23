@@ -1,7 +1,7 @@
-"""Контент сайта: события, «О нас», члены Совета и руководство.
+"""Контент сайта: события, «О нас», члены Совета, руководство и контакты.
 
 Публичные ручки — без авторизации, для сайта; ручки `/marketing/...` — для отдела
-маркетинга (права events.*, about.*, council_profiles.*, leadership.*).
+маркетинга (права events.*, about.*, council_profiles.*, leadership.*, contacts.*).
 """
 
 from datetime import date
@@ -21,6 +21,8 @@ from src.common.responses.exceptions import (
     LeadershipProfileNotFoundException,
     PersonPhotoNotFoundException,
     PhotoTooLargeException,
+    SiteContactEmptyException,
+    SiteContactNotFoundException,
 )
 from src.common.responses.response import ResponseBuilder
 from src.common.swagger.responses import (
@@ -44,8 +46,15 @@ from src.website.schemas.website_schema import (
     EventUpdateDTO,
     PersonCreateForm,
     PersonUpdateDTO,
+    SiteContactCreateDTO,
+    SiteContactUpdateDTO,
 )
-from src.website.services.website_service import AboutService, EventService, PersonService
+from src.website.services.website_service import (
+    AboutService,
+    EventService,
+    PersonService,
+    SiteContactService,
+)
 
 AUDIT = {
     "created_by": {"id": 12, "full_name": "Marketing Operator", "username": "marketing1"},
@@ -376,6 +385,111 @@ async def delete_about(section_id: int, db: DBDep):
     return ResponseBuilder.success(message="About section deleted.")
 
 
+# ======================= контакты организации =======================
+
+CONTACT_PUBLIC = {
+    "id": 1,
+    "phone": "+998712000000",
+    "email": "info@yoshlarfondi.uz",
+    "sort_order": 0,
+}
+CONTACT = {**CONTACT_PUBLIC, "is_active": True, **AUDIT}
+CONTACT_NOT_FOUND = {404: error_examples(SiteContactNotFoundException)}
+
+contacts_public = APIRouter(prefix="/contacts", tags=["Контакты: сайт"])
+contacts = APIRouter(prefix="/marketing/contacts", tags=["Контакты: управление (маркетинг)"])
+
+
+@contacts_public.get(
+    "",
+    summary="Контакты организации (телефон, email) — активные, по порядку",
+    description="Без авторизации. Порядок — по `sort_order`, затем по `id`.",
+    responses={200: success_example([CONTACT_PUBLIC], "Contacts retrieved."), **PUBLIC_ERRORS},
+)
+async def get_public_contacts(db: DBDep):
+    data = await SiteContactService(db).get_public_list()
+    return ResponseBuilder.success(data=data, message="Contacts retrieved.")
+
+
+@contacts.get(
+    "",
+    summary="Все контакты, включая неактивные",
+    dependencies=[perm(Module.CONTACTS, Action.READ)],
+    responses={200: success_example([CONTACT], "Contacts retrieved."), **COMMON_ERRORS},
+)
+async def get_contacts(db: DBDep):
+    data = await SiteContactService(db).get_list()
+    return ResponseBuilder.success(data=data, message="Contacts retrieved.")
+
+
+@contacts.post(
+    "",
+    status_code=201,
+    summary="Добавить контакт: телефон и/или email",
+    description=(
+        "Телефон — +998XXXXXXXXX, email сохраняется в нижнем регистре. Нужно хотя бы одно из "
+        "двух, иначе 422."
+    ),
+    dependencies=[perm(Module.CONTACTS, Action.CREATE)],
+    responses={201: success_example(CONTACT, "Contact created."), **COMMON_ERRORS},
+)
+async def create_contact(data: SiteContactCreateDTO, db: DBDep, user: CurrentUserDep):
+    contact = await SiteContactService(db).create(user, data)
+    return ResponseBuilder.success(data=contact, message="Contact created.", status_code=201)
+
+
+@contacts.get(
+    "/{contact_id}",
+    summary="Контакт по ID",
+    dependencies=[perm(Module.CONTACTS, Action.READ)],
+    responses={
+        200: success_example(CONTACT, "Contact found."),
+        **COMMON_ERRORS,
+        **CONTACT_NOT_FOUND,
+    },
+)
+async def get_contact(contact_id: int, db: DBDep):
+    data = await SiteContactService(db).get_detail(contact_id)
+    return ResponseBuilder.success(data=data, message="Contact found.")
+
+
+@contacts.patch(
+    "/{contact_id}",
+    summary="Изменить телефон, email, порядок или активность контакта",
+    description=(
+        "Передаются только изменяемые поля; `null` убирает телефон или email. Если не останется "
+        "ни того, ни другого — 400 `site_contact_empty`."
+    ),
+    dependencies=[perm(Module.CONTACTS, Action.UPDATE)],
+    responses={
+        200: success_example(CONTACT, "Contact updated."),
+        **COMMON_ERRORS,
+        400: error_examples(SiteContactEmptyException),
+        **CONTACT_NOT_FOUND,
+    },
+)
+async def update_contact(
+    contact_id: int, data: SiteContactUpdateDTO, db: DBDep, user: CurrentUserDep
+):
+    contact = await SiteContactService(db).update(user, contact_id, data)
+    return ResponseBuilder.success(data=contact, message="Contact updated.")
+
+
+@contacts.delete(
+    "/{contact_id}",
+    summary="Удалить контакт",
+    dependencies=[perm(Module.CONTACTS, Action.DELETE)],
+    responses={
+        200: success_example(None, "Contact deleted."),
+        **COMMON_ERRORS,
+        **CONTACT_NOT_FOUND,
+    },
+)
+async def delete_contact(contact_id: int, db: DBDep):
+    await SiteContactService(db).delete(contact_id)
+    return ResponseBuilder.success(message="Contact deleted.")
+
+
 # ======================= члены Совета и руководство =======================
 
 SECTIONS = {
@@ -605,4 +719,6 @@ ROUTERS = [
     council,
     leadership_public,
     leadership,
+    contacts_public,
+    contacts,
 ]

@@ -179,9 +179,12 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
    (`[{"translations": [...], "sort_order": 0}, ...]`); позже варианты меняются отдельно:
    `POST /fund/products/{id}/fields/{field_id}/options`, `PATCH` / `DELETE /fund/products/{id}/options/{option_id}`.
    Смена типа между SELECT / RADIO / CHECKBOX сохраняет варианты, смена на другой тип удаляет их.
-4. `POST /fund/products/{id}/publish` → `PUBLISHED`: нужны активный банк, этап, хотя бы одно поле в каждом этапе и
-   не меньше двух вариантов у каждого поля с выбором (иначе 400 `product_not_ready` со списком `bank_ids`, `stages`,
+4. `POST /fund/products/{id}/publish` → `PUBLISHED`: нужны этап, хотя бы одно поле в каждом этапе,
+   не меньше двух вариантов у каждого поля с выбором и, если банки указаны, хотя бы один активный банк (иначе 400 `product_not_ready` со списком `bank_ids`, `stages`,
    `stages.<номер>.fields`, `stages.<номер>.fields.<id>.options`).
+   **Продукт без банков** (`bank_ids` пустой) тоже публикуется: заявитель банк не выбирает (`bank_id` не требуется
+   при отправке, `PUT .../bank` вернёт ошибку), а «Согласен» всего Совета сразу завершает заявку
+   (`COUNCIL_APPROVED → COMPLETED`, без банка). Маршрут решается по `bank_id` заявки на момент утверждения.
    `POST .../archive` → `ARCHIVED`: новые заявки не принимаются, черновики не отправляются; повторный `publish` возвращает продукт.
 
 Когда по продукту есть хотя бы одна заявка (включая черновики), этапы и поля менять нельзя (409 `product_locked`),
@@ -360,6 +363,17 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 - Члены Совета на сайте — только карточки страницы, они не связаны с пользователями роли `COUNCIL_MEMBER`.
   Фото — `MEDIA_PATH/site/people/<id>/`.
 
+### Контакты организации на сайте (маркетинг)
+
+Миграция `b1d3f5a7c9e2`; права `contacts.create/read/update/delete` — роли `MARKETING`.
+
+- Контактов может быть несколько. У каждого: `phone` (+998XXXXXXXXX) и/или `email` (хранится в нижнем регистре) —
+  хотя бы одно из двух, `sort_order`, `is_active`.
+- Сайт: `GET /api/v1/contacts` — без токена, только активные, по `sort_order`, затем `id`.
+- Маркетинг: `GET/POST /api/v1/marketing/contacts`, `GET/PATCH/DELETE /api/v1/marketing/contacts/{id}` (JSON).
+  Пустой контакт или неверный формат при создании — 422; если `PATCH` убирает и телефон, и email —
+  400 `site_contact_empty`.
+
 ## Режимы, пока нет интеграций
 
 - `SSO_MOCK=true` — вместо YIA Portal доступен `POST /api/v1/auth/sso/mock-login` (ПИНФЛ + ФИО, опционально `sub`).
@@ -375,7 +389,7 @@ SQLAdmin на Tabler UI, вход только для роли с `is_superuser`
 | Этап | Кто | Действие |
 |---|---|---|
 | `FUND_REVIEW` | Фонд | бюллетень с `application_id` (`POST /fund/bulletins`) или `POST /fund/applications/{id}/reject` (причина обязательна) |
-| `COUNCIL_REVIEW` | Совет | подпись бюллетеня каждым членом; все «Согласен» → `COUNCIL_APPROVED` и автоматически `SENT_TO_BANK`; аннулирование бюллетеня → обратно `FUND_REVIEW` |
+| `COUNCIL_REVIEW` | Совет | подпись бюллетеня каждым членом; все «Согласен» → `COUNCIL_APPROVED` и автоматически `SENT_TO_BANK` (продукт без банка — сразу `COMPLETED`); аннулирование бюллетеня → обратно `FUND_REVIEW` |
 | `SENT_TO_BANK` → `BANK_REVIEW` | банк | приём и решение; одобрение → `BANK_APPROVED` → сразу `COMPLETED` |
 
 Банк видит заявку только после утверждения Советом. Документ «Требование подтверждено» и выделение ресурсов больше не входят в процесс: таблицы `demand_documents` / `resource_allocations` и старые записи доступны в админке только для чтения. Статусы `READY_FOR_BANK`, `DEMAND_DOCUMENT_CREATED`, `RESOURCE_ALLOCATION` — устаревшие: новые заявки их не получают, значения оставлены ради истории. Миграция `f3b5d7e9a1c3` перевела незавершённые заявки в новый порядок (каждый перенос — событие `workflow_migrated` в истории).

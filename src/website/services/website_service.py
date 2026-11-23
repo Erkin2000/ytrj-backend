@@ -1,4 +1,4 @@
-"""Контент сайта: события, «О нас», члены Совета и руководство."""
+"""Контент сайта: события, «О нас», члены Совета и руководство, контакты."""
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -15,6 +15,8 @@ from src.common.responses.exceptions import (
     EventPhotoNotFoundException,
     LeadershipProfileNotFoundException,
     PersonPhotoNotFoundException,
+    SiteContactEmptyException,
+    SiteContactNotFoundException,
 )
 from src.product.services.product_service import apply_translations
 from src.utils.base_service import BaseService
@@ -22,6 +24,8 @@ from src.website.enums import PersonKind
 from src.website.mappers import (
     about_dto,
     about_public,
+    contact_dto,
+    contact_public,
     event_dto,
     event_public,
     person_dto,
@@ -34,6 +38,7 @@ from src.website.models.website_model import (
     EventTranslationORM,
     PersonORM,
     PersonTranslationORM,
+    SiteContactORM,
 )
 from src.website.schemas.website_schema import (
     AboutCreateDTO,
@@ -50,6 +55,10 @@ from src.website.schemas.website_schema import (
     PersonDTO,
     PersonPublicDTO,
     PersonUpdateDTO,
+    SiteContactCreateDTO,
+    SiteContactDTO,
+    SiteContactPublicDTO,
+    SiteContactUpdateDTO,
 )
 from src.website.storage import EventPhotoStorage, PersonPhotoStorage, SitePhotoStorage
 
@@ -240,6 +249,61 @@ class AboutService(BaseService):
         if section is None:
             raise AboutSectionNotFoundException()
         return section
+
+
+class SiteContactService(BaseService):
+    """Контакты организации на сайте: телефон и/или email, несколько записей."""
+
+    async def get_public_list(self) -> list[SiteContactPublicDTO]:
+        return [contact_public(c) for c in await self.db.website.get_contacts(only_active=True)]
+
+    async def get_list(self) -> list[SiteContactDTO]:
+        return [contact_dto(c) for c in await self.db.website.get_contacts(only_active=False)]
+
+    async def get_detail(self, contact_id: int) -> SiteContactDTO:
+        return contact_dto(await self._get(contact_id))
+
+    async def create(self, user: CurrentUserDTO, data: SiteContactCreateDTO) -> SiteContactDTO:
+        contact = SiteContactORM(
+            phone=data.phone,
+            email=data.email.lower() if data.email else None,
+            sort_order=data.sort_order,
+            is_active=data.is_active,
+            created_by_id=user.id,
+            updated_by_id=user.id,
+        )
+        self.db.session.add(contact)
+        await self.db.commit()
+        return await self.get_detail(contact.id)
+
+    async def update(
+        self, user: CurrentUserDTO, contact_id: int, data: SiteContactUpdateDTO
+    ) -> SiteContactDTO:
+        contact = await self._get(contact_id)
+        changes = data.model_fields_set
+        if "phone" in changes:
+            contact.phone = data.phone
+        if "email" in changes:
+            contact.email = data.email.lower() if data.email else None
+        if not contact.phone and not contact.email:
+            raise SiteContactEmptyException()
+        if data.sort_order is not None:
+            contact.sort_order = data.sort_order
+        if data.is_active is not None:
+            contact.is_active = data.is_active
+        contact.updated_by_id = user.id
+        await self.db.commit()
+        return await self.get_detail(contact_id)
+
+    async def delete(self, contact_id: int) -> None:
+        await self.db.session.delete(await self._get(contact_id))
+        await self.db.commit()
+
+    async def _get(self, contact_id: int) -> SiteContactORM:
+        contact = await self.db.website.get_contact(contact_id)
+        if contact is None:
+            raise SiteContactNotFoundException()
+        return contact
 
 
 NOT_FOUND = {

@@ -112,7 +112,8 @@ class CouncilService(ApplicationBaseService):
     ) -> None:
         """Правило итога (кворум/большинство ещё не согласованы — см. архитектуру):
         «Против» любого члена завершает заявку как COUNCIL_REJECTED;
-        «Согласен» всех назначенных — COUNCIL_APPROVED и отправка в банк заявителя."""
+        «Согласен» всех назначенных — COUNCIL_APPROVED и отправка в банк заявителя
+        (без банка — сразу COMPLETED)."""
         if decision == CouncilDecision.REJECTED:
             application.council_decided_at = now()
             application.council_reject_reason = reason or f"Совет: «Против» (бюллетень {source})"
@@ -138,5 +139,16 @@ class CouncilService(ApplicationBaseService):
             comment=f"Совет: «Согласен» (бюллетень {source})",
         )
 
-        # Утверждённая Советом заявка уходит в банк, выбранный заявителем.
+        # Утверждённая Советом заявка уходит в банк, выбранный заявителем;
+        # без банка (продукт без банков) утверждение Советом завершает заявку.
+        if application.bank_id is None:
+            application.completed_at = now()
+            await self.transition(
+                application,
+                ApplicationStatus.COMPLETED,
+                event="completed",
+                actor=None,
+                comment="Заявка утверждена Советом. Продукт без банка — процесс завершён",
+            )
+            return
         await self.route_to_chosen_bank(application)

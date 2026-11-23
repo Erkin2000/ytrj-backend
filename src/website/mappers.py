@@ -1,6 +1,11 @@
 from src.application.mappers import actor
 from src.website.enums import PersonKind
-from src.website.models.website_model import AboutSectionORM, EventORM, PersonORM
+from src.website.models.website_model import (
+    AboutSectionORM,
+    EventORM,
+    PersonORM,
+    SiteContactORM,
+)
 from src.website.schemas.website_schema import (
     AboutDTO,
     AboutPublicDTO,
@@ -10,6 +15,8 @@ from src.website.schemas.website_schema import (
     PersonPublicDTO,
     PersonTranslationOutDTO,
     PhotoDTO,
+    SiteContactDTO,
+    SiteContactPublicDTO,
     TitleTextOutDTO,
 )
 
@@ -108,6 +115,23 @@ def person_public(model: PersonORM) -> PersonPublicDTO:
 def person_dto(model: PersonORM) -> PersonDTO:
     return PersonDTO(
         **_person_fields(model, PERSON_PATHS[model.kind][1]),
+        is_active=model.is_active,
+        **_audit(model),
+    )
+
+
+def contact_public(model: SiteContactORM) -> SiteContactPublicDTO:
+    return SiteContactPublicDTO(
+        id=model.id, phone=model.phone, email=model.email, sort_order=model.sort_order
+    )
+
+
+def contact_dto(model: SiteContactORM) -> SiteContactDTO:
+    return SiteContactDTO(
+        id=model.id,
+        phone=model.phone,
+        email=model.email,
+        sort_order=model.sort_order,
         is_active=model.is_active,
         **_audit(model),
     )

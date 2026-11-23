@@ -374,6 +374,15 @@ class AboutSectionNotFoundException(NotFoundException):
     message = "About section not found"
 
 
+class SiteContactNotFoundException(NotFoundException):
+    message = "Contact not found"
+
+
+class SiteContactEmptyException(BadRequestException):
+    message = "Contact needs a phone or an email"
+    field = "phone"
+
+
 class CouncilProfileNotFoundException(NotFoundException):
     message = "Council member card not found"
 

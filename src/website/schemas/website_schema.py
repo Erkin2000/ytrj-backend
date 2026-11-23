@@ -2,7 +2,15 @@ import datetime as dt
 from typing import Annotated
 
 from fastapi import UploadFile
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from src.account.schemas.user_schema import PhoneStr
 from src.application.schemas.application_schema import ActorDTO
@@ -268,4 +276,49 @@ class PersonPublicDTO(BaseModel):
 
 
 class PersonDTO(AuditDTO, PersonPublicDTO):
+    is_active: bool
+
+
+# ---------- контакты организации ----------
+
+CONTACT_NOTE = "Нужно хотя бы одно из полей `phone` и `email`; `null` убирает значение."
+
+
+class SiteContactCreateDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    phone: PhoneStr | None = Field(default=None, description=PHONE_NOTE, examples=["+998712000000"])
+    email: EmailStr | None = Field(default=None, examples=["info@yoshlarfondi.uz"])
+    sort_order: int = Field(default=0, ge=0, description="Порядок на сайте: меньше — выше.")
+    is_active: bool = Field(
+        default=True, description="Неактивный контакт не показывается на сайте."
+    )
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.phone and not self.email:
+            raise ValueError("Нужен телефон или email")
+        return self
+
+
+class SiteContactUpdateDTO(BaseModel):
+    """Передаются только изменяемые поля. `null` в `phone` или `email` убирает значение,
+    но хотя бы одно должно остаться."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    phone: PhoneStr | None = Field(default=None, description=PHONE_NOTE)
+    email: EmailStr | None = None
+    sort_order: int | None = Field(default=None, ge=0)
+    is_active: bool | None = None
+
+
+class SiteContactPublicDTO(BaseModel):
+    id: int
+    phone: str | None = None
+    email: str | None = None
+    sort_order: int
+
+
+class SiteContactDTO(AuditDTO, SiteContactPublicDTO):
     is_active: bool

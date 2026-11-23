@@ -230,7 +230,9 @@ class ProductService(BaseService):
             raise ProductStatusException("Product is already published")
 
         missing: list[str] = []
-        if not any(bank.is_active for bank in product.banks):
+        # Банки не обязательны: продукт без банков завершается решением Совета.
+        # Но если банки указаны, хотя бы один должен быть активным.
+        if product.banks and not any(bank.is_active for bank in product.banks):
             missing.append("bank_ids")
         if not product.stages:
             missing.append("stages")
