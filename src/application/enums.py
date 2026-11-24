@@ -7,10 +7,11 @@ class SubjectType(StrEnum):
     YATT = "YATT"  # ИП (yakka tartibdagi tadbirkor)
     MCHJ = "MCHJ"  # ООО (mas'uliyati cheklangan jamiyat)
     SELF_EMPLOYED = "SELF_EMPLOYED"  # Самозанятый
+    COOPERATIVE = "COOPERATIVE"  # Кооператив (kooperativ)
 
 
-# Для ИП и ООО обязательно юридическое наименование.
-SUBJECT_TYPES_WITH_LEGAL_NAME = {SubjectType.YATT, SubjectType.MCHJ}
+# Для ИП, ООО и кооператива обязательно юридическое наименование.
+SUBJECT_TYPES_WITH_LEGAL_NAME = {SubjectType.YATT, SubjectType.MCHJ, SubjectType.COOPERATIVE}
 
 # Реквизиты предприятия (СТИР, руководитель) и учредители — только у ООО.
 # ИП и самозанятый действуют от своего имени: данные берутся из профиля заявителя.

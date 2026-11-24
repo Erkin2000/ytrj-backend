@@ -49,6 +49,7 @@ SUBJECT_LABELS: dict[str, str] = {
     "YATT": "ИП",
     "MCHJ": "ООО",
     "SELF_EMPLOYED": "Самозанятый",
+    "COOPERATIVE": "Кооператив",
 }
 
 PRODUCT_STATUS_LABELS: dict[str, tuple[str, str]] = {

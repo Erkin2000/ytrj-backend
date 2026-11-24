@@ -194,7 +194,7 @@ UZ: dict[str, str] = {
     "Банки для окна выбора (фильтр по типу субъекта)": (
         "Tanlash oynasi uchun banklar (subyekt turi boʻyicha filtr)"
     ),
-    "Тип субъекта: YATT, MCHJ, SELF_EMPLOYED": "Subyekt turi: YATT, MCHJ, SELF_EMPLOYED",
+    "Тип субъекта: YATT, MCHJ, SELF_EMPLOYED, COOPERATIVE": "Subyekt turi: YATT, MCHJ, SELF_EMPLOYED, COOPERATIVE",
     "АКБ «Микрокредитбанк»": "ATB «Mikrokreditbank»",
     "Добавление банка в каталог": "Katalogga bank qoʻshish",
     "Банк по ID": "ID boʻyicha bank",

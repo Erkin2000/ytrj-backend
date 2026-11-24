@@ -36,7 +36,7 @@ BANK_EXAMPLE = {
 async def get_banks(
     db: DBDep,
     subject_type: SubjectType | None = Query(
-        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED"
+        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED, COOPERATIVE"
     ),
     include_inactive: bool = Query(False),
 ):

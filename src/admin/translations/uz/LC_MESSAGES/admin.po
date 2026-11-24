@@ -722,6 +722,9 @@ msgstr "MChJ"
 msgid "Самозанятый"
 msgstr "Oʻzini oʻzi band qilgan"
 
+msgid "Кооператив"
+msgstr "Kooperativ"
+
 msgid "Одобрено"
 msgstr "Maʼqullangan"
 

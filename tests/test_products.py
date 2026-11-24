@@ -60,7 +60,7 @@ def test_fund_builds_and_publishes_product(api, fund, bank_pair, applicant):
     api.product_ids.append(product["id"])
     assert product["category"]["id"] == category["id"]
     assert product["status"] == "DRAFT" and product["stages"] == []
-    assert product["allowed_subject_types"] == ["YATT", "MCHJ", "SELF_EMPLOYED"]
+    assert product["allowed_subject_types"] == ["YATT", "MCHJ", "SELF_EMPLOYED", "COOPERATIVE"]
 
     publish = f"/api/v1/fund/products/{product['id']}/publish"
     r = c.post(publish, headers=fund)

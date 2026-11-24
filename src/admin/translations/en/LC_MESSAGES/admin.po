@@ -527,6 +527,9 @@ msgstr "LLC"
 msgid "Самозанятый"
 msgstr "Self-employed"
 
+msgid "Кооператив"
+msgstr "Cooperative"
+
 msgid "Одобрено"
 msgstr "Approved"
 

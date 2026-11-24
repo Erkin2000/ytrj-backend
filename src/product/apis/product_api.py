@@ -53,7 +53,7 @@ async def get_field_types():
 async def get_available_categories(
     db: DBDep,
     subject_type: SubjectType | None = Query(
-        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED"
+        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED, COOPERATIVE"
     ),
 ):
     data = await ProductService(db).get_available_categories(subject_type)
@@ -74,7 +74,7 @@ async def get_available_categories(
 async def get_available_products(
     db: DBDep,
     subject_type: SubjectType | None = Query(
-        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED"
+        None, description="Тип субъекта: YATT, MCHJ, SELF_EMPLOYED, COOPERATIVE"
     ),
     category_id: int | None = Query(None, description="Категория из `GET /products/categories`"),
 ):
