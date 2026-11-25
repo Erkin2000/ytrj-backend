@@ -5,6 +5,11 @@
 
 Первый аргумент — код программы (`GET /registry/programs`). Как и `POST /registry/import`,
 заменяет все ранее импортированные проекты программы.
+
+    uv run python -m src.registry.cli seed
+
+Заполняет сидом без персональных данных программы, в которых ещё нет проектов (идемпотентно;
+запускается `docker/entrypoint.sh` при каждом старте).
 """
 
 import argparse
@@ -15,6 +20,7 @@ from pathlib import Path
 import src.models  # noqa: F401  (регистрирует все ORM-модели)
 from src.common.responses.exceptions import ApiException
 from src.database import async_session_maker_null_pool
+from src.registry.seed import seed_empty_programs
 from src.registry.services.registry_service import RegistryImportService
 from src.utils.db_manager import DBManager
 
@@ -42,13 +48,28 @@ async def import_file(program_code: str, path: Path) -> None:
         print("  не распознаны банки:", ", ".join(result.unknown_banks))
 
 
+async def seed() -> None:
+    async with async_session_maker_null_pool() as session:
+        seeded = await seed_empty_programs(session)
+        await session.commit()
+    if seeded:
+        for code, count in seeded.items():
+            print(f"{code}: добавлено из сида {count}")
+    else:
+        print("Реестр не пуст — сид не нужен")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m src.registry.cli")
     sub = parser.add_subparsers(dest="command", required=True)
     cmd = sub.add_parser("import", help="загрузить Excel программы в реестр")
     cmd.add_argument("program", help="код программы: PQ60, PQ400, KOMAK, INCUBATION")
     cmd.add_argument("file", type=Path)
+    sub.add_parser("seed", help="заполнить пустые программы сидом без персональных данных")
     args = parser.parse_args()
+    if args.command == "seed":
+        asyncio.run(seed())
+        return
     if not args.file.is_file():
         sys.exit(f"Файл не найден: {args.file}")
     asyncio.run(import_file(args.program, args.file))
