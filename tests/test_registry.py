@@ -263,3 +263,39 @@ def test_public_analytics_without_token(client, superadmin, registry):
     assert r.status_code == 200
     assert pid not in [p["id"] for p in data(client.get(f"{base}/programs"))]
     assert data(client.get(f"{base}/summary?program_id={pid}"))["projects"] == 0
+
+
+def test_seed_fills_only_empty_programs(registry):
+    """Сид при старте: пустая программа заполняется, повторный запуск и непустые — не трогаются."""
+    from src.registry.seed import seed_empty_programs
+
+    code = registry["code"]
+    columns = ["number", "region", "sector", "requested_amount", "council_date", "status"]
+    seed = {
+        "columns": columns,
+        "programs": {
+            code: [
+                [1, "ANDIJAN", "SERVICES", "100000000", "2026-02-13", "CREDIT_ISSUED"],
+                [2, "KHOREZM", None, "50000000", None, "ALLOCATED"],
+            ],
+            "TEST_MISSING_PROGRAM": [[1, None, None, None, None, "IN_PROGRESS"]],
+        },
+    }
+
+    assert db_run(lambda s: seed_empty_programs(s, seed)) == {code: 2}
+    # Программа уже не пуста — второй запуск ничего не добавляет
+    assert db_run(lambda s: seed_empty_programs(s, seed)) == {}
+
+    rows = db_run(
+        lambda s: s.execute(
+            text(
+                "SELECT applicant_name, source::text, status::text, extra->>'seed' "
+                "FROM registry_projects WHERE program_id = :id ORDER BY number"
+            ),
+            {"id": registry["id"]},
+        )
+    ).all()
+    assert rows == [
+        (f"{code} №1", "IMPORT", "CREDIT_ISSUED", "2026-11-20"),
+        (f"{code} №2", "IMPORT", "ALLOCATED", "2026-11-20"),
+    ]

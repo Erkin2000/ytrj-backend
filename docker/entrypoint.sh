@@ -2,8 +2,9 @@
 # Entrypoint контейнера приложения:
 #   1) ждём PostgreSQL;
 #   2) alembic upgrade head (схема + сид: права, роли, банки);
-#   3) создаём суперпользователя SUPERUSER с паролем ADMIN_PASSWORD (идемпотентно);
-#   4) запускаем команду из CMD (uvicorn).
+#   3) реестр проектов: пустые программы заполняются сидом (идемпотентно);
+#   4) создаём суперпользователя SUPERUSER с паролем ADMIN_PASSWORD (идемпотентно);
+#   5) запускаем команду из CMD (uvicorn).
 set -eu
 
 : "${DB_HOST:=db}"
@@ -12,6 +13,7 @@ set -eu
 : "${ADMIN_PASSWORD:=admin12345}"
 : "${RUN_MIGRATIONS:=true}"
 : "${CREATE_SUPERUSER:=true}"
+: "${SEED_REGISTRY:=true}"
 export DB_HOST DB_PORT SUPERUSER ADMIN_PASSWORD
 
 echo "[entrypoint] waiting for PostgreSQL at ${DB_HOST}:${DB_PORT} ..."
@@ -39,6 +41,11 @@ done
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[entrypoint] alembic upgrade head"
     alembic upgrade head
+fi
+
+if [ "$SEED_REGISTRY" = "true" ]; then
+    echo "[entrypoint] registry seed (only programs without projects)"
+    python -m src.registry.cli seed
 fi
 
 if [ "$CREATE_SUPERUSER" = "true" ]; then
