@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from scalar_fastapi import OpenAPISource, get_scalar_api_reference
 
 from src.account.apis import user_api
+from src.act.apis import contract_api, fund_act_api, my_act_api
+from src.act.apis import verify_api as act_verify_api
 from src.admin.admin import setup_admin
 from src.application.apis import (
     admin_application_api,
@@ -49,6 +51,7 @@ Backend платформы финансирования **Jamg'arma** (YTRJ-EP).
 - **faq** — вопросы и ответы для сайта; ведёт отдел маркетинга (роль MARKETING).
 - **news** — новости сайта с фото: публикация сразу или в выбранное время; ведёт маркетинг.
 - **website** — события, «О нас», члены Совета, руководство, контакты (телефон, email) и отзывы на сайте; ведёт маркетинг.
+- **act** — договоры исполнителей и акты выполненных работ: подпись E-IMZO исполнителя и руководителя, проверка по QR.
 
 Все ответы имеют единый формат `{"success": bool, "message": str, "data": ...}`.
 Авторизация: заголовок `Authorization: Bearer <access_token>`.
@@ -282,11 +285,17 @@ for website_router in website_api.ROUTERS:
 app.include_router(registry_api.router, prefix=API_PREFIX)
 app.include_router(public_analytics_api.router, prefix=API_PREFIX)
 app.include_router(verify_api.api_router, prefix=API_PREFIX)
+app.include_router(contract_api.router, prefix=API_PREFIX)
+app.include_router(contract_api.my_router, prefix=API_PREFIX)
+app.include_router(my_act_api.router, prefix=API_PREFIX)
+app.include_router(fund_act_api.router, prefix=API_PREFIX)
+app.include_router(act_verify_api.api_router, prefix=API_PREFIX)
 
 # Веб-страницы входа через YIA Portal (вне /api/v1, без OpenAPI)
 app.include_router(sso_web_api.router)
 # Страница проверки бюллетеня по QR (вне /api/v1, без OpenAPI)
 app.include_router(verify_api.web_router)
+app.include_router(act_verify_api.web_router)
 
 setup_admin(app)
 

@@ -94,6 +94,16 @@ class Settings(BaseSettings):
     EIMZO_CLIENT_SECRET: str = ""
     EIMZO_TIMEOUT_SECONDS: float = 10.0
 
+    # ---------- акты выполненных работ (dalolatnoma) ----------
+    # Адрес страницы проверки акта по QR: <ACT_VERIFY_BASE_URL>/<public_id>
+    # (встроенная страница backend: GET /acts/verify/{public_id}).
+    ACT_VERIFY_BASE_URL: str = "https://api.yoshlarfondi.uz/acts/verify"
+    # Заказчик в тексте акта и город составления.
+    ACT_CUSTOMER_NAME: str = "Yoshlar tadbirkorligini rivojlantirish davlat maqsadli jamg‘armasi"
+    ACT_CITY: str = "Toshkent shahri"
+    ACT_MAX_ATTACHMENTS: int = 30
+    ACT_MAX_ITEMS: int = 60
+
     # ---------- бюллетени Совета ----------
     # Адрес страницы проверки, на который ведёт QR-код: <BULLETIN_VERIFY_BASE_URL>/<public_id>.
     # По умолчанию — встроенная страница backend (GET /bulletins/verify/{public_id}).

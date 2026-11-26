@@ -32,6 +32,10 @@ class Module(StrEnum):
     CONTACTS = "contacts"
     TESTIMONIALS = "testimonials"
     REGISTRY = "registry"
+    CONTRACTS = "contracts"
+    ACTS = "acts"
+    ACT_REVIEW = "act_review"
+    ACT_SIGNING = "act_signing"
 
 
 class Action(StrEnum):
@@ -63,6 +67,10 @@ MODULE_NAMES: dict[Module, str] = {
     Module.CONTACTS: "Контакты на сайте",
     Module.TESTIMONIALS: "Отзывы на сайте",
     Module.REGISTRY: "Реестр проектов и аналитика",
+    Module.CONTRACTS: "Договоры исполнителей",
+    Module.ACTS: "Мои акты выполненных работ",
+    Module.ACT_REVIEW: "Проверка актов выполненных работ",
+    Module.ACT_SIGNING: "Подписание актов руководителем",
 }
 
 ACTION_NAMES: dict[Action, str] = {
@@ -162,6 +170,23 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
         "Импорт Excel в реестр",
         "Загрузка файла отдела с заменой данных программы",
     ),
+    "contracts.create": ("Создание договоров", "Новый договор с исполнителем"),
+    "contracts.read": ("Просмотр договоров", "Все договоры исполнителей"),
+    "contracts.update": ("Изменение договоров", "Данные, срок, руководитель, закрытие договора"),
+    "contracts.delete": ("Удаление договоров", "Удаление договора без актов"),
+    "acts.create": ("Составление своих актов", "Новый акт по своему договору"),
+    "acts.read": ("Просмотр своих актов", "Свои договоры и акты"),
+    "acts.update": ("Изменение своих актов", "Строки, приложение, подпись и отправка"),
+    "acts.delete": ("Удаление своих черновиков актов", "Удаление неотправленного акта"),
+    "act_review.read": ("Просмотр актов исполнителей", "Все акты и их история"),
+    "act_review.approve": (
+        "Проверка актов исполнителей",
+        "Принятие, возврат на доработку и аннулирование акта",
+    ),
+    "act_signing.approve": (
+        "Подписание актов руководителем",
+        "Подпись E-IMZO актов по договорам, где он руководитель",
+    ),
 }
 
 
@@ -171,6 +196,7 @@ class RoleCode(StrEnum):
     BANK_EMPLOYEE = "BANK_EMPLOYEE"
     COUNCIL_MEMBER = "COUNCIL_MEMBER"
     MARKETING = "MARKETING"
+    CONTRACTOR = "CONTRACTOR"
     APPLICANT = "APPLICANT"
 
 
@@ -214,6 +240,14 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "registry.update",
             "registry.delete",
             "registry.approve",
+            "contracts.create",
+            "contracts.read",
+            "contracts.update",
+            "contracts.delete",
+            "act_review.read",
+            "act_review.approve",
+            # Потолок роли: лично выдаётся только руководителю, который подписывает акты.
+            "act_signing.approve",
         ],
     ),
     RoleCode.BANK_EMPLOYEE: (
@@ -275,6 +309,17 @@ ROLE_PRESETS: dict[str, tuple[str, str, bool, list[str]]] = {
             "testimonials.read",
             "testimonials.update",
             "testimonials.delete",
+        ],
+    ),
+    RoleCode.CONTRACTOR: (
+        "Исполнитель",
+        "Исполнитель по договору: свои договоры и акты выполненных работ",
+        False,
+        [
+            "acts.create",
+            "acts.read",
+            "acts.update",
+            "acts.delete",
         ],
     ),
     RoleCode.APPLICANT: (

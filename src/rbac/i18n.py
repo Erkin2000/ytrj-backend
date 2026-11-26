@@ -352,6 +352,59 @@ PERMISSION_I18N: dict[str, dict[str, tuple[str, str]]] = {
         "uz": ("Fikrlarni saytdan oʻchirish", "Fikrni rasmi bilan oʻchirish"),
         "en": ("Delete testimonials from the website", "Delete a testimonial with its photo"),
     },
+    "contracts.create": {
+        "uz": ("Shartnomalarni yaratish", "Ijrochi bilan yangi shartnoma"),
+        "en": ("Create contracts", "New contract with a contractor"),
+    },
+    "contracts.read": {
+        "uz": ("Shartnomalarni koʻrish", "Ijrochilarning barcha shartnomalari"),
+        "en": ("View contracts", "All contractor contracts"),
+    },
+    "contracts.update": {
+        "uz": ("Shartnomalarni oʻzgartirish", "Maʼlumotlar, muddat, rahbar, shartnomani yopish"),
+        "en": ("Edit contracts", "Data, term, approver, closing the contract"),
+    },
+    "contracts.delete": {
+        "uz": ("Shartnomalarni oʻchirish", "Dalolatnomasi yoʻq shartnomani oʻchirish"),
+        "en": ("Delete contracts", "Delete a contract without reports"),
+    },
+    "acts.create": {
+        "uz": ("Oʻz dalolatnomalarini tuzish", "Oʻz shartnomasi boʻyicha yangi dalolatnoma"),
+        "en": ("Draft own reports", "New report under own contract"),
+    },
+    "acts.read": {
+        "uz": ("Oʻz dalolatnomalarini koʻrish", "Oʻz shartnomalari va dalolatnomalari"),
+        "en": ("View own reports", "Own contracts and reports"),
+    },
+    "acts.update": {
+        "uz": ("Oʻz dalolatnomalarini oʻzgartirish", "Qatorlar, ilova, imzolash va yuborish"),
+        "en": ("Edit own reports", "Rows, appendix, signing and submitting"),
+    },
+    "acts.delete": {
+        "uz": ("Oʻz qoralamalarini oʻchirish", "Yuborilmagan dalolatnomani oʻchirish"),
+        "en": ("Delete own drafts", "Delete a report that was not submitted"),
+    },
+    "act_review.read": {
+        "uz": ("Ijrochilar dalolatnomalarini koʻrish", "Barcha dalolatnomalar va tarixi"),
+        "en": ("View contractor reports", "All reports and their history"),
+    },
+    "act_review.approve": {
+        "uz": (
+            "Ijrochilar dalolatnomalarini tekshirish",
+            "Qabul qilish, qayta ishlashga qaytarish va bekor qilish",
+        ),
+        "en": ("Review contractor reports", "Accept, return for changes and cancel"),
+    },
+    "act_signing.approve": {
+        "uz": (
+            "Dalolatnomalarni rahbar sifatida imzolash",
+            "U rahbar boʻlgan shartnomalar dalolatnomalarini E-IMZO bilan imzolash",
+        ),
+        "en": (
+            "Sign reports as approver",
+            "E-IMZO signature of reports under contracts where they are the approver",
+        ),
+    },
 }
 
 MODULE_I18N: dict[str, dict[str, str]] = {
@@ -381,6 +434,10 @@ MODULE_I18N: dict[str, dict[str, str]] = {
     Module.CONTACTS: {"uz": "Saytdagi kontaktlar", "en": "Contacts on the website"},
     Module.TESTIMONIALS: {"uz": "Saytdagi fikrlar", "en": "Testimonials on the website"},
     Module.REGISTRY: {"uz": "Loyihalar reestri va tahlil", "en": "Project registry and analytics"},
+    Module.CONTRACTS: {"uz": "Ijrochilar shartnomalari", "en": "Contractor contracts"},
+    Module.ACTS: {"uz": "Mening dalolatnomalarim", "en": "My work reports"},
+    Module.ACT_REVIEW: {"uz": "Dalolatnomalarni tekshirish", "en": "Work report review"},
+    Module.ACT_SIGNING: {"uz": "Dalolatnomalarni rahbar imzolashi", "en": "Approver signing"},
 }
 
 ACTION_I18N: dict[str, dict[str, str]] = {
@@ -426,6 +483,10 @@ ROLE_I18N: dict[str, dict[str, tuple[str, str]]] = {
             "Website content: news, events, FAQ, «About us», Council members, leadership, "
             "contacts and testimonials",
         ),
+    },
+    "CONTRACTOR": {
+        "uz": ("Ijrochi", "Shartnoma boʻyicha ijrochi: oʻz shartnomalari va dalolatnomalari"),
+        "en": ("Contractor", "Contractor under a contract: own contracts and work reports"),
     },
     "APPLICANT": {
         "uz": ("Ariza beruvchi", "Faqat oʻz profili va oʻz arizalari"),

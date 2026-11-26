@@ -20,6 +20,10 @@ REQUIRED_FIELD_MESSAGES: dict[str, str] = {
     "date_of_birth": "Date of birth is required",
     "bank_ids": "Add at least one active bank",
     "stages": "Add at least one stage",
+    "items": "Add at least one row of completed work",
+    "intro": "Describe the services under the contract",
+    "contract": "The contract must be active",
+    "contractor.pinfl": "The contractor has no PINFL: ask the Fund to add it",
 }
 
 
@@ -681,3 +685,95 @@ class BulletinDeadlinePassedException(BadRequestException):
 
 class BulletinNotOpenForSigningException(BadRequestException):
     message = "The bulletin is not open for signing"
+
+
+# ---------- договоры и акты выполненных работ ----------
+
+
+class ContractNotFoundException(NotFoundException):
+    message = "Contract not found"
+
+
+class ContractNumberTakenException(ConflictException):
+    message = "A contract with this number already exists"
+    field = "number"
+
+
+class ContractInUseException(ConflictException):
+    message = "The contract has reports: close it instead of deleting"
+
+
+class ContractDatesException(BadRequestException):
+    message = "The contract end date must not be earlier than its start date"
+    field = "end_date"
+
+
+class ContractContractorException(BadRequestException):
+    message = "The contractor must be an active user with the Contractor role and a PINFL"
+    field = "contractor_id"
+
+
+class ContractApproverException(BadRequestException):
+    message = (
+        "The approver must be an active staff user with the act_signing.approve permission "
+        "and a PINFL"
+    )
+    field = "approver_id"
+
+
+class ContractClosedException(BadRequestException):
+    message = "The contract is closed: new reports cannot be drafted or submitted"
+    field = "contract_id"
+
+
+class ActNotFoundException(NotFoundException):
+    message = "Work report not found"
+
+
+class ActAttachmentNotFoundException(NotFoundException):
+    message = "Appendix file not found"
+
+
+class ActPdfNotFoundException(NotFoundException):
+    message = "The signed report PDF is missing"
+
+
+class ActNotEditableException(BadRequestException):
+    message = "Only a draft or a returned report can be changed"
+
+
+class ActStatusException(BadRequestException):
+    message = "This action is not available in the current report status"
+
+
+class ActPeriodException(BadRequestException):
+    message = "The report period must be inside the contract term and must not end before it starts"
+    field = "period_from"
+
+
+class ActPeriodOverlapException(ConflictException):
+    message = "Another report under this contract already covers part of this period"
+    field = "period_from"
+
+
+class ActLimitException(BadRequestException):
+    message = "Too many rows or appendix files in the report"
+
+
+class ActNotReadyException(BadRequestException):
+    """Отправка невозможна: `missing` — чего не хватает (список полей)."""
+
+    message = "The report is not ready to be submitted"
+    example_missing = ["items"]
+
+    def __init__(self, missing: list[str] | None = None, message: str | None = None):
+        self.missing = missing or []
+        super().__init__(message)
+
+
+class ActNotApproverException(ForbiddenException):
+    message = "Only the approver named in the contract can sign this report"
+
+
+class ActContentChangedException(ConflictException):
+    message = "The report content no longer matches what the contractor signed"
