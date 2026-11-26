@@ -4,6 +4,14 @@
 
 from src.account.models.user_model import UserORM
 from src.account.models.user_permission_model import UserPermissionORM
+from src.act.models.act_model import (
+    ActAttachmentORM,
+    ActEventORM,
+    ActItemORM,
+    ActORM,
+    ActSignatureORM,
+    ContractORM,
+)
 from src.application.models.answer_model import ApplicationFieldFileORM, ApplicationFieldValueORM
 from src.application.models.application_model import ApplicationORM
 from src.application.models.bank_model import BankORM
@@ -48,6 +56,12 @@ from src.website.models.website_model import (
 )
 
 __all__ = [
+    "ActAttachmentORM",
+    "ActEventORM",
+    "ActItemORM",
+    "ActORM",
+    "ActSignatureORM",
+    "ContractORM",
     "UserORM",
     "UserPermissionORM",
     "ApplicationORM",

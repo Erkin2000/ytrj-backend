@@ -1,4 +1,5 @@
 from src.account.repositories.user_rep import UserRepository
+from src.act.repositories.act_rep import ActRepository, ContractRepository
 from src.application.repositories.application_rep import ApplicationRepository
 from src.application.repositories.bank_rep import BankRepository
 from src.application.repositories.council_assignment_rep import CouncilAssignmentRepository
@@ -44,6 +45,8 @@ class DBManager:
         self.news = NewsRepository(self.session)
         self.website = WebsiteRepository(self.session)
         self.registry = RegistryRepository(self.session)
+        self.contract = ContractRepository(self.session)
+        self.act = ActRepository(self.session)
 
         return self
 
